@@ -1,10 +1,11 @@
 package com.hack.kidhack.feature.parent
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -34,7 +36,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
-import com.hack.kidhack.core.designsystem.component.BrandGradientHeader
+import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
@@ -54,7 +56,8 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 data class ParentChatUiState(
-    val room: ChatRoom? = null,
+    val rooms: List<ChatRoom> = emptyList(),
+    val selectedRoom: ChatRoom? = null,
     val messages: List<ChatMessage> = emptyList(),
     val draft: String = "",
     val loading: Boolean = true,
@@ -72,27 +75,44 @@ class ParentChatViewModel(
     private var observeJob: Job? = null
 
     init {
-        viewModelScope.launch {
-            selectedChildRepository.selectedChildId.collect { load() }
-        }
-        load()
+        loadRooms()
     }
 
     fun onDraft(v: String) = _state.update { it.copy(draft = v) }
 
-    fun load() {
+    fun loadRooms() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
-                val children = childRepository.children()
-                val childId = selectedChildRepository.resolveId(children)
-                val child = children.find { it.id == childId }
                 val rooms = chatRepository.rooms()
-                val room = rooms.find { it.title == child?.name } ?: rooms.firstOrNull()
-                val messages = room?.let { chatRepository.messages(it.id) }.orEmpty()
-                _state.update { it.copy(loading = false, room = room, messages = messages) }
-                observe(room?.id)
-                room?.let { chatRepository.markRead(it.id, messages.lastOrNull()?.id) }
+                _state.update { it.copy(loading = false, rooms = rooms, selectedRoom = null) }
+            }.onFailure { t ->
+                _state.update { it.copy(loading = false, error = t.message) }
+            }
+        }
+    }
+
+    fun selectRoom(room: ChatRoom?) {
+        observeJob?.cancel()
+        if (room == null) {
+            _state.update { it.copy(selectedRoom = null, messages = emptyList()) }
+            loadRooms() // 목록으로 돌아올 때 마지막 메시지 등 최신 정보 반영
+            return
+        }
+
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null, selectedRoom = room) }
+            runCatching {
+                // 자녀 전환 동기화
+                val children = childRepository.children()
+                children.find { it.name == room.title }?.let {
+                    selectedChildRepository.select(it.id)
+                }
+
+                val messages = chatRepository.messages(room.id)
+                _state.update { it.copy(loading = false, messages = messages) }
+                observe(room.id)
+                chatRepository.markRead(room.id, messages.lastOrNull()?.id)
             }.onFailure { t ->
                 _state.update { it.copy(loading = false, error = t.message) }
             }
@@ -101,7 +121,7 @@ class ParentChatViewModel(
 
     fun send() {
         val text = _state.value.draft.trim()
-        val room = _state.value.room ?: return
+        val room = _state.value.selectedRoom ?: return
         if (text.isBlank()) return
         _state.update { it.copy(draft = "") }
         viewModelScope.launch {
@@ -112,7 +132,6 @@ class ParentChatViewModel(
     }
 
     private fun observe(roomId: String?) {
-        observeJob?.cancel()
         if (roomId == null) return
         observeJob = viewModelScope.launch {
             chatRepository.observeMessages(roomId).collect { append(it) }
@@ -122,12 +141,7 @@ class ParentChatViewModel(
     private fun append(msg: ChatMessage) {
         _state.update { s ->
             if (s.messages.any { it.id == msg.id }) return@update s
-            val last = s.messages.lastOrNull()
-            if (last != null && last.id.startsWith("local-") && last.text == msg.text && last.fromRole == msg.fromRole) {
-                s.copy(messages = s.messages.dropLast(1) + msg)
-            } else {
-                s.copy(messages = s.messages + msg)
-            }
+            s.copy(messages = s.messages + msg)
         }
     }
 }
@@ -137,103 +151,149 @@ fun ParentChatScreen(viewModel: ParentChatViewModel = koinViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
     val listState = rememberLazyListState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val selectedRoom = state.selectedRoom
+
     LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.scrollToItem(state.messages.lastIndex)
+        if (state.messages.isNotEmpty()) {
+            listState.animateScrollToItem(state.messages.lastIndex)
+        }
     }
 
-    Column(Modifier.fillMaxSize().background(colors.surface).imePadding()) {
-        BrandGradientHeader {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center,
-                ) { Text("👦", fontSize = 20.sp) }
-                Spacer(Modifier.size(12.dp))
-                Column {
-                    Text(state.room?.title ?: "", color = Color.White, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 16.sp)
-                    Text(
-                        if (state.room?.online == true) stringResource(R.string.parent_chat_online) else stringResource(R.string.parent_chat_offline),
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 12.sp,
-                    )
+    LaunchedEffect(state.error) {
+        state.error?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    ParentScreenScaffold(
+        header = {
+            if (selectedRoom == null) {
+                ParentHeaderBar(title = stringResource(R.string.parent_chat_title))
+            } else {
+                ParentHeaderBar(
+                    title = selectedRoom.title,
+                    onBack = { viewModel.selectRoom(null) }
+                )
+            }
+        },
+        scrollable = false,
+        contentPadding = PaddingValues(0.dp),
+        modifier = Modifier.imePadding()
+    ) {
+        if (selectedRoom == null) {
+            // 채팅방 목록 화면
+            if (state.loading && state.rooms.isEmpty()) {
+                ParentLoadingOrError(true, state.error, viewModel::loadRooms)
+            } else if (state.rooms.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.parent_chat_empty_rooms), color = colors.muted)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(state.rooms) { room ->
+                        KidCard(Modifier.clickable { viewModel.selectRoom(room) }) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    Modifier.size(48.dp).clip(CircleShape).background(colors.surface),
+                                    contentAlignment = Alignment.Center
+                                ) { Text("👦", fontSize = 24.sp) }
+                                Spacer(Modifier.width(16.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(room.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 16.sp, color = colors.text)
+                                    Text(room.lastMessage, color = colors.muted, fontSize = 13.sp, maxLines = 1)
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(room.lastAt, color = colors.muted, fontSize = 11.sp)
+                                    if (room.online) {
+                                        Text(stringResource(R.string.parent_chat_online), color = colors.safe, fontSize = 10.sp, fontWeight = FontBold)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        }
-        if (state.loading && state.messages.isEmpty()) {
-            ParentLoadingOrError(true, state.error, viewModel::load)
-        }
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(state.messages, key = { it.id }) { m ->
-                val mine = m.fromRole == Role.PARENT
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
-                    Column(
+        } else {
+            // 채팅 상세 화면
+            Column(Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(state.messages, key = { it.id }) { m ->
+                        val mine = m.fromRole == Role.PARENT
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.7f)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (mine) colors.brand else Color.White)
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                            ) {
+                                Text(
+                                    m.text,
+                                    color = if (mine) Color.White else colors.text,
+                                    fontFamily = KidhackFontFamily,
+                                    fontWeight = FontSemibold,
+                                    fontSize = 14.sp,
+                                )
+                                Text(
+                                    m.sentAt,
+                                    color = if (mine) Color.White.copy(alpha = 0.7f) else colors.muted,
+                                    fontSize = 11.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    BasicTextField(
+                        value = state.draft,
+                        onValueChange = viewModel::onDraft,
                         modifier = Modifier
-                            .fillMaxWidth(0.7f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (mine) colors.brand else Color.White)
-                            .then(if (!mine) Modifier.background(Color.White) else Modifier)
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colors.surface)
                             .padding(horizontal = 16.dp, vertical = 10.dp),
-                    ) {
-                        Text(
-                            m.text,
-                            color = if (mine) Color.White else colors.text,
+                        textStyle = androidx.compose.ui.text.TextStyle(
                             fontFamily = KidhackFontFamily,
                             fontWeight = FontSemibold,
                             fontSize = 14.sp,
-                        )
-                        Text(
-                            m.sentAt,
-                            color = if (mine) Color.White.copy(alpha = 0.7f) else colors.muted,
-                            fontSize = 11.sp,
-                        )
+                            color = colors.text,
+                        ),
+                        decorationBox = { inner ->
+                            Box {
+                                if (state.draft.isEmpty()) {
+                                    Text(stringResource(R.string.parent_chat_input_hint), color = colors.muted, fontSize = 14.sp)
+                                }
+                                inner()
+                            }
+                        },
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colors.brand)
+                            .clickable(onClick = viewModel::send),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(stringResource(R.string.parent_chat_send), color = Color.White, fontWeight = FontBold)
                     }
                 }
-            }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            BasicTextField(
-                value = state.draft,
-                onValueChange = viewModel::onDraft,
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(colors.surface)
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontSemibold,
-                    fontSize = 14.sp,
-                    color = colors.text,
-                ),
-                decorationBox = { inner ->
-                    Box {
-                        if (state.draft.isEmpty()) {
-                            Text(stringResource(R.string.parent_chat_input_hint), color = colors.muted, fontSize = 14.sp)
-                        }
-                        inner()
-                    }
-                },
-            )
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(colors.brand)
-                    .clickable(onClick = viewModel::send),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(stringResource(R.string.parent_chat_send), color = Color.White, fontWeight = FontBold)
             }
         }
     }

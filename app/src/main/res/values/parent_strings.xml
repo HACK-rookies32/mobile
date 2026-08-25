@@ -9,6 +9,8 @@
     <string name="parent_dashboard_stat_blocked">차단된 앱</string>
     <string name="parent_dashboard_stat_alerts">위험 알림</string>
     <string name="parent_dashboard_blocked_count">12개</string>
+    <string name="parent_dashboard_empty_child">아직 연결된 자녀가 없어요</string>
+    <string name="parent_dashboard_empty_pair_action">자녀 기기 연결하기</string>
     <string name="parent_dashboard_usage_title">오늘 앱 사용 현황</string>
     <string name="parent_dashboard_see_all">전체 보기</string>
     <string name="parent_dashboard_recent">최근 알림</string>
@@ -19,7 +21,9 @@
     <string name="parent_map_placeholder">지도 영역</string>
     <string name="parent_location_current">현재 위치</string>
     <string name="parent_location_live">실시간</string>
+    <string name="parent_location_recent">최근 위치</string>
     <string name="parent_location_route">오늘 이동 경로</string>
+    <string name="parent_location_empty_history">아직 기록된 이동 경로가 없어요</string>
     <string name="parent_geofence_manage">지정 장소 관리</string>
 
     <string name="parent_geofence_title">지정 장소 관리</string>
@@ -33,10 +37,13 @@
     <string name="parent_geofence_delete">삭제</string>
     <string name="parent_geofence_radius_unit">%1$dm</string>
 
+    <string name="parent_chat_title">채팅</string>
     <string name="parent_chat_input_hint">메시지 입력...</string>
     <string name="parent_chat_send">→</string>
     <string name="parent_chat_online">● 온라인</string>
     <string name="parent_chat_offline">오프라인</string>
+    <string name="parent_chat_empty_rooms">아직 채팅방이 없어요</string>
+    <string name="parent_chat_send_error">메시지 전송에 실패했어요</string>
 
     <string name="parent_notifications_title">알림 수신</string>
     <string name="parent_notifications_section">알림 설정</string>

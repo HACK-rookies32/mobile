@@ -65,6 +65,8 @@ object FakeData {
     )
 
     val children = listOf(minjun, jia)
+    // 자녀 없을 때 테스트 (empty)
+    //val children = emptyList<ChildProfile>()
 
     val usages = listOf(
         AppUsage("YouTube", 80 * 60, "동영상"),
