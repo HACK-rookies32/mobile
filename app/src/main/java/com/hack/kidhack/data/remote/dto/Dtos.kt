@@ -293,3 +293,80 @@ data class CreateInquiryRequest(
     val imageUrls: List<String>? = null,
     val links: List<String>? = null,
 )
+
+@Serializable
+data class ChargePrepareRequest(val amount: Int, val method: String)
+
+@Serializable
+data class ChargePrepareResponse(
+    val chargeId: String,
+    val paymentKey: String,
+    val amount: Int,
+    val status: String
+)
+
+@Serializable
+data class ChargeConfirmRequest(
+    val chargeId: String,
+    val paymentKey: String,
+    val amount: Int
+)
+
+@Serializable
+data class ChargeConfirmResponse(
+    val chargeId: String,
+    val status: String,
+    val walletBalance: Int
+)
+
+@Serializable
+data class ChargeCancelRequest(val reason: String)
+
+@Serializable
+data class WalletDto(
+    val walletId: String,
+    val balance: Int,
+    val updatedAt: String
+)
+
+@Serializable
+data class WalletTransactionDto(
+    val txId: String,
+    val type: String,
+    val amount: Int,
+    val balanceAfter: Int,
+    val refId: String?,
+    val createdAt: String
+)
+
+@Serializable
+data class TransferRequest(
+    val childId: String,
+    val amount: Int,
+    val memo: String? = null
+)
+
+@Serializable
+data class TransferResponse(
+    val parentBalance: Int,
+    val childBalance: Int,
+    val txId: String
+)
+
+@Serializable
+data class CardDto(
+    val cardId: String,
+    val last4: String,
+    val expiry: String,
+    val ownerName: String
+)
+
+@Serializable
+data class CardRegisterRequest(
+    val cardNumber: String,
+    val expiry: String,
+    val cvc: String,
+    val cardPassword2: String,
+    val birthDate: String,
+    val ownerName: String
+)

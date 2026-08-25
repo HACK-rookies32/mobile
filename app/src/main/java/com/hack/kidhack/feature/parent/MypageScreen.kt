@@ -239,7 +239,8 @@ fun ParentMypageScreen(
             ListRow(stringResource(R.string.parent_mypage_app_control), leading = "🛡️", onClick = onOpenAppControl)
             ListRow(stringResource(R.string.parent_mypage_screenshot), leading = "📸", onClick = onOpenScreenshot)
             ListRow(stringResource(R.string.parent_mypage_child_profile), leading = "👦", onClick = onOpenProfile)
-            ListRow(stringResource(R.string.parent_mypage_harmful), leading = "🚫", onClick = onOpenHarmful, showDivider = false)
+            ListRow(stringResource(R.string.parent_mypage_harmful), leading = "🚫", onClick = onOpenHarmful)
+            ListRow(stringResource(R.string.parent_mypage_pay), leading = "💳", onClick = onOpenPay, showDivider = false)
         }
 
         GroupCard(stringResource(R.string.parent_mypage_community_group)) {
@@ -249,8 +250,6 @@ fun ParentMypageScreen(
         }
 
         GroupCard(stringResource(R.string.parent_mypage_service)) {
-            ListRow(stringResource(R.string.parent_mypage_pay), leading = "💳", onClick = onOpenPay)
-            ListRow(stringResource(R.string.parent_mypage_payments), leading = "🧾", onClick = onOpenPay)
             ListRow(stringResource(R.string.parent_mypage_pairing), leading = "🔗", onClick = onOpenPairing, showDivider = false)
         }
         GroupCard(stringResource(R.string.parent_mypage_other)) {

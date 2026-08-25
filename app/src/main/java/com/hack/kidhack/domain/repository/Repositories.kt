@@ -9,6 +9,8 @@ import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
@@ -22,6 +24,8 @@ import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
+import com.hack.kidhack.domain.model.Wallet
+import com.hack.kidhack.domain.model.WalletTransaction
 import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {
@@ -116,6 +120,31 @@ interface InquiryRepository {
     suspend fun list(): List<Inquiry>
     suspend fun create(title: String, body: String, imageUrls: List<String>? = null, links: List<String>? = null): Inquiry
     suspend fun get(id: String): Inquiry
+}
+
+interface WalletRepository {
+    suspend fun getMyWallet(): Wallet
+    suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction>
+    suspend fun transferToChild(childId: String, amount: Int, memo: String?): com.hack.kidhack.data.remote.dto.TransferResponse
+    suspend fun reclaimFromChild(childId: String, amount: Int): com.hack.kidhack.data.remote.dto.TransferResponse
+    suspend fun getChildWallet(childId: String): Wallet
+    
+    // PG 충전 관련
+    suspend fun prepareCharge(amount: Int, method: String): Charge
+    suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet
+}
+
+interface CardRepository {
+    suspend fun register(
+        cardNumber: String,
+        expiry: String,
+        cvc: String,
+        cardPassword2: String,
+        birthDate: String,
+        ownerName: String
+    ): Card
+    suspend fun list(): List<Card>
+    suspend fun delete(cardId: String)
 }
 
 interface ChatRepository {

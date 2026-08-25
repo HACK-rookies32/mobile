@@ -2,6 +2,8 @@ package com.hack.kidhack.data.repository
 
 import com.hack.kidhack.data.remote.dto.AppControlDto
 import com.hack.kidhack.data.remote.dto.AppUsageDto
+import com.hack.kidhack.data.remote.dto.CardDto
+import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.ChildDto
@@ -22,8 +24,12 @@ import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SubscriptionDto
 import com.hack.kidhack.data.remote.dto.TokenResponse
 import com.hack.kidhack.data.remote.dto.UserDto
+import com.hack.kidhack.data.remote.dto.WalletDto
+import com.hack.kidhack.data.remote.dto.WalletTransactionDto
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
@@ -43,6 +49,8 @@ import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
+import com.hack.kidhack.domain.model.Wallet
+import com.hack.kidhack.domain.model.WalletTransaction
 
 fun UserDto.toDomain(): User = User(
     id = id,
@@ -207,4 +215,34 @@ fun InquiryAnswerDto.toDomain(): InquiryAnswer = InquiryAnswer(
     author = author,
     body = body,
     createdAt = createdAt
+)
+
+fun WalletDto.toDomain(): Wallet = Wallet(
+    walletId = walletId,
+    balance = balance,
+    updatedAt = updatedAt
+)
+
+fun WalletTransactionDto.toDomain(): WalletTransaction = WalletTransaction(
+    txId = txId,
+    type = type,
+    amount = amount,
+    balanceAfter = balanceAfter,
+    refId = refId,
+    createdAt = createdAt
+)
+
+fun ChargePrepareResponse.toDomain(): Charge = Charge(
+    chargeId = chargeId,
+    amount = amount,
+    status = status,
+    paymentKey = paymentKey,
+    method = "" // Response에는 없으므로 필요시 별도 처리
+)
+
+fun CardDto.toDomain(): Card = Card(
+    cardId = cardId,
+    last4 = last4,
+    expiry = expiry,
+    ownerName = ownerName
 )

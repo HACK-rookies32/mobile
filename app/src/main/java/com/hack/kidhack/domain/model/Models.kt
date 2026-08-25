@@ -181,3 +181,33 @@ data class InstalledApp(
     val appName: String,
     val category: String?,
 )
+
+data class Wallet(
+    val walletId: String,
+    val balance: Int,
+    val updatedAt: String
+)
+
+data class WalletTransaction(
+    val txId: String,
+    val type: String, // CHARGE, TRANSFER_IN, TRANSFER_OUT, PAYMENT, REFUND, RECLAIM, ADJUST
+    val amount: Int,
+    val balanceAfter: Int,
+    val refId: String?,
+    val createdAt: String
+)
+
+data class Charge(
+    val chargeId: String,
+    val amount: Int,
+    val status: String,
+    val paymentKey: String?,
+    val method: String
+)
+
+data class Card(
+    val cardId: String,
+    val last4: String,
+    val expiry: String,
+    val ownerName: String
+)

@@ -8,6 +8,13 @@ import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.BlocklistResponse
+import com.hack.kidhack.data.remote.dto.CardDto
+import com.hack.kidhack.data.remote.dto.CardRegisterRequest
+import com.hack.kidhack.data.remote.dto.ChargeCancelRequest
+import com.hack.kidhack.data.remote.dto.ChargeConfirmRequest
+import com.hack.kidhack.data.remote.dto.ChargeConfirmResponse
+import com.hack.kidhack.data.remote.dto.ChargePrepareRequest
+import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
@@ -41,9 +48,13 @@ import com.hack.kidhack.data.remote.dto.SignupRequest
 import com.hack.kidhack.data.remote.dto.SubscribeRequest
 import com.hack.kidhack.data.remote.dto.SubscriptionDto
 import com.hack.kidhack.data.remote.dto.TokenResponse
+import com.hack.kidhack.data.remote.dto.TransferRequest
+import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UsePointRequest
 import com.hack.kidhack.data.remote.dto.UserDto
 import com.hack.kidhack.data.remote.dto.UserUpdateRequest
+import com.hack.kidhack.data.remote.dto.WalletDto
+import com.hack.kidhack.data.remote.dto.WalletTransactionDto
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
@@ -335,4 +346,58 @@ interface InquiryApi {
 
     @GET("inquiries/{id}")
     suspend fun getInquiry(@Path("id") id: String): ApiEnvelope<InquiryDto>
+}
+
+interface PaymentChargeApi {
+    @POST("payments/charge/prepare")
+    suspend fun prepare(@Body body: ChargePrepareRequest): ApiEnvelope<ChargePrepareResponse>
+
+    @POST("payments/charge/confirm")
+    suspend fun confirm(@Body body: ChargeConfirmRequest): ApiEnvelope<ChargeConfirmResponse>
+
+    @GET("payments/charges")
+    suspend fun list(
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20
+    ): ApiEnvelope<PageResponse<ChargePrepareResponse>>
+
+    @GET("payments/charges/{chargeId}")
+    suspend fun get(@Path("chargeId") chargeId: String): ApiEnvelope<ChargePrepareResponse>
+
+    @POST("payments/charges/{chargeId}/cancel")
+    suspend fun cancel(@Path("chargeId") chargeId: String, @Body body: ChargeCancelRequest): ApiEnvelope<Unit>
+}
+
+interface WalletApi {
+    @GET("wallets/me")
+    suspend fun me(): ApiEnvelope<WalletDto>
+
+    @GET("wallets/me/transactions")
+    suspend fun transactions(
+        @Query("type") type: String? = null,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20
+    ): ApiEnvelope<PageResponse<WalletTransactionDto>>
+
+    @POST("wallets/transfer")
+    suspend fun transfer(@Body body: TransferRequest): ApiEnvelope<TransferResponse>
+
+    @POST("wallets/reclaim")
+    suspend fun reclaim(@Body body: TransferRequest): ApiEnvelope<TransferResponse>
+
+    @GET("children/{childId}/wallet")
+    suspend fun childWallet(@Path("childId") childId: String): ApiEnvelope<WalletDto>
+}
+
+interface CardApi {
+    @POST("payments/cards")
+    suspend fun register(@Body body: CardRegisterRequest): ApiEnvelope<CardDto>
+
+    @GET("payments/cards")
+    suspend fun list(): ApiEnvelope<List<CardDto>>
+
+    @DELETE("payments/cards/{cardId}")
+    suspend fun delete(@Path("cardId") cardId: String): ApiEnvelope<Unit>
 }

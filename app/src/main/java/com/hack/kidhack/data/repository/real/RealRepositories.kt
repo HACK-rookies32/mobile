@@ -8,6 +8,7 @@ import com.hack.kidhack.data.remote.api.AppControlApi
 import com.hack.kidhack.data.remote.api.AppUsageApi
 import com.hack.kidhack.data.remote.api.AuthApi
 import com.hack.kidhack.data.remote.api.BlocklistApi
+import com.hack.kidhack.data.remote.api.CardApi
 import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommunityApi
@@ -17,14 +18,19 @@ import com.hack.kidhack.data.remote.api.LocationApi
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
 import com.hack.kidhack.data.remote.api.PaymentApi
+import com.hack.kidhack.data.remote.api.PaymentChargeApi
 import com.hack.kidhack.data.remote.api.PointApi
 import com.hack.kidhack.data.remote.api.ScreenshotApi
 import com.hack.kidhack.data.remote.api.SubscriptionApi
 import com.hack.kidhack.data.remote.api.UserApi
+import com.hack.kidhack.data.remote.api.WalletApi
 import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
 import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
+import com.hack.kidhack.data.remote.dto.CardRegisterRequest
+import com.hack.kidhack.data.remote.dto.ChargeConfirmRequest
+import com.hack.kidhack.data.remote.dto.ChargePrepareRequest
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
@@ -39,6 +45,8 @@ import com.hack.kidhack.data.remote.dto.PairingConnectRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.SignupRequest
 import com.hack.kidhack.data.remote.dto.SubscribeRequest
+import com.hack.kidhack.data.remote.dto.TransferRequest
+import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UsePointRequest
 import com.hack.kidhack.data.remote.dto.UserUpdateRequest
 import com.hack.kidhack.data.remote.paging.PageResponsePagingSource
@@ -53,6 +61,7 @@ import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
+import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
@@ -70,10 +79,13 @@ import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
+import com.hack.kidhack.domain.model.Wallet
+import com.hack.kidhack.domain.model.WalletTransaction
 import com.hack.kidhack.domain.repository.AppControlRepository
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.AuthRepository
 import com.hack.kidhack.domain.repository.BlocklistRepository
+import com.hack.kidhack.domain.repository.CardRepository
 import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
@@ -89,6 +101,7 @@ import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
 import com.hack.kidhack.domain.repository.SubscriptionRepository
 import com.hack.kidhack.domain.repository.UserRepository
+import com.hack.kidhack.domain.repository.WalletRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
@@ -116,9 +129,6 @@ class RealAuthRepository(
             SignupRequest(loginId, password, name, role.name, phone, email),
         ).unwrap().toSession()
         sessionRepository.save(session)
-        if (role == Role.CHILD && !pairingCode.isNullOrBlank()) {
-            // Pairing requires CHILD JWT; connect is invoked by PairingRepository after signup.
-        }
         return session
     }
 
@@ -272,6 +282,47 @@ class RealInquiryRepository(private val api: InquiryApi) : InquiryRepository {
 
     override suspend fun get(id: String): Inquiry =
         api.getInquiry(id).unwrap().toDomain()
+}
+
+class RealWalletRepository(
+    private val walletApi: WalletApi,
+    private val chargeApi: PaymentChargeApi
+) : WalletRepository {
+    override suspend fun getMyWallet(): Wallet = walletApi.me().unwrap().toDomain()
+    
+    override suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction> =
+        walletApi.transactions(type = type, page = page).unwrap().content.map { it.toDomain() }
+
+    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResponse =
+        walletApi.transfer(TransferRequest(childId, amount, memo)).unwrap()
+
+    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResponse =
+        walletApi.reclaim(TransferRequest(childId, amount)).unwrap()
+
+    override suspend fun getChildWallet(childId: String): Wallet =
+        walletApi.childWallet(childId).unwrap().toDomain()
+
+    override suspend fun prepareCharge(amount: Int, method: String): com.hack.kidhack.domain.model.Charge =
+        chargeApi.prepare(ChargePrepareRequest(amount, method)).unwrap().toDomain()
+
+    override suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet =
+        chargeApi.confirm(ChargeConfirmRequest(chargeId, paymentKey, amount)).unwrap().let { resp ->
+            Wallet(walletId = resp.chargeId, balance = resp.walletBalance, updatedAt = "")
+        }
+}
+
+class RealCardRepository(private val api: CardApi) : CardRepository {
+    override suspend fun register(
+        cardNumber: String,
+        expiry: String,
+        cvc: String,
+        cardPassword2: String,
+        birthDate: String,
+        ownerName: String
+    ): Card = api.register(CardRegisterRequest(cardNumber, expiry, cvc, cardPassword2, birthDate, ownerName)).unwrap().toDomain()
+
+    override suspend fun list(): List<Card> = api.list().unwrap().map { it.toDomain() }
+    override suspend fun delete(cardId: String) { api.delete(cardId).unwrapOrNull() }
 }
 
 class RealChatRepository(

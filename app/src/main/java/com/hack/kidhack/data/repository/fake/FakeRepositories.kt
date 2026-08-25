@@ -4,14 +4,18 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.hack.kidhack.data.remote.PageResponse
+import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.paging.PageResponsePagingSource
 import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
+import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
+import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryAnswer
@@ -27,10 +31,13 @@ import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
+import com.hack.kidhack.domain.model.Wallet
+import com.hack.kidhack.domain.model.WalletTransaction
 import com.hack.kidhack.domain.repository.AppControlRepository
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.AuthRepository
 import com.hack.kidhack.domain.repository.BlocklistRepository
+import com.hack.kidhack.domain.repository.CardRepository
 import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
@@ -42,21 +49,18 @@ import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
 import com.hack.kidhack.domain.repository.PointRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
-import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
 import com.hack.kidhack.domain.repository.SubscriptionRepository
 import com.hack.kidhack.domain.repository.UserRepository
+import com.hack.kidhack.domain.repository.WalletRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.filter
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import kotlinx.coroutines.flow.asSharedFlow
 
 class FakeAuthRepository(
     private val sessionRepository: SessionRepository,
-    private val sessionEvents: SessionEvents,
+    private val fakeUserRepository: UserRepository,
 ) : AuthRepository {
     override suspend fun signup(
         loginId: String,
@@ -67,71 +71,48 @@ class FakeAuthRepository(
         email: String?,
         pairingCode: String?,
     ): Session {
-        delay(300)
-        if (role == Role.CHILD && !pairingCode.isNullOrBlank() && pairingCode != FakeData.PAIRING_CODE) {
-            error("페어링 코드가 올바르지 않아요")
-        }
-        val user = User(
-            id = "user-$loginId",
-            loginId = loginId,
-            name = name,
-            role = role,
-            phone = phone,
-            email = email,
+        val session = FakeData.sessionFor(
+            User(id = "user-${System.currentTimeMillis()}", loginId = loginId, name = name, role = role, phone = phone, email = email),
         )
-        val session = FakeData.sessionFor(user)
         sessionRepository.save(session)
         return session
     }
 
     override suspend fun login(loginId: String, password: String, preferredRole: Role?): Session {
-        delay(250)
-        require(loginId.isNotBlank() && password.isNotBlank()) { "아이디와 비밀번호를 입력해 주세요" }
-        val user = when {
-            preferredRole == Role.CHILD || loginId.contains("minjun") || loginId.startsWith("child") ->
-                FakeData.childUser.copy(loginId = loginId.ifBlank { FakeData.childUser.loginId })
-            else -> FakeData.parent.copy(loginId = loginId.ifBlank { FakeData.parent.loginId })
-        }
-        val session = FakeData.sessionFor(user)
+        val session = FakeData.sessionFor(
+            if (loginId == "minjun") FakeData.childUser else FakeData.parent,
+        )
         sessionRepository.save(session)
         return session
     }
 
     override suspend fun logout() {
         sessionRepository.clear()
-        sessionEvents.emitLogout()
     }
 
-    override suspend fun findId(name: String, phone: String): String {
-        delay(200)
-        return if (name.contains("민준")) FakeData.childUser.loginId else FakeData.parent.loginId
-    }
-
-    override suspend fun resetPassword(loginId: String, verifyCode: String, newPassword: String) {
-        delay(200)
-        require(verifyCode.length >= 4) { "인증 코드가 올바르지 않아요" }
-        require(newPassword.length >= 8) { "비밀번호는 8자 이상이어야 해요" }
-    }
+    override suspend fun findId(name: String, phone: String): String = "parent01"
+    override suspend fun resetPassword(loginId: String, verifyCode: String, newPassword: String) {}
 }
 
 class FakeUserRepository : UserRepository {
-    private var settings = NotificationSettings(true, true, false, true)
+    private var mySettings = NotificationSettings(location = true, harmfulAccess = true, appUsage = true, notice = true)
     override suspend fun me(): User = FakeData.parent
-    override suspend fun updateMe(name: String?, phone: String?, email: String?): User =
-        FakeData.parent.copy(name = name ?: FakeData.parent.name, phone = phone ?: FakeData.parent.phone, email = email ?: FakeData.parent.email)
-    override suspend fun deleteMe() = Unit
-    override suspend fun notificationSettings(): NotificationSettings = settings
+    override suspend fun updateMe(name: String?, phone: String?, email: String?): User = FakeData.parent.copy(
+        name = name ?: FakeData.parent.name,
+        phone = phone ?: FakeData.parent.phone,
+        email = email ?: FakeData.parent.email,
+    )
+    override suspend fun deleteMe() {}
+    override suspend fun notificationSettings(): NotificationSettings = mySettings
     override suspend fun patchNotificationSettings(settings: NotificationSettings): NotificationSettings {
-        this.settings = settings
-        return settings
+        mySettings = settings
+        return mySettings
     }
 }
 
 class FakePairingRepository : PairingRepository {
     override suspend fun issueCode(): PairingCode = FakeData.pairing
-    override suspend fun connect(pairingCode: String) {
-        require(pairingCode == FakeData.PAIRING_CODE) { "페어링 코드가 올바르지 않아요" }
-    }
+    override suspend fun connect(pairingCode: String) {}
 }
 
 class FakeChildRepository : ChildRepository {
@@ -155,31 +136,27 @@ class FakeChildRepository : ChildRepository {
 }
 
 class FakeLocationRepository : LocationRepository {
-    override suspend fun current(childId: String) = LocationPoint(
-        lat = "37.5172",
-        lng = "127.0473",
-        recordedAt = "2026-08-25T14:22:00",
-        label = "서울시 강남구 학동로 12길 (학교 근처)",
+    private val historyMap = mutableMapOf<String, MutableList<LocationPoint>>()
+    override suspend fun current(childId: String): LocationPoint =
+        LocationPoint("37.5665", "126.9780", "2024.08.20 14:30", "📍 서울시청")
+    override suspend fun history(childId: String): List<LocationPoint> = historyMap[childId] ?: listOf(
+        LocationPoint("37.5665", "126.9780", "14:00", "📍 학교"),
+        LocationPoint("37.5655", "126.9770", "15:30", "📍 학원"),
+        LocationPoint("37.5645", "126.9760", "17:00", "📍 집"),
     )
-    override suspend fun history(childId: String) = listOf(
-        LocationPoint("37.4979", "127.0276", "08:10", "집 출발"),
-        LocationPoint("37.5172", "127.0473", "08:40", "학교 도착"),
-        LocationPoint("37.5048", "127.0490", "15:10", "학원"),
-        current(childId),
-    )
-    override suspend fun uploadBatch(points: List<LocationPoint>) = Unit
-    override suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String) = Unit
+    override suspend fun uploadBatch(points: List<LocationPoint>) {}
+    override suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String) {}
 }
 
 class FakeGeofenceRepository : GeofenceRepository {
     private val items = mutableListOf(
-        Geofence("geo-school", "학교", "37.5172", "127.0473", 200, true),
-        Geofence("geo-home", "집", "37.4979", "127.0276", 150, true),
+        Geofence("g1", "학교", "37.5665", "126.9780", 200, true),
+        Geofence("g2", "집", "37.5410", "127.0270", 100, true),
     )
-    override suspend fun list(childId: String) = items.toList()
+    override suspend fun list(childId: String): List<Geofence> = items.toList()
     override suspend fun create(childId: String, geofence: Geofence): Geofence {
-        val created = geofence.copy(id = "geo-${items.size + 1}")
-        items += created
+        val created = geofence.copy(id = "g-${items.size + 1}")
+        items.add(created)
         return created
     }
     override suspend fun delete(childId: String, geofenceId: String) {
@@ -188,47 +165,43 @@ class FakeGeofenceRepository : GeofenceRepository {
 }
 
 class FakeNotificationRepository : NotificationRepository {
-    private val items = listOf(
-        AppNotification("n1", "HARMFUL", "유해 사이트 차단", "성인 콘텐츠 접속을 차단했어요", "10분 전", false),
-        AppNotification("n2", "ARRIVAL", "학교 도착 확인", "김민준 님이 학교에 도착했어요", "오늘 08:42", true),
-        AppNotification("n3", "NOTICE", "루키즈 앱 사용량 제한 도달", "오늘 스크린타임 한도에 도달했어요", "어제", true),
-    )
     override fun paged(type: String?): Flow<PagingData<AppNotification>> = Pager(PagingConfig(20)) {
         PageResponsePagingSource { page, size ->
-            val filtered = items.filter { type == null || it.type == type }
-            PageResponse(filtered, page, size, filtered.size.toLong(), 1)
+            PageResponse(list(type), page, size, 2, 1)
         }
     }.flow
-    override suspend fun list(type: String?) = items.filter { type == null || it.type == type }
+    override suspend fun list(type: String?): List<AppNotification> = listOf(
+        AppNotification("n1", "LOCATION", "안전 구역 이탈", "민준이가 '학교' 구역을 벗어났습니다.", "14:20", false),
+        AppNotification("n2", "HARMFUL", "유해 사이트 접속 차단", "부적절한 사이트 접속 시도가 차단되었습니다.", "12:05", true),
+    ).filter { type == null || it.type == type }
 }
 
 class FakeBlocklistRepository : BlocklistRepository {
-    private val items = mutableListOf(
-        BlocklistItem("b1", "BLACK", "gambling.com"),
-        BlocklistItem("b2", "BLACK", "성인"),
-        BlocklistItem("w1", "WHITE", "school.ac.kr"),
-    )
-    override suspend fun get(childId: String) = items.toList()
+    private val black = mutableListOf("욕설", "폭력", "성인")
+    private val white = mutableListOf("https://edu.example.com", "https://library.org")
+    override suspend fun get(childId: String): List<BlocklistItem> =
+        black.mapIndexed { i, kw -> BlocklistItem("b$i", "BLACK", kw) } +
+            white.mapIndexed { i, kw -> BlocklistItem("w$i", "WHITE", kw) }
     override suspend fun add(childId: String, listType: String, keyword: String) {
-        items += BlocklistItem("b-${items.size}", listType, keyword)
+        if (listType == "BLACK") black.add(keyword) else white.add(keyword)
     }
-    override suspend fun remove(childId: String, itemId: String) {
-        items.removeAll { it.id == itemId }
-    }
-    override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) = Unit
+    override suspend fun remove(childId: String, itemId: String) {}
+    override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) {}
 }
 
 class FakeScreenshotRepository : ScreenshotRepository {
-    private val items = listOf(
-        Screenshot("s1", "오늘 14:22", "YouTube 시청 중", "MANUAL"),
-        Screenshot("s2", "오늘 11:05", "카카오톡", "MANUAL"),
-        Screenshot("s3", "어제 18:40", "Chrome", "SCHEDULED"),
-    )
     override fun paged(childId: String): Flow<PagingData<Screenshot>> = Pager(PagingConfig(20)) {
-        PageResponsePagingSource { page, size -> PageResponse(items, page, size, items.size.toLong(), 1) }
+        PageResponsePagingSource { page, size ->
+            PageResponse(list(childId), page, size, 2, 1)
+        }
     }.flow
-    override suspend fun list(childId: String) = items
-    override suspend fun requestCapture(childId: String) = Unit
+    override suspend fun list(childId: String): List<Screenshot> = listOf(
+        Screenshot("s1", "14:30", "게임 중", "MANUAL", null),
+        Screenshot("s2", "11:15", "웹 서핑", "AUTO", null),
+    )
+    override suspend fun requestCapture(childId: String) {
+        delay(1500)
+    }
 }
 
 class FakeCommunityRepository : CommunityRepository {
@@ -329,114 +302,124 @@ class FakeInquiryRepository : InquiryRepository {
     override suspend fun get(id: String): Inquiry = items.first { it.id == id }
 }
 
+class FakeWalletRepository : WalletRepository {
+    private var balance = 45_000
+    override suspend fun getMyWallet(): Wallet = Wallet("w-parent", balance, "방금")
+    override suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction> = listOf(
+        WalletTransaction("tx1", "CHARGE", 50000, 50000, null, "08.15"),
+        WalletTransaction("tx2", "TRANSFER_OUT", -5000, 45000, "child-minjun", "08.20")
+    )
+    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResponse {
+        balance -= amount
+        return TransferResponse(balance, 10000 + amount, "tx-${System.currentTimeMillis()}")
+    }
+    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResponse {
+        balance += amount
+        return TransferResponse(balance, 10000 - amount, "tx-${System.currentTimeMillis()}")
+    }
+    override suspend fun getChildWallet(childId: String): Wallet = Wallet("w-child", 10000, "방금")
+    override suspend fun prepareCharge(amount: Int, method: String): Charge = Charge("c1", amount, "PENDING", "key1", method)
+    override suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet {
+        balance += amount
+        return Wallet("w-parent", balance, "방금")
+    }
+}
+
+class FakeCardRepository : CardRepository {
+    private val items = mutableListOf(
+        Card("card1", "1234", "12/28", "김지영"),
+        Card("card2", "5678", "05/26", "김지영")
+    )
+    override suspend fun register(
+        cardNumber: String,
+        expiry: String,
+        cvc: String,
+        cardPassword2: String,
+        birthDate: String,
+        ownerName: String
+    ): Card {
+        val new = Card("card-${items.size + 1}", cardNumber.takeLast(4), expiry, ownerName)
+        items.add(new)
+        return new
+    }
+    override suspend fun list(): List<Card> = items.toList()
+    override suspend fun delete(cardId: String) { items.removeAll { it.cardId == cardId } }
+}
+
 class FakeChatRepository(
     private val sessionRepository: SessionRepository,
 ) : ChatRepository {
-    private val lock = Any()
     private val store = mutableMapOf(
         "room-minjun" to FakeData.chatMessages.toMutableList(),
         "room-jia" to mutableListOf<ChatMessage>(),
     )
     private val incoming = MutableSharedFlow<ChatMessage>(extraBufferCapacity = 64)
 
-    override suspend fun rooms(): List<ChatRoom> = synchronized(lock) {
-        listOf(
-            roomOf("room-minjun", "김민준", true),
-            roomOf("room-jia", "이지아", false),
-        )
-    }
+    override suspend fun rooms(): List<ChatRoom> = listOf(
+        ChatRoom("room-minjun", "김민준", "학원 끝나요", "14:32", true),
+        ChatRoom("room-jia", "이지아", "아직 대화가 없어요", "", false),
+    )
 
-    override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> {
-        val all = synchronized(lock) {
-            store.getOrPut(roomId) { FakeData.chatMessages.toMutableList() }.toList()
-        }
-        val filtered = if (before.isNullOrBlank()) all else all.takeWhile { it.id != before }
-        return filtered.takeLast(size)
-    }
+    override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> =
+        store[roomId] ?: emptyList()
 
-    override fun observeMessages(roomId: String): Flow<ChatMessage> =
-        incoming.filter { it.roomId == roomId }
+    override fun observeMessages(roomId: String): Flow<ChatMessage> = incoming.asSharedFlow()
 
-    /**
-     * In-memory send only. Mock builds never open a live WebSocket.
-     */
     override suspend fun send(roomId: String, content: String): ChatMessage {
         val role = sessionRepository.current()?.user?.role ?: Role.PARENT
-        val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-        val msg = ChatMessage(
-            id = "fake-${System.currentTimeMillis()}",
-            roomId = roomId,
-            fromRole = role,
-            text = content,
-            sentAt = time,
-        )
-        synchronized(lock) {
-            store.getOrPut(roomId) { mutableListOf() }.add(msg)
-        }
+        val msg = ChatMessage("m-${System.currentTimeMillis()}", roomId, role, content, "방금")
+        store.getOrPut(roomId) { mutableListOf() }.add(msg)
         incoming.emit(msg)
         return msg
     }
 
-    override suspend fun markRead(roomId: String, lastMessageId: String?) = Unit
-
-    private fun roomOf(id: String, title: String, online: Boolean): ChatRoom {
-        val last = store[id]?.lastOrNull()
-        return ChatRoom(
-            id = id,
-            title = title,
-            lastMessage = last?.text ?: if (id == "room-jia") "숙제 다 했어요" else "",
-            lastAt = last?.sentAt ?: if (id == "room-jia") "어제" else "",
-            online = online,
-        )
-    }
+    override suspend fun markRead(roomId: String, lastMessageId: String?) {}
 }
 
 class FakePaymentRepository : PaymentRepository {
-    override suspend fun checkout(amount: Int, method: String, productId: Int) =
-        Payment("pay-new", "충전", amount, "오늘", "in")
-    override suspend fun history() = FakeData.payments
+    override suspend fun checkout(amount: Int, method: String, productId: Int): Payment =
+        Payment("pay-${System.currentTimeMillis()}", "상품 구매", -amount, "방금", "out")
+    override suspend fun history(): List<Payment> = FakeData.payments
 }
 
 class FakePointRepository : PointRepository {
-    override suspend fun balance() = FakeData.pointBalance
-    override suspend fun history() = listOf(
-        PointHistory("ph1", "충전", 50_000, "08.15"),
-        PointHistory("ph2", "구독 결제", -9_900, "08.01"),
+    override suspend fun balance(): PointBalance = FakeData.pointBalance
+    override suspend fun history(): List<PointHistory> = listOf(
+        PointHistory("ph1", "이벤트 참여", 1000, "08.20"),
+        PointHistory("ph2", "포인트 전환", -500, "08.18")
     )
-    override suspend fun use(productId: Int, point: Int) = Unit
+    override suspend fun use(productId: Int, point: Int) {}
 }
 
 class FakeSubscriptionRepository : SubscriptionRepository {
-    override suspend fun me() = Subscription(1, "ACTIVE", "TOSS")
-    override suspend fun subscribe(planId: Int, method: String) = Subscription(planId, "ACTIVE", method)
-    override suspend fun cancel() = Unit
+    private var sub: Subscription? = Subscription(1, "ACTIVE", "CARD")
+    override suspend fun me(): Subscription? = sub
+    override suspend fun subscribe(planId: Int, method: String): Subscription {
+        sub = Subscription(planId, "ACTIVE", method)
+        return sub!!
+    }
+    override suspend fun cancel() { sub = null }
 }
 
 class FakeAppUsageRepository : AppUsageRepository {
-    override suspend fun list(childId: String, groupBy: String) = FakeData.usages
-    override suspend fun report(childId: String, usages: List<AppUsage>) = Unit
+    override suspend fun list(childId: String, groupBy: String): List<AppUsage> = FakeData.usages
+    override suspend fun report(childId: String, usages: List<AppUsage>) {}
 }
 
 class FakeAppControlRepository : AppControlRepository {
-    private val items = mutableListOf(
-        AppControlItem("com.google.android.youtube", "YouTube", "▶️", "동영상", false, "1시간", 60),
-        AppControlItem("com.zhiliaoapp.musically", "TikTok", "🎵", "동영상", true, "차단", null),
-        AppControlItem("com.kakao.talk", "카카오톡", "💬", "메신저", false, "무제한", 0),
-        AppControlItem("com.instagram.android", "Instagram", "📸", "SNS", true, "차단", null),
-        AppControlItem("com.android.chrome", "Chrome", "🌐", "브라우저", false, "2시간", 120),
-        AppControlItem("com.nexon.kart", "게임", "🎮", "게임", true, "차단", null),
+    private val db = mutableListOf(
+        com.hack.kidhack.domain.model.AppControlItem("com.youtube", "YouTube", "📺", "동영상", false, "1시간 30분", 90),
+        com.hack.kidhack.domain.model.AppControlItem("com.tiktok", "TikTok", "🎵", "소셜", true, "차단"),
+        com.hack.kidhack.domain.model.AppControlItem("com.roblox", "Roblox", "🎮", "게임", false, "무제한")
     )
-    override suspend fun items(childId: String) = items.toList()
+    override suspend fun items(childId: String): List<com.hack.kidhack.domain.model.AppControlItem> = db.toList()
 
-    override suspend fun getInstalledApps(childId: String) = listOf(
-        com.hack.kidhack.domain.model.InstalledApp("com.google.android.youtube", "YouTube", "동영상"),
-        com.hack.kidhack.domain.model.InstalledApp("com.zhiliaoapp.musically", "TikTok", "동영상"),
-        com.hack.kidhack.domain.model.InstalledApp("com.kakao.talk", "카카오톡", "메신저"),
-        com.hack.kidhack.domain.model.InstalledApp("com.instagram.android", "Instagram", "SNS"),
-        com.hack.kidhack.domain.model.InstalledApp("com.android.chrome", "Chrome", "브라우저"),
-        com.hack.kidhack.domain.model.InstalledApp("com.nexon.kart", "게임", "게임"),
-        com.hack.kidhack.domain.model.InstalledApp("com.netflix.mediaclient", "Netflix", "동영상"),
-        com.hack.kidhack.domain.model.InstalledApp("com.facebook.katana", "Facebook", "SNS"),
+    override suspend fun getInstalledApps(childId: String): List<com.hack.kidhack.domain.model.InstalledApp> = listOf(
+        com.hack.kidhack.domain.model.InstalledApp("com.youtube", "YouTube", "동영상"),
+        com.hack.kidhack.domain.model.InstalledApp("com.tiktok", "TikTok", "소셜"),
+        com.hack.kidhack.domain.model.InstalledApp("com.instagram", "Instagram", "소셜"),
+        com.hack.kidhack.domain.model.InstalledApp("com.roblox", "Roblox", "게임"),
+        com.hack.kidhack.domain.model.InstalledApp("com.pubg", "배틀그라운드", "게임")
     )
 
     override suspend fun updateAppControl(
@@ -444,23 +427,23 @@ class FakeAppControlRepository : AppControlRepository {
         packageName: String,
         blocked: Boolean,
         limitMinutes: Int?
-    ): AppControlItem {
-        val existing = items.find { it.packageName == packageName }
-        val updated = AppControlItem(
+    ): com.hack.kidhack.domain.model.AppControlItem {
+        val existing = db.find { it.packageName == packageName }
+        val updated = com.hack.kidhack.domain.model.AppControlItem(
             packageName = packageName,
-            name = existing?.name ?: packageName.split(".").last().capitalize(),
-            icon = existing?.icon ?: "❓",
+            name = existing?.name ?: "알 수 없는 앱",
+            icon = existing?.icon ?: "📱",
             category = existing?.category ?: "기타",
             blocked = blocked,
             limitMinutes = limitMinutes,
             limit = if (blocked) "차단" else if (limitMinutes == null || limitMinutes == 0) "무제한" else "${limitMinutes / 60}시간 ${limitMinutes % 60}분"
         )
-        items.removeAll { it.packageName == packageName }
-        items.add(updated)
+        db.removeAll { it.packageName == packageName }
+        db.add(updated)
         return updated
     }
 
     override suspend fun deleteAppControl(childId: String, packageName: String) {
-        items.removeAll { it.packageName == packageName }
+        db.removeAll { it.packageName == packageName }
     }
 }
