@@ -1,8 +1,20 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+// Prefer host LAN IP on Windows emulators; 10.0.2.2 often times out for OkHttp only.
+val apiBaseUrl: String =
+    localProperties.getProperty("api.base.url", "http://10.0.2.2:8080/api")
 
 android {
     namespace = "com.hack.kidhack"
@@ -19,15 +31,35 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "BASE_URL", "\"https://api.childsafe.example.com/api\"")
+        buildConfigField("String", "BASE_URL", "\"$apiBaseUrl\"")
+        manifestPlaceholders["usesCleartextTraffic"] = "false"
     }
 
     buildTypes {
+        // 목업 UI 테스트 (Fake repos)
         debug {
             buildConfigField("boolean", "USE_MOCK", "true")
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
+        // 로컬/실서버 API 연동 테스트 (debuggable, mock off)
+        create("api") {
+            initWith(getByName("debug"))
+            matchingFallbacks += listOf("debug")
+            applicationIdSuffix = ".api"
+            versionNameSuffix = "-api"
+            buildConfigField("boolean", "USE_MOCK", "false")
+            buildConfigField("String", "BASE_URL", "\"$apiBaseUrl\"")
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+        }
+        // 배포·보안 실습용 (서명 필요). keystore 연결 후 signingConfig 지정.
         release {
             buildConfigField("boolean", "USE_MOCK", "false")
+            buildConfigField(
+                "String",
+                "BASE_URL",
+                "\"https://api.childsafe.example.com/api\"",
+            )
+            manifestPlaceholders["usesCleartextTraffic"] = "false"
             optimization {
                 enable = false
             }
