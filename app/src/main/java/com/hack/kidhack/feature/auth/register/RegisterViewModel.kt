@@ -23,11 +23,22 @@ data class RegisterUiState(
     val password: String = "",
     val passwordConfirm: String = "",
     val parentId: String = "",
-    val agreed: Boolean = false,
+    val agreedAge: Boolean = false,
+    val agreedTerms: Boolean = false,
+    val agreedPrivacy: Boolean = false,
+    val agreedLocation: Boolean = false,
+    val agreedPush: Boolean = false,
+    val agreedMarketing: Boolean = false,
     val loading: Boolean = false,
     val error: String? = null,
     val session: Session? = null,
-)
+) {
+    val agreedAll: Boolean
+        get() = agreedAge && agreedTerms && agreedPrivacy && agreedLocation && agreedPush && agreedMarketing
+
+    val requiredAgreed: Boolean
+        get() = agreedAge && agreedTerms && agreedPrivacy && agreedLocation && agreedPush
+}
 
 class RegisterViewModel(
     private val authRepository: AuthRepository,
@@ -47,7 +58,22 @@ class RegisterViewModel(
     fun onPassword(v: String) = _state.update { it.copy(password = v) }
     fun onPasswordConfirm(v: String) = _state.update { it.copy(passwordConfirm = v) }
     fun onParentId(v: String) = _state.update { it.copy(parentId = v.filter { ch -> ch.isDigit() }) }
-    fun onAgreed(v: Boolean) = _state.update { it.copy(agreed = v) }
+    fun onAgreedAge(v: Boolean) = _state.update { it.copy(agreedAge = v) }
+    fun onAgreedTerms(v: Boolean) = _state.update { it.copy(agreedTerms = v) }
+    fun onAgreedPrivacy(v: Boolean) = _state.update { it.copy(agreedPrivacy = v) }
+    fun onAgreedLocation(v: Boolean) = _state.update { it.copy(agreedLocation = v) }
+    fun onAgreedPush(v: Boolean) = _state.update { it.copy(agreedPush = v) }
+    fun onAgreedMarketing(v: Boolean) = _state.update { it.copy(agreedMarketing = v) }
+    fun onAgreedAll(v: Boolean) = _state.update {
+        it.copy(
+            agreedAge = v,
+            agreedTerms = v,
+            agreedPrivacy = v,
+            agreedLocation = v,
+            agreedPush = v,
+            agreedMarketing = v,
+        )
+    }
 
     fun nextFromInfo() {
         val s = _state.value
@@ -72,7 +98,7 @@ class RegisterViewModel(
         val s = _state.value
         val role = s.role ?: return
         when {
-            !s.agreed -> _state.update { it.copy(error = "약관에 동의해 주세요") }
+            !s.requiredAgreed -> _state.update { it.copy(error = "필수 약관에 모두 동의해 주세요") }
             else -> viewModelScope.launch {
                 _state.update { it.copy(loading = true, error = null) }
                 runCatching {

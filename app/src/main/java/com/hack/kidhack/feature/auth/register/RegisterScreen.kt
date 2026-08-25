@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +40,7 @@ import com.hack.kidhack.core.designsystem.component.KidTextField
 import com.hack.kidhack.core.designsystem.component.StepProgressBar
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
+import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.Role
@@ -212,22 +214,44 @@ private fun TermsStep(state: RegisterUiState, viewModel: RegisterViewModel) {
         Text("약관 동의", fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 24.sp, color = colors.text)
         Text("가입을 완료하려면 약관에 동의해 주세요", color = colors.muted, fontSize = 14.sp)
     }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
-            .border(1.dp, colors.border, RoundedCornerShape(12.dp))
-            .clickable { viewModel.onAgreed(!state.agreed) }
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Checkbox(
-            checked = state.agreed,
-            onCheckedChange = viewModel::onAgreed,
-            colors = CheckboxDefaults.colors(checkedColor = colors.brand),
+    KidCard {
+        TermsCheckRow(
+            checked = state.agreedAll,
+            label = "모든 약관에 동의합니다",
+            emphasized = true,
+            onCheckedChange = viewModel::onAgreedAll,
         )
-        Text("[필수] 서비스 이용약관 및 개인정보처리방침에 동의합니다", color = colors.muted, fontSize = 12.sp)
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = colors.border)
+        TermsCheckRow(
+            checked = state.agreedAge,
+            label = "[필수] 만 14세 이상입니다.",
+            onCheckedChange = viewModel::onAgreedAge,
+        )
+        TermsCheckRow(
+            checked = state.agreedTerms,
+            label = "[필수] 서비스 이용약관 동의",
+            onCheckedChange = viewModel::onAgreedTerms,
+        )
+        TermsCheckRow(
+            checked = state.agreedPrivacy,
+            label = "[필수] 개인정보 수집 및 이용 동의",
+            onCheckedChange = viewModel::onAgreedPrivacy,
+        )
+        TermsCheckRow(
+            checked = state.agreedLocation,
+            label = "[필수] 위치기반 서비스 이용약관 동의",
+            onCheckedChange = viewModel::onAgreedLocation,
+        )
+        TermsCheckRow(
+            checked = state.agreedPush,
+            label = "[필수] PUSH 알림 수신 동의",
+            onCheckedChange = viewModel::onAgreedPush,
+        )
+        TermsCheckRow(
+            checked = state.agreedMarketing,
+            label = "[선택] 마케팅 활용 동의",
+            onCheckedChange = viewModel::onAgreedMarketing,
+        )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         KidButton("← 이전", viewModel::back, Modifier.weight(1f), KidButtonVariant.Ghost)
@@ -236,6 +260,37 @@ private fun TermsStep(state: RegisterUiState, viewModel: RegisterViewModel) {
             onClick = viewModel::submit,
             modifier = Modifier.weight(1f),
             enabled = !state.loading,
+        )
+    }
+}
+
+@Composable
+private fun TermsCheckRow(
+    checked: Boolean,
+    label: String,
+    onCheckedChange: (Boolean) -> Unit,
+    emphasized: Boolean = false,
+) {
+    val colors = LocalKidhackColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = CheckboxDefaults.colors(checkedColor = colors.brand),
+        )
+        Text(
+            text = label,
+            color = if (emphasized) colors.text else colors.muted,
+            fontFamily = KidhackFontFamily,
+            fontWeight = if (emphasized) FontBold else FontSemibold,
+            fontSize = if (emphasized) 15.sp else 12.sp,
         )
     }
 }
