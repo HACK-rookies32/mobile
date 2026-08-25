@@ -2,12 +2,11 @@ package com.hack.kidhack.data.remote.interceptor
 
 import com.hack.kidhack.core.common.KidhackJson
 import com.hack.kidhack.data.remote.ApiEnvelope
+import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.RefreshRequest
-import com.hack.kidhack.data.remote.dto.TokenResponse
 import com.hack.kidhack.data.remote.unwrap
-import com.hack.kidhack.domain.model.Role
+import com.hack.kidhack.data.repository.toDomain
 import com.hack.kidhack.domain.model.Session
-import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.runBlocking
@@ -36,7 +35,7 @@ class TokenAuthenticator(
             failLogout()
             return null
         }
-        val refreshToken = sessionRepository.refreshToken() ?: run {
+        val refreshToken = sessionRepository.refreshToken()?.takeIf { it.isNotBlank() } ?: run {
             failLogout()
             return null
         }
@@ -69,22 +68,19 @@ class TokenAuthenticator(
             if (!resp.isSuccessful) return null
             val payload = resp.body?.string().orEmpty()
             val envelope = KidhackJson.instance.decodeFromString(
-                serializer<ApiEnvelope<TokenResponse>>(),
+                serializer<ApiEnvelope<LoginResponse>>(),
                 payload,
             )
             val data = envelope.unwrap()
+            val access = data.resolvedAccessToken()?.takeIf { it.isNotBlank() } ?: return null
+            val nextRefresh = data.refreshToken?.takeIf { it.isNotBlank() } ?: refreshToken
+            val user = data.user?.toDomain()
+                ?: runBlocking { sessionRepository.current() }?.user
+                ?: return null
             return Session(
-                accessToken = data.accessToken,
-                refreshToken = data.refreshToken,
-                user = User(
-                    id = data.user.id,
-                    loginId = data.user.loginId,
-                    name = data.user.name,
-                    role = runCatching { Role.valueOf(data.user.role) }.getOrDefault(Role.PARENT),
-                    phone = data.user.phone,
-                    email = data.user.email,
-                    profileImageUrl = data.user.profileImageUrl,
-                ),
+                accessToken = access,
+                refreshToken = nextRefresh,
+                user = user,
             )
         }
     }
