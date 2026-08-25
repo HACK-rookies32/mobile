@@ -5,7 +5,10 @@ import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.ChildDto
+import com.hack.kidhack.data.remote.dto.CommentDto
 import com.hack.kidhack.data.remote.dto.GeofenceDto
+import com.hack.kidhack.data.remote.dto.InquiryAnswerDto
+import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
 import com.hack.kidhack.data.remote.dto.LocationDto
 import com.hack.kidhack.data.remote.dto.NotificationDto
@@ -24,7 +27,10 @@ import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
+import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.Inquiry
+import com.hack.kidhack.domain.model.InquiryAnswer
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -123,6 +129,16 @@ fun PostDto.toDomain(): Post = Post(
     likeCount = likeCount,
     createdAtLabel = createdAtLabel,
     liked = liked,
+    imageUrls = imageUrls,
+    links = links,
+    comments = comments.map { it.toDomain() }
+)
+
+fun CommentDto.toDomain(): Comment = Comment(
+    id = id,
+    author = author,
+    text = body,
+    createdAt = createdAt
 )
 
 fun ChatRoomDto.toDomain(): ChatRoom = ChatRoom(
@@ -173,4 +189,22 @@ fun InstalledAppDto.toDomain(): com.hack.kidhack.domain.model.InstalledApp = com
     packageName = packageName,
     appName = appName,
     category = category
+)
+
+fun InquiryDto.toDomain(): Inquiry = Inquiry(
+    id = id,
+    title = title,
+    body = body,
+    status = status,
+    createdAt = createdAt,
+    imageUrls = imageUrls,
+    links = links,
+    answers = answers.map { it.toDomain() }
+)
+
+fun InquiryAnswerDto.toDomain(): InquiryAnswer = InquiryAnswer(
+    id = id,
+    author = author,
+    body = body,
+    createdAt = createdAt
 )

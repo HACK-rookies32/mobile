@@ -16,6 +16,7 @@ import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.GeofenceApi
+import com.hack.kidhack.data.remote.api.InquiryApi
 import com.hack.kidhack.data.remote.api.LocationApi
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
@@ -34,6 +35,7 @@ import com.hack.kidhack.data.repository.fake.FakeChatRepository
 import com.hack.kidhack.data.repository.fake.FakeChildRepository
 import com.hack.kidhack.data.repository.fake.FakeCommunityRepository
 import com.hack.kidhack.data.repository.fake.FakeGeofenceRepository
+import com.hack.kidhack.data.repository.fake.FakeInquiryRepository
 import com.hack.kidhack.data.repository.fake.FakeLocationRepository
 import com.hack.kidhack.data.repository.fake.FakeNotificationRepository
 import com.hack.kidhack.data.repository.fake.FakePairingRepository
@@ -50,6 +52,7 @@ import com.hack.kidhack.data.repository.real.RealChatRepository
 import com.hack.kidhack.data.repository.real.RealChildRepository
 import com.hack.kidhack.data.repository.real.RealCommunityRepository
 import com.hack.kidhack.data.repository.real.RealGeofenceRepository
+import com.hack.kidhack.data.repository.real.RealInquiryRepository
 import com.hack.kidhack.data.repository.real.RealLocationRepository
 import com.hack.kidhack.data.repository.real.RealNotificationRepository
 import com.hack.kidhack.data.repository.real.RealPairingRepository
@@ -68,6 +71,7 @@ import com.hack.kidhack.domain.repository.ChildOnboardingStore
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.GeofenceRepository
+import com.hack.kidhack.domain.repository.InquiryRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
@@ -174,6 +178,7 @@ val appModule = module {
     single { get<Retrofit>().create(SubscriptionApi::class.java) }
     single { get<Retrofit>().create(AppUsageApi::class.java) }
     single { get<Retrofit>().create(AppControlApi::class.java) }
+    single { get<Retrofit>().create(InquiryApi::class.java) }
 
     single<AuthRepository> {
         if (useMock) FakeAuthRepository(get(), get()) else RealAuthRepository(get(), get(), get())
@@ -192,6 +197,9 @@ val appModule = module {
     }
     single<CommunityRepository> {
         if (useMock) FakeCommunityRepository() else RealCommunityRepository(get())
+    }
+    single<InquiryRepository> {
+        if (useMock) FakeInquiryRepository() else RealInquiryRepository(get())
     }
     single { ChatWebSocketClient(get(), get(), BuildConfig.BASE_URL) }
     single<ChatRepository> {
@@ -226,7 +234,7 @@ val appModule = module {
     viewModel { params -> CommunityDetailViewModel(params.get(), get()) }
     viewModel { CommunityWriteViewModel(get()) }
     viewModel { NoticeViewModel() }
-    viewModel { ContactViewModel() }
+    viewModel { ContactViewModel(get<InquiryRepository>()) }
     viewModel { PayViewModel(get(), get()) }
 
     viewModel { ChildHomeViewModel(get()) }

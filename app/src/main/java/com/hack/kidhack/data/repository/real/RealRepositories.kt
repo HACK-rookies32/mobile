@@ -12,6 +12,7 @@ import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.GeofenceApi
+import com.hack.kidhack.data.remote.api.InquiryApi
 import com.hack.kidhack.data.remote.api.LocationApi
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
@@ -27,6 +28,7 @@ import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
+import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
 import com.hack.kidhack.data.remote.dto.GeofenceDto
@@ -55,6 +57,7 @@ import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -75,6 +78,7 @@ import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.GeofenceRepository
+import com.hack.kidhack.domain.repository.InquiryRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
@@ -242,12 +246,32 @@ class RealCommunityRepository(private val api: CommunityApi) : CommunityReposito
         }.flow.map { paging -> paging.map { it.toDomain() } }
     override suspend fun posts(): List<Post> = api.posts(0, 50).unwrap().content.map { it.toDomain() }
     override suspend fun post(postId: String): Post = api.post(postId).unwrap().toDomain()
-    override suspend fun create(title: String, body: String): Post =
-        api.create(CreatePostRequest(title, body)).unwrap().toDomain()
+    override suspend fun create(
+        title: String,
+        body: String,
+        imageUrls: List<String>?,
+        links: List<String>?
+    ): Post =
+        api.create(CreatePostRequest(title, body, imageUrls, links)).unwrap().toDomain()
     override suspend fun like(postId: String) { api.like(postId).unwrapOrNull() }
     override suspend fun comment(postId: String, body: String) {
         api.comment(postId, CommentRequest(body)).unwrapOrNull()
     }
+}
+
+class RealInquiryRepository(private val api: InquiryApi) : InquiryRepository {
+    override suspend fun list(): List<Inquiry> =
+        api.getInquiries().unwrap().map { it.toDomain() }
+
+    override suspend fun create(
+        title: String,
+        body: String,
+        imageUrls: List<String>?,
+        links: List<String>?
+    ): Inquiry = api.createInquiry(CreateInquiryRequest(title, body, imageUrls, links)).unwrap().toDomain()
+
+    override suspend fun get(id: String): Inquiry =
+        api.getInquiry(id).unwrap().toDomain()
 }
 
 class RealChatRepository(

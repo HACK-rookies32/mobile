@@ -14,12 +14,14 @@ import com.hack.kidhack.data.remote.dto.CheckoutRequest
 import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
+import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
 import com.hack.kidhack.data.remote.dto.FindIdResponse
 import com.hack.kidhack.data.remote.dto.GeofenceDto
 import com.hack.kidhack.data.remote.dto.GpsStatusRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
+import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
 import com.hack.kidhack.data.remote.dto.InstalledAppsResponse
 import com.hack.kidhack.data.remote.dto.LocationDto
@@ -322,4 +324,15 @@ interface AppControlApi {
         @Path("childId") childId: String,
         @Path("packageName") packageName: String,
     ): ApiEnvelope<Unit>
+}
+
+interface InquiryApi {
+    @GET("inquiries")
+    suspend fun getInquiries(): ApiEnvelope<List<InquiryDto>>
+
+    @POST("inquiries")
+    suspend fun createInquiry(@Body body: CreateInquiryRequest): ApiEnvelope<InquiryDto>
+
+    @GET("inquiries/{id}")
+    suspend fun getInquiry(@Path("id") id: String): ApiEnvelope<InquiryDto>
 }

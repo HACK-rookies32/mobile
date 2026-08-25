@@ -145,6 +145,14 @@ data class ScreenshotDto(
 )
 
 @Serializable
+data class CommentDto(
+    val id: String,
+    val author: String,
+    val body: String,
+    val createdAt: String,
+)
+
+@Serializable
 data class PostDto(
     val id: String,
     val title: String,
@@ -153,10 +161,18 @@ data class PostDto(
     val likeCount: Int = 0,
     val createdAtLabel: String = "",
     val liked: Boolean = false,
+    val imageUrls: List<String> = emptyList(),
+    val links: List<String> = emptyList(),
+    val comments: List<CommentDto> = emptyList(),
 )
 
 @Serializable
-data class CreatePostRequest(val title: String, val body: String)
+data class CreatePostRequest(
+    val title: String,
+    val body: String,
+    val imageUrls: List<String>? = null,
+    val links: List<String>? = null,
+)
 
 @Serializable
 data class CommentRequest(val body: String)
@@ -248,4 +264,32 @@ data class AppControlUpdateRequest(
     val packageName: String,
     val blocked: Boolean,
     val limitMinutes: Int? = null,
+)
+
+@Serializable
+data class InquiryDto(
+    val id: String,
+    val title: String,
+    val body: String,
+    val status: String,
+    val createdAt: String,
+    val imageUrls: List<String> = emptyList(),
+    val links: List<String> = emptyList(),
+    val answers: List<InquiryAnswerDto> = emptyList(),
+)
+
+@Serializable
+data class InquiryAnswerDto(
+    val id: String,
+    val author: String,
+    val body: String,
+    val createdAt: String,
+)
+
+@Serializable
+data class CreateInquiryRequest(
+    val title: String,
+    val body: String,
+    val imageUrls: List<String>? = null,
+    val links: List<String>? = null,
 )

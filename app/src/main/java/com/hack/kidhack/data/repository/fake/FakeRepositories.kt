@@ -13,6 +13,8 @@ import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.Inquiry
+import com.hack.kidhack.domain.model.InquiryAnswer
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -33,6 +35,7 @@ import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.GeofenceRepository
+import com.hack.kidhack.domain.repository.InquiryRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
@@ -237,8 +240,22 @@ class FakeCommunityRepository : CommunityRepository {
     }.flow
     override suspend fun posts() = items.toList()
     override suspend fun post(postId: String) = items.first { it.id == postId }
-    override suspend fun create(title: String, body: String): Post {
-        val created = Post("p-${items.size + 1}", title, FakeData.parent.name, 0, 0, "방금")
+    override suspend fun create(
+        title: String,
+        body: String,
+        imageUrls: List<String>?,
+        links: List<String>?
+    ): Post {
+        val created = Post(
+            id = "p-${items.size + 1}",
+            title = title,
+            author = FakeData.parent.name,
+            commentCount = 0,
+            likeCount = 0,
+            createdAtLabel = "방금",
+            imageUrls = imageUrls ?: emptyList(),
+            links = links ?: emptyList()
+        )
         items.add(0, created)
         return created
     }
@@ -251,8 +268,65 @@ class FakeCommunityRepository : CommunityRepository {
     }
     override suspend fun comment(postId: String, body: String) {
         val i = items.indexOfFirst { it.id == postId }
-        if (i >= 0) items[i] = items[i].copy(commentCount = items[i].commentCount + 1)
+        if (i >= 0) {
+            val p = items[i]
+            val newComment = com.hack.kidhack.domain.model.Comment(
+                id = "c-${System.currentTimeMillis()}",
+                author = "나",
+                text = body,
+                createdAt = "방금"
+            )
+            items[i] = p.copy(
+                commentCount = p.commentCount + 1,
+                comments = p.comments + newComment
+            )
+        }
     }
+}
+
+class FakeInquiryRepository : InquiryRepository {
+    private val items = mutableListOf(
+        Inquiry(
+            id = "i1",
+            title = "페어링 코드가 안 나와요",
+            body = "부모 앱에서 버튼을 눌러도 코드가 생성되지 않습니다.",
+            status = "ANSWERED",
+            createdAt = "2024.08.20",
+            answers = listOf(
+                InquiryAnswer("a1", "관리자", "안녕하세요. 앱을 최신 버전으로 업데이트하신 후 다시 시도해 주세요.", "2024.08.21")
+            )
+        ),
+        Inquiry(
+            id = "i2",
+            title = "위치 추적 간격 설정 문의",
+            body = "위치 추적 간격을 10분보다 짧게 설정할 수 있나요?",
+            status = "PENDING",
+            createdAt = "2024.08.24"
+        )
+    )
+
+    override suspend fun list(): List<Inquiry> = items.toList()
+
+    override suspend fun create(
+        title: String,
+        body: String,
+        imageUrls: List<String>?,
+        links: List<String>?
+    ): Inquiry {
+        val created = Inquiry(
+            id = "i-${items.size + 1}",
+            title = title,
+            body = body,
+            status = "PENDING",
+            createdAt = "방금",
+            imageUrls = imageUrls ?: emptyList(),
+            links = links ?: emptyList()
+        )
+        items.add(0, created)
+        return created
+    }
+
+    override suspend fun get(id: String): Inquiry = items.first { it.id == id }
 }
 
 class FakeChatRepository(

@@ -9,6 +9,7 @@ import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -101,9 +102,20 @@ interface CommunityRepository {
     fun pagedPosts(): Flow<PagingData<Post>>
     suspend fun posts(): List<Post>
     suspend fun post(postId: String): Post
-    suspend fun create(title: String, body: String): Post
+    suspend fun create(
+        title: String,
+        body: String,
+        imageUrls: List<String>? = null,
+        links: List<String>? = null
+    ): Post
     suspend fun like(postId: String)
     suspend fun comment(postId: String, body: String)
+}
+
+interface InquiryRepository {
+    suspend fun list(): List<Inquiry>
+    suspend fun create(title: String, body: String, imageUrls: List<String>? = null, links: List<String>? = null): Inquiry
+    suspend fun get(id: String): Inquiry
 }
 
 interface ChatRepository {

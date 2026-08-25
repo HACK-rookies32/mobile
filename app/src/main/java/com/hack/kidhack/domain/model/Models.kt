@@ -84,6 +84,34 @@ data class Post(
     val likeCount: Int,
     val createdAtLabel: String,
     val liked: Boolean = false,
+    val imageUrls: List<String> = emptyList(),
+    val links: List<String> = emptyList(),
+    val comments: List<Comment> = emptyList(),
+)
+
+data class Comment(
+    val id: String,
+    val author: String,
+    val text: String,
+    val createdAt: String,
+)
+
+data class Inquiry(
+    val id: String,
+    val title: String,
+    val body: String,
+    val status: String, // PENDING, ANSWERED
+    val createdAt: String,
+    val imageUrls: List<String> = emptyList(),
+    val links: List<String> = emptyList(),
+    val answers: List<InquiryAnswer> = emptyList(),
+)
+
+data class InquiryAnswer(
+    val id: String,
+    val author: String,
+    val body: String,
+    val createdAt: String,
 )
 
 data class ChatRoom(
