@@ -25,6 +25,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
+import com.hack.kidhack.core.common.formatPhoneNumber
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
@@ -87,7 +88,7 @@ class MypageViewModel(
 
     fun toggleEdit() = _state.update { it.copy(editing = !it.editing, message = null) }
     fun onName(v: String) = _state.update { it.copy(name = v) }
-    fun onPhone(v: String) = _state.update { it.copy(phone = v) }
+    fun onPhone(v: String) = _state.update { it.copy(phone = formatPhoneNumber(v)) }
 
     fun saveProfile() {
         viewModelScope.launch {

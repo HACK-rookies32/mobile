@@ -206,7 +206,7 @@ val appModule = module {
     }
 
     viewModel { LoginViewModel(get()) }
-    viewModel { RegisterViewModel(get()) }
+    viewModel { RegisterViewModel(get(), get(), get(), androidContext()) }
     viewModel { ForgotViewModel(get()) }
 
     viewModel { DashboardViewModel(get(), get(), get(), get(), get()) }
@@ -232,5 +232,7 @@ val appModule = module {
     viewModel { ChildServicesViewModel(get(), get()) }
     viewModel { ChildMypageViewModel(get(), get(), get()) }
     viewModel { ChildScreenshotViewModel(get()) }
-    viewModel { ChildOnboardingViewModel(get()) }
+    viewModel { (persistDone: Boolean) ->
+        ChildOnboardingViewModel(get(), get(), persistDone)
+    }
 }

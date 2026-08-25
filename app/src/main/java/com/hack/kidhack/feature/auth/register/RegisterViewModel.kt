@@ -1,12 +1,16 @@
 package com.hack.kidhack.feature.auth.register
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hack.kidhack.background.ChildPlatformController
 import com.hack.kidhack.core.common.formatPhoneNumber
+import com.hack.kidhack.core.permission.KidhackPermissions
 import com.hack.kidhack.data.remote.userMessage
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.repository.AuthRepository
+import com.hack.kidhack.domain.repository.ChildOnboardingStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,10 +44,16 @@ data class RegisterUiState(
 
     val requiredAgreed: Boolean
         get() = agreedAge && agreedTerms && agreedPrivacy && agreedLocation && agreedPush
+
+    val doneStep: Int
+        get() = if (role == Role.CHILD) 4 else 3
 }
 
 class RegisterViewModel(
     private val authRepository: AuthRepository,
+    private val onboardingStore: ChildOnboardingStore,
+    private val platformController: ChildPlatformController,
+    private val appContext: Context,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(RegisterUiState())
@@ -98,11 +108,26 @@ class RegisterViewModel(
         }
     }
 
+    /** After terms: child goes to OS permissions; parent submits immediately. */
+    fun nextFromTerms() {
+        val s = _state.value
+        val role = s.role ?: return
+        when {
+            !s.requiredAgreed -> _state.update { it.copy(error = "필수 약관에 모두 동의해 주세요") }
+            role == Role.CHILD -> _state.update { it.copy(step = 3, error = null) }
+            else -> submit()
+        }
+    }
+
     fun submit() {
         val s = _state.value
         val role = s.role ?: return
         when {
             !s.requiredAgreed -> _state.update { it.copy(error = "필수 약관에 모두 동의해 주세요") }
+            role == Role.CHILD && !KidhackPermissions.hasAllRequiredForChildControl(appContext) ->
+                _state.update {
+                    it.copy(error = "자녀 보호에 필요한 권한을 모두 허용해 주세요")
+                }
             else -> viewModelScope.launch {
                 _state.update { it.copy(loading = true, error = null) }
                 runCatching {
@@ -118,7 +143,17 @@ class RegisterViewModel(
                         parentId = s.parentId.toLongOrNull()?.takeIf { role == Role.CHILD },
                     )
                 }.onSuccess { session ->
-                    _state.update { it.copy(loading = false, step = 3, session = session) }
+                    if (role == Role.CHILD) {
+                        onboardingStore.markDone()
+                        platformController.reevaluate()
+                    }
+                    _state.update {
+                        it.copy(
+                            loading = false,
+                            step = it.doneStep,
+                            session = session,
+                        )
+                    }
                 }.onFailure { t ->
                     _state.update {
                         it.copy(loading = false, error = t.userMessage("가입에 실패했어요"))

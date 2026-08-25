@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,9 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
@@ -46,7 +50,10 @@ import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.feature.auth.AuthScaffold
+import com.hack.kidhack.feature.child.onboarding.ChildOnboardingViewModel
+import com.hack.kidhack.feature.child.onboarding.ChildPermissionWizard
 import org.koin.androidx.compose.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 @Composable
 fun RegisterScreen(
@@ -57,6 +64,49 @@ fun RegisterScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
     val role = state.role
+    val permissionVm: ChildOnboardingViewModel = koinViewModel { parametersOf(false) }
+
+    val onPermissionsStep = role == Role.CHILD && state.step == 3 && state.session == null
+    val onDoneStep = state.session != null && state.step == state.doneStep
+
+    LaunchedEffect(state.error, state.session, state.step) {
+        if (onPermissionsStep && state.error != null && !state.loading) {
+            permissionVm.resetFinished()
+        }
+    }
+
+    if (onPermissionsStep) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            ChildPermissionWizard(
+                onFinished = { viewModel.submit() },
+                titleRes = R.string.child_register_permissions_title,
+                subtitleRes = R.string.child_register_permissions_subtitle,
+                continueRes = R.string.child_register_permissions_continue,
+                persistDone = false,
+                viewModel = permissionVm,
+            )
+            if (state.loading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.35f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            } else if (state.error != null) {
+                Text(
+                    text = state.error.orEmpty(),
+                    color = colors.danger,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp),
+                )
+            }
+        }
+        return
+    }
 
     AuthScaffold(
         header = {
@@ -64,12 +114,22 @@ fun RegisterScreen(
             Text("루키즈 가족이 되어보세요", color = Color.White.copy(alpha = 0.75f), fontSize = 14.sp)
             if (role != null) {
                 Spacer(Modifier.height(16.dp))
-                StepProgressBar(totalSteps = 3, currentStep = state.step.coerceAtMost(2))
+                val total = if (role == Role.CHILD) 4 else 3
+                val current = if (role == Role.CHILD) {
+                    (state.step - 1).coerceIn(0, total - 1)
+                } else {
+                    state.step.coerceAtMost(total - 1)
+                }
+                StepProgressBar(totalSteps = total, currentStep = current)
             }
         },
     ) {
         when {
-            state.step == 0 -> RoleStep(onParent = { viewModel.selectRole(Role.PARENT) }, onChild = { viewModel.selectRole(Role.CHILD) }, onLogin = onLogin)
+            state.step == 0 -> RoleStep(
+                onParent = { viewModel.selectRole(Role.PARENT) },
+                onChild = { viewModel.selectRole(Role.CHILD) },
+                onLogin = onLogin,
+            )
             state.step == 1 && role != null -> InfoStep(
                 badge = if (role == Role.PARENT) "🛡️ 부모님으로 가입" else "😊 자녀로 가입",
                 nicknameLabel = if (role == Role.PARENT) "닉네임 (선택)" else "닉네임 (선택)",
@@ -80,7 +140,7 @@ fun RegisterScreen(
                 viewModel = viewModel,
             )
             state.step == 2 -> TermsStep(state = state, viewModel = viewModel)
-            state.step == 3 && state.session != null -> DoneStep(session = state.session!!, onStart = { onRegistered(state.session!!) })
+            onDoneStep -> DoneStep(session = state.session!!, onStart = { onRegistered(state.session!!) })
         }
         if (state.error != null) {
             Text(state.error.orEmpty(), color = colors.danger, fontSize = 13.sp)
@@ -253,11 +313,16 @@ private fun TermsStep(state: RegisterUiState, viewModel: RegisterViewModel) {
             onCheckedChange = viewModel::onAgreedMarketing,
         )
     }
+    val isChild = state.role == Role.CHILD
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         KidButton("← 이전", viewModel::back, Modifier.weight(1f), KidButtonVariant.Ghost)
         KidButton(
-            text = if (state.loading) "처리 중..." else "가입하기",
-            onClick = viewModel::submit,
+            text = when {
+                state.loading -> "처리 중..."
+                isChild -> "다음 →"
+                else -> "가입하기"
+            },
+            onClick = viewModel::nextFromTerms,
             modifier = Modifier.weight(1f),
             enabled = !state.loading,
         )
