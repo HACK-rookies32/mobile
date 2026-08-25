@@ -1,0 +1,322 @@
+package com.hack.kidhack.feature.parent
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import com.hack.kidhack.R
+import com.hack.kidhack.core.designsystem.component.KidCard
+import com.hack.kidhack.core.designsystem.component.StatCard
+import com.hack.kidhack.core.designsystem.component.UsageBar
+import com.hack.kidhack.core.designsystem.theme.FontBlack
+import com.hack.kidhack.core.designsystem.theme.FontBold
+import com.hack.kidhack.core.designsystem.theme.FontSemibold
+import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
+import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.domain.model.AppNotification
+import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.ChildProfile
+import com.hack.kidhack.domain.repository.AppUsageRepository
+import com.hack.kidhack.domain.repository.ChildRepository
+import com.hack.kidhack.domain.repository.LocationRepository
+import com.hack.kidhack.domain.repository.NotificationRepository
+import com.hack.kidhack.domain.repository.SelectedChildRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import org.koin.androidx.compose.koinViewModel
+
+data class DashboardUiState(
+    val children: List<ChildProfile> = emptyList(),
+    val selectedId: String? = null,
+    val selected: ChildProfile? = null,
+    val lastLocation: String? = null,
+    val lastLocationAt: String? = null,
+    val usages: List<AppUsage> = emptyList(),
+    val notifications: List<AppNotification> = emptyList(),
+    val loading: Boolean = true,
+    val error: String? = null,
+)
+
+class DashboardViewModel(
+    private val childRepository: ChildRepository,
+    private val selectedChildRepository: SelectedChildRepository,
+    private val appUsageRepository: AppUsageRepository,
+    private val notificationRepository: NotificationRepository,
+    private val locationRepository: LocationRepository,
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(DashboardUiState())
+    val state: StateFlow<DashboardUiState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            selectedChildRepository.selectedChildId.collect { id ->
+                if (_state.value.children.isNotEmpty()) loadFor(id)
+            }
+        }
+        refresh()
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null) }
+            runCatching {
+                val children = childRepository.children()
+                val selectedId = selectedChildRepository.resolveId(children)
+                Triple(children, selectedId, selectedId)
+            }.onSuccess { (children, selectedId, _) ->
+                _state.update { it.copy(children = children, selectedId = selectedId) }
+                loadFor(selectedId)
+            }.onFailure { t ->
+                _state.update { it.copy(loading = false, error = t.message ?: "불러오지 못했어요") }
+            }
+        }
+    }
+
+    fun selectChild(id: String) {
+        viewModelScope.launch { selectedChildRepository.select(id) }
+    }
+
+    private suspend fun loadFor(childId: String?) {
+        if (childId == null) {
+            _state.update { it.copy(loading = false, selected = null) }
+            return
+        }
+        runCatching {
+            val child = _state.value.children.find { it.id == childId }
+                ?: childRepository.child(childId)
+            val usages = appUsageRepository.list(childId, "APP")
+            val notes = notificationRepository.list(null)
+            val loc = runCatching { locationRepository.current(childId) }.getOrNull()
+            _state.update {
+                it.copy(
+                    loading = false,
+                    error = null,
+                    selectedId = childId,
+                    selected = child,
+                    usages = usages,
+                    notifications = notes,
+                    lastLocation = loc?.label,
+                    lastLocationAt = loc?.recordedAt?.takeLast(5),
+                )
+            }
+        }.onFailure { t ->
+            _state.update { it.copy(loading = false, error = t.message) }
+        }
+    }
+}
+
+@Composable
+fun ParentDashboardScreen(
+    onOpenNotifications: () -> Unit = {},
+    onOpenAppControl: () -> Unit = {},
+    onOpenPairing: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
+    viewModel: DashboardViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val colors = LocalKidhackColors.current
+    val child = state.selected
+    val totalSec = state.usages.sumOf { it.durationSec }
+    val alertCount = state.notifications.count { !it.read }.coerceAtLeast(state.notifications.size.coerceAtMost(2))
+    val maxUsage = state.usages.maxOfOrNull { it.durationSec }?.coerceAtLeast(1) ?: 1
+
+    ParentScreenScaffold(
+        header = {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.parent_hello),
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 12.sp,
+                    )
+                    Text(
+                        stringResource(R.string.parent_dashboard_title),
+                        color = Color.White,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBlack,
+                        fontSize = 20.sp,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .clickable(onClick = onOpenNotifications),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("🔔", fontSize = 18.sp)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                state.children.forEach { c ->
+                    val selected = c.id == state.selectedId
+                    Text(
+                        text = c.name,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(if (selected) Color.White else Color.White.copy(alpha = 0.2f))
+                            .clickable { viewModel.selectChild(c.id) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        color = if (selected) colors.brand else Color.White,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 12.sp,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.parent_add_child),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(99.dp))
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .clickable(onClick = onOpenPairing)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = Color.White,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 12.sp,
+                )
+            }
+        },
+    ) {
+        ParentLoadingOrError(state.loading && child == null, state.error, viewModel::refresh)
+        if (child != null) {
+            KidCard(Modifier.clickable(onClick = onOpenProfile)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Brush.linearGradient(listOf(colors.brand, colors.brandDark))),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(child.avatarEmoji(), fontSize = 28.sp)
+                    }
+                    Spacer(Modifier.size(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(child.name, fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 18.sp, color = colors.text)
+                        Text(
+                            if (child.online) stringResource(R.string.parent_dashboard_online) else stringResource(R.string.parent_dashboard_offline),
+                            color = if (child.online) colors.safe else colors.muted,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 12.sp,
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(stringResource(R.string.parent_dashboard_last_location), color = colors.muted, fontSize = 11.sp, fontWeight = FontBold)
+                        Text(
+                            state.lastLocation?.let { "📍 ${it.substringAfterLast('(').removeSuffix(")").ifBlank { it }}" }
+                                ?: stringResource(R.string.parent_location_school),
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 12.sp,
+                            color = colors.text,
+                        )
+                        Text(state.lastLocationAt ?: "", color = colors.muted, fontSize = 11.sp)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatCard("⏱️", stringResource(R.string.parent_dashboard_stat_screentime), formatDuration(totalSec), Modifier.weight(1f))
+                StatCard("🛡️", stringResource(R.string.parent_dashboard_stat_blocked), stringResource(R.string.parent_dashboard_blocked_count), Modifier.weight(1f))
+                StatCard("⚠️", stringResource(R.string.parent_dashboard_stat_alerts), "${alertCount}건", Modifier.weight(1f))
+            }
+            KidCard {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.parent_dashboard_usage_title),
+                        modifier = Modifier.weight(1f),
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 14.sp,
+                        color = colors.text,
+                    )
+                    Text(
+                        stringResource(R.string.parent_dashboard_see_all),
+                        modifier = Modifier.clickable(onClick = onOpenAppControl),
+                        color = colors.brand,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 12.sp,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                val barColors = listOf(Color(0xFFF87171), Color(0xFFFACC15), colors.info)
+                state.usages.forEachIndexed { i, u ->
+                    UsageBar(
+                        name = u.appName,
+                        timeLabel = formatDuration(u.durationSec),
+                        progress = u.durationSec.toFloat() / maxUsage,
+                        barColor = barColors.getOrElse(i) { colors.brand },
+                    )
+                    if (i < state.usages.lastIndex) Spacer(Modifier.height(10.dp))
+                }
+            }
+            KidCard {
+                Text(
+                    stringResource(R.string.parent_dashboard_recent),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 14.sp,
+                    color = colors.text,
+                )
+                Spacer(Modifier.height(8.dp))
+                state.notifications.take(3).forEachIndexed { i, n ->
+                    val icon = when (n.type) {
+                        "HARMFUL" -> "🚫" to colors.danger
+                        "ARRIVAL" -> "📍" to colors.safe
+                        else -> "⏱️" to colors.warn
+                    }
+                    Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
+                        Text(icon.first, fontSize = 18.sp)
+                        Spacer(Modifier.size(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(n.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 12.sp, color = colors.text)
+                            Text(n.createdAt, fontFamily = KidhackFontFamily, fontWeight = FontSemibold, fontSize = 12.sp, color = colors.muted)
+                        }
+                    }
+                    if (i < state.notifications.take(3).lastIndex) {
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}

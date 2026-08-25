@@ -1,0 +1,236 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
+package com.hack.kidhack.di
+
+import com.hack.kidhack.BuildConfig
+import com.hack.kidhack.core.common.KidhackJson
+import com.hack.kidhack.data.local.ChildOnboardingStoreImpl
+import com.hack.kidhack.data.local.SelectedChildRepositoryImpl
+import com.hack.kidhack.data.local.SessionEventsImpl
+import com.hack.kidhack.data.local.SessionRepositoryImpl
+import com.hack.kidhack.data.remote.api.AppUsageApi
+import com.hack.kidhack.data.remote.api.AuthApi
+import com.hack.kidhack.data.remote.api.BlocklistApi
+import com.hack.kidhack.data.remote.api.ChatApi
+import com.hack.kidhack.data.remote.api.ChildApi
+import com.hack.kidhack.data.remote.api.CommunityApi
+import com.hack.kidhack.data.remote.api.GeofenceApi
+import com.hack.kidhack.data.remote.api.LocationApi
+import com.hack.kidhack.data.remote.api.NotificationApi
+import com.hack.kidhack.data.remote.api.PairingApi
+import com.hack.kidhack.data.remote.api.PaymentApi
+import com.hack.kidhack.data.remote.api.PointApi
+import com.hack.kidhack.data.remote.api.ScreenshotApi
+import com.hack.kidhack.data.remote.api.SubscriptionApi
+import com.hack.kidhack.data.remote.api.UserApi
+import com.hack.kidhack.data.remote.interceptor.AuthInterceptor
+import com.hack.kidhack.data.remote.interceptor.TokenAuthenticator
+import com.hack.kidhack.data.repository.fake.FakeAppControlRepository
+import com.hack.kidhack.data.repository.fake.FakeAppUsageRepository
+import com.hack.kidhack.data.repository.fake.FakeAuthRepository
+import com.hack.kidhack.data.repository.fake.FakeBlocklistRepository
+import com.hack.kidhack.data.repository.fake.FakeChatRepository
+import com.hack.kidhack.data.repository.fake.FakeChildRepository
+import com.hack.kidhack.data.repository.fake.FakeCommunityRepository
+import com.hack.kidhack.data.repository.fake.FakeGeofenceRepository
+import com.hack.kidhack.data.repository.fake.FakeLocationRepository
+import com.hack.kidhack.data.repository.fake.FakeNotificationRepository
+import com.hack.kidhack.data.repository.fake.FakePairingRepository
+import com.hack.kidhack.data.repository.fake.FakePaymentRepository
+import com.hack.kidhack.data.repository.fake.FakePointRepository
+import com.hack.kidhack.data.repository.fake.FakeScreenshotRepository
+import com.hack.kidhack.data.repository.fake.FakeSubscriptionRepository
+import com.hack.kidhack.data.repository.fake.FakeUserRepository
+import com.hack.kidhack.data.repository.real.RealAppControlRepository
+import com.hack.kidhack.data.repository.real.RealAppUsageRepository
+import com.hack.kidhack.data.repository.real.RealAuthRepository
+import com.hack.kidhack.data.repository.real.RealBlocklistRepository
+import com.hack.kidhack.data.repository.real.RealChatRepository
+import com.hack.kidhack.data.repository.real.RealChildRepository
+import com.hack.kidhack.data.repository.real.RealCommunityRepository
+import com.hack.kidhack.data.repository.real.RealGeofenceRepository
+import com.hack.kidhack.data.repository.real.RealLocationRepository
+import com.hack.kidhack.data.repository.real.RealNotificationRepository
+import com.hack.kidhack.data.repository.real.RealPairingRepository
+import com.hack.kidhack.data.repository.real.RealPaymentRepository
+import com.hack.kidhack.data.repository.real.RealPointRepository
+import com.hack.kidhack.data.repository.real.RealScreenshotRepository
+import com.hack.kidhack.data.repository.real.RealSubscriptionRepository
+import com.hack.kidhack.data.repository.real.RealUserRepository
+import com.hack.kidhack.data.ws.ChatWebSocketClient
+import com.hack.kidhack.domain.repository.AppControlRepository
+import com.hack.kidhack.domain.repository.AppUsageRepository
+import com.hack.kidhack.domain.repository.AuthRepository
+import com.hack.kidhack.domain.repository.BlocklistRepository
+import com.hack.kidhack.domain.repository.ChatRepository
+import com.hack.kidhack.domain.repository.ChildOnboardingStore
+import com.hack.kidhack.domain.repository.ChildRepository
+import com.hack.kidhack.domain.repository.CommunityRepository
+import com.hack.kidhack.domain.repository.GeofenceRepository
+import com.hack.kidhack.domain.repository.LocationRepository
+import com.hack.kidhack.domain.repository.NotificationRepository
+import com.hack.kidhack.domain.repository.PairingRepository
+import com.hack.kidhack.domain.repository.PaymentRepository
+import com.hack.kidhack.domain.repository.PointRepository
+import com.hack.kidhack.domain.repository.ScreenshotRepository
+import com.hack.kidhack.domain.repository.SelectedChildRepository
+import com.hack.kidhack.domain.repository.SessionEvents
+import com.hack.kidhack.domain.repository.SessionRepository
+import com.hack.kidhack.domain.repository.SubscriptionRepository
+import com.hack.kidhack.domain.repository.UserRepository
+import com.hack.kidhack.feature.auth.forgot.ForgotViewModel
+import com.hack.kidhack.feature.auth.login.LoginViewModel
+import com.hack.kidhack.feature.auth.register.RegisterViewModel
+import com.hack.kidhack.feature.parent.AppControlViewModel
+import com.hack.kidhack.feature.parent.ChildProfileViewModel
+import com.hack.kidhack.feature.parent.CommunityDetailViewModel
+import com.hack.kidhack.feature.parent.CommunityListViewModel
+import com.hack.kidhack.feature.parent.CommunityWriteViewModel
+import com.hack.kidhack.feature.parent.ContactViewModel
+import com.hack.kidhack.feature.parent.DashboardViewModel
+import com.hack.kidhack.feature.parent.GeofenceViewModel
+import com.hack.kidhack.feature.parent.HarmfulViewModel
+import com.hack.kidhack.feature.parent.LocationViewModel
+import com.hack.kidhack.feature.parent.MypageViewModel
+import com.hack.kidhack.feature.parent.NoticeViewModel
+import com.hack.kidhack.feature.parent.NotificationsViewModel
+import com.hack.kidhack.feature.parent.PairingViewModel
+import com.hack.kidhack.feature.parent.ParentChatViewModel
+import com.hack.kidhack.feature.parent.PayViewModel
+import com.hack.kidhack.feature.parent.ScreenshotViewModel
+import com.hack.kidhack.feature.child.chat.ChildChatViewModel
+import com.hack.kidhack.feature.child.home.ChildHomeViewModel
+import com.hack.kidhack.feature.child.mypage.ChildMypageViewModel
+import com.hack.kidhack.feature.child.onboarding.ChildOnboardingViewModel
+import com.hack.kidhack.feature.child.screenshot.ChildScreenshotViewModel
+import com.hack.kidhack.feature.child.services.ChildServicesViewModel
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import org.koin.android.ext.koin.androidContext
+import org.koin.core.module.dsl.viewModel
+import org.koin.dsl.module
+import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.concurrent.TimeUnit
+
+private val useMock: Boolean = BuildConfig.USE_MOCK
+
+val appModule = module {
+    single<SessionEvents> { SessionEventsImpl() }
+    single<SessionRepository> { SessionRepositoryImpl(androidContext()) }
+    single<SelectedChildRepository> { SelectedChildRepositoryImpl(androidContext()) }
+    single<ChildOnboardingStore> { ChildOnboardingStoreImpl(androidContext()) }
+
+    single {
+        val logging = HttpLoggingInterceptor().apply {
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+        }
+        OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor(get()))
+            .authenticator(
+                TokenAuthenticator(
+                    sessionRepository = get(),
+                    sessionEvents = get(),
+                    baseUrl = BuildConfig.BASE_URL.trimEnd('/') + "/",
+                    refreshClient = OkHttpClient.Builder()
+                        .connectTimeout(15, TimeUnit.SECONDS)
+                        .build(),
+                ),
+            )
+            .addInterceptor(logging)
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .build()
+    }
+
+    single {
+        val contentType = "application/json".toMediaType()
+        Retrofit.Builder()
+            .baseUrl(BuildConfig.BASE_URL.trimEnd('/') + "/")
+            .client(get())
+            .addConverterFactory(KidhackJson.instance.asConverterFactory(contentType))
+            .build()
+    }
+
+    single { get<Retrofit>().create(AuthApi::class.java) }
+    single { get<Retrofit>().create(UserApi::class.java) }
+    single { get<Retrofit>().create(PairingApi::class.java) }
+    single { get<Retrofit>().create(ChildApi::class.java) }
+    single { get<Retrofit>().create(LocationApi::class.java) }
+    single { get<Retrofit>().create(GeofenceApi::class.java) }
+    single { get<Retrofit>().create(NotificationApi::class.java) }
+    single { get<Retrofit>().create(BlocklistApi::class.java) }
+    single { get<Retrofit>().create(ScreenshotApi::class.java) }
+    single { get<Retrofit>().create(CommunityApi::class.java) }
+    single { get<Retrofit>().create(ChatApi::class.java) }
+    single { get<Retrofit>().create(PaymentApi::class.java) }
+    single { get<Retrofit>().create(PointApi::class.java) }
+    single { get<Retrofit>().create(SubscriptionApi::class.java) }
+    single { get<Retrofit>().create(AppUsageApi::class.java) }
+
+    single<AuthRepository> {
+        if (useMock) FakeAuthRepository(get(), get()) else RealAuthRepository(get(), get(), get())
+    }
+    single<UserRepository> { if (useMock) FakeUserRepository() else RealUserRepository(get()) }
+    single<PairingRepository> { if (useMock) FakePairingRepository() else RealPairingRepository(get()) }
+    single<ChildRepository> { if (useMock) FakeChildRepository() else RealChildRepository(get()) }
+    single<LocationRepository> { if (useMock) FakeLocationRepository() else RealLocationRepository(get()) }
+    single<GeofenceRepository> { if (useMock) FakeGeofenceRepository() else RealGeofenceRepository(get()) }
+    single<NotificationRepository> {
+        if (useMock) FakeNotificationRepository() else RealNotificationRepository(get())
+    }
+    single<BlocklistRepository> { if (useMock) FakeBlocklistRepository() else RealBlocklistRepository(get()) }
+    single<ScreenshotRepository> {
+        if (useMock) FakeScreenshotRepository() else RealScreenshotRepository(get())
+    }
+    single<CommunityRepository> {
+        if (useMock) FakeCommunityRepository() else RealCommunityRepository(get())
+    }
+    single { ChatWebSocketClient(get(), get(), BuildConfig.BASE_URL) }
+    single<ChatRepository> {
+        if (useMock) FakeChatRepository(get()) else RealChatRepository(get(), get(), get())
+    }
+    single<PaymentRepository> { if (useMock) FakePaymentRepository() else RealPaymentRepository(get()) }
+    single<PointRepository> { if (useMock) FakePointRepository() else RealPointRepository(get()) }
+    single<SubscriptionRepository> {
+        if (useMock) FakeSubscriptionRepository() else RealSubscriptionRepository(get())
+    }
+    single<AppUsageRepository> { if (useMock) FakeAppUsageRepository() else RealAppUsageRepository(get()) }
+    single<AppControlRepository> {
+        if (useMock) FakeAppControlRepository() else RealAppControlRepository()
+    }
+
+    viewModel { LoginViewModel(get()) }
+    viewModel { RegisterViewModel(get(), get()) }
+    viewModel { ForgotViewModel(get()) }
+
+    viewModel { DashboardViewModel(get(), get(), get(), get(), get()) }
+    viewModel { LocationViewModel(get(), get(), get()) }
+    viewModel { GeofenceViewModel(get(), get(), get(), get()) }
+    viewModel { ParentChatViewModel(get(), get(), get()) }
+    viewModel { NotificationsViewModel(get()) }
+    viewModel { MypageViewModel(get(), get(), get()) }
+    viewModel { AppControlViewModel(get(), get(), get()) }
+    viewModel { ScreenshotViewModel(get(), get(), get()) }
+    viewModel { ChildProfileViewModel(get(), get()) }
+    viewModel { HarmfulViewModel(get(), get(), get()) }
+    viewModel { PairingViewModel(get(), get()) }
+    viewModel { CommunityListViewModel(get()) }
+    viewModel { params -> CommunityDetailViewModel(params.get(), get()) }
+    viewModel { CommunityWriteViewModel(get()) }
+    viewModel { NoticeViewModel() }
+    viewModel { ContactViewModel() }
+    viewModel { PayViewModel(get(), get()) }
+
+    viewModel { ChildHomeViewModel(get()) }
+    viewModel { ChildChatViewModel(get()) }
+    viewModel { ChildServicesViewModel(get(), get()) }
+    viewModel { ChildMypageViewModel(get(), get(), get()) }
+    viewModel { ChildScreenshotViewModel(get()) }
+    viewModel { ChildOnboardingViewModel(get()) }
+}

@@ -1,0 +1,61 @@
+package com.hack.kidhack.navigation
+
+sealed class Route(val path: String) {
+    data object Splash : Route("splash")
+    data object Login : Route("login")
+    data object Register : Route("register")
+    data object Forgot : Route("forgot")
+
+    data object ParentGraph : Route("parent")
+    data object ParentDashboard : Route("parent/dashboard")
+    data object ParentLocation : Route("parent/location")
+    data object ParentChat : Route("parent/chat")
+    data object ParentNotifications : Route("parent/notifications")
+    data object ParentMypage : Route("parent/mypage")
+    data object ParentAppControl : Route("parent/appcontrol")
+    data object ParentScreenshot : Route("parent/screenshot")
+    data object ParentChildProfile : Route("parent/profile")
+    data object ParentHarmful : Route("parent/harmful")
+    data object ParentPairing : Route("parent/pairing")
+    data object ParentCommunity : Route("parent/community")
+    data object ParentCommunityDetail : Route("parent/community/detail/{postId}") {
+        fun create(postId: String) = "parent/community/detail/$postId"
+    }
+    data object ParentCommunityWrite : Route("parent/community/write")
+    data object ParentNotice : Route("parent/notice")
+    data object ParentContact : Route("parent/contact")
+    data object ParentPay : Route("parent/pay")
+    data object ParentGeofence : Route("parent/geofence")
+
+    data object ChildGraph : Route("child")
+    data object ChildStart : Route("child/start")
+    data object ChildOnboarding : Route("child/onboarding")
+    data object ChildHome : Route("child/home")
+    data object ChildChat : Route("child/chat")
+    data object ChildServices : Route("child/services")
+    data object ChildCamera : Route("child/camera")
+    data object ChildMypage : Route("child/mypage")
+    data object ChildScreenshot : Route("child/screenshot")
+}
+
+data class TabItem(
+    val route: Route,
+    val label: String,
+    val emoji: String,
+)
+
+val ParentTabs = listOf(
+    TabItem(Route.ParentDashboard, "대시보드", "📊"),
+    TabItem(Route.ParentLocation, "위치", "📍"),
+    TabItem(Route.ParentChat, "채팅", "💬"),
+    TabItem(Route.ParentNotifications, "알림", "🔔"),
+    TabItem(Route.ParentMypage, "마이", "👤"),
+)
+
+val ChildTabs = listOf(
+    TabItem(Route.ChildHome, "홈", "🏠"),
+    TabItem(Route.ChildChat, "채팅", "💬"),
+    TabItem(Route.ChildServices, "서비스", "🛡️"),
+    TabItem(Route.ChildCamera, "카메라", "📷"),
+    TabItem(Route.ChildMypage, "마이", "👤"),
+)

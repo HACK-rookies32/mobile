@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">루키즈</string>
+    <string name="child_platform_channel">자녀 보호 서비스</string>
+    <string name="child_platform_channel_desc">위치 추적과 화면 캡처 알림</string>
+    <string name="child_location_notif_title">위치 추적 실행 중</string>
+    <string name="child_location_notif_text">보호자가 위치를 확인할 수 있어요</string>
+    <string name="child_capture_notif_title">화면 캡처</string>
+    <string name="child_capture_notif_text">화면 캡처를 준비하고 있어요</string>
+    <string name="harmful_block_accessibility_description">유해 사이트·키워드를 감지해 차단하고 보호자에게 알려 줍니다.</string>
+    <string name="harmful_block_toast">유해 콘텐츠가 차단됐어요: %1$s</string>
+</resources>
