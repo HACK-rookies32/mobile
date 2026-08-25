@@ -224,3 +224,26 @@ data class AppUsageDto(
 
 @Serializable
 data class AppUsageReportRequest(val usages: List<AppUsageDto>)
+
+@Serializable
+data class InstalledAppDto(val packageName: String, val appName: String, val category: String?)
+
+@Serializable
+data class InstalledAppsResponse(val apps: List<InstalledAppDto>)
+
+@Serializable
+data class AppControlDto(
+    val packageName: String,
+    val appName: String,
+    val icon: String? = null,
+    val category: String? = null,
+    val blocked: Boolean,
+    val limitMinutes: Int? = null,
+)
+
+@Serializable
+data class AppControlUpdateRequest(
+    val packageName: String,
+    val blocked: Boolean,
+    val limitMinutes: Int? = null,
+)

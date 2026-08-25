@@ -85,7 +85,9 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
             ParentLocationScreen(onOpenGeofence = { navController.navigate(Route.ParentGeofence.path) })
         }
         parentTab(Route.ParentChat.path, navController) { ParentChatScreen() }
-        parentTab(Route.ParentNotifications.path, navController) { ParentNotificationsScreen() }
+        parentTab(Route.ParentNotifications.path, navController) { 
+            ParentNotificationsScreen(onBack = { navController.popBackStack() }) 
+        }
         parentTab(Route.ParentMypage.path, navController) {
             ParentMypageScreen(
                 onOpenNotifications = { navController.navigate(Route.ParentNotifications.path) },

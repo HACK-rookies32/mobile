@@ -139,9 +139,17 @@ data class PairingCode(
 )
 
 data class AppControlItem(
+    val packageName: String,
     val name: String,
     val icon: String,
     val category: String,
     val blocked: Boolean,
     val limit: String,
+    val limitMinutes: Int? = null,
+)
+
+data class InstalledApp(
+    val packageName: String,
+    val appName: String,
+    val category: String?,
 )

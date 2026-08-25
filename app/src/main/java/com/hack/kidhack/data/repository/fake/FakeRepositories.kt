@@ -341,12 +341,48 @@ class FakeAppUsageRepository : AppUsageRepository {
 
 class FakeAppControlRepository : AppControlRepository {
     private val items = mutableListOf(
-        AppControlItem("YouTube", "▶️", "동영상", false, "1시간"),
-        AppControlItem("TikTok", "🎵", "동영상", true, "차단"),
-        AppControlItem("카카오톡", "💬", "메신저", false, "무제한"),
-        AppControlItem("Instagram", "📸", "SNS", true, "차단"),
-        AppControlItem("Chrome", "🌐", "브라우저", false, "2시간"),
-        AppControlItem("게임", "🎮", "게임", true, "차단"),
+        AppControlItem("com.google.android.youtube", "YouTube", "▶️", "동영상", false, "1시간", 60),
+        AppControlItem("com.zhiliaoapp.musically", "TikTok", "🎵", "동영상", true, "차단", null),
+        AppControlItem("com.kakao.talk", "카카오톡", "💬", "메신저", false, "무제한", 0),
+        AppControlItem("com.instagram.android", "Instagram", "📸", "SNS", true, "차단", null),
+        AppControlItem("com.android.chrome", "Chrome", "🌐", "브라우저", false, "2시간", 120),
+        AppControlItem("com.nexon.kart", "게임", "🎮", "게임", true, "차단", null),
     )
     override suspend fun items(childId: String) = items.toList()
+
+    override suspend fun getInstalledApps(childId: String) = listOf(
+        com.hack.kidhack.domain.model.InstalledApp("com.google.android.youtube", "YouTube", "동영상"),
+        com.hack.kidhack.domain.model.InstalledApp("com.zhiliaoapp.musically", "TikTok", "동영상"),
+        com.hack.kidhack.domain.model.InstalledApp("com.kakao.talk", "카카오톡", "메신저"),
+        com.hack.kidhack.domain.model.InstalledApp("com.instagram.android", "Instagram", "SNS"),
+        com.hack.kidhack.domain.model.InstalledApp("com.android.chrome", "Chrome", "브라우저"),
+        com.hack.kidhack.domain.model.InstalledApp("com.nexon.kart", "게임", "게임"),
+        com.hack.kidhack.domain.model.InstalledApp("com.netflix.mediaclient", "Netflix", "동영상"),
+        com.hack.kidhack.domain.model.InstalledApp("com.facebook.katana", "Facebook", "SNS"),
+    )
+
+    override suspend fun updateAppControl(
+        childId: String,
+        packageName: String,
+        blocked: Boolean,
+        limitMinutes: Int?
+    ): AppControlItem {
+        val existing = items.find { it.packageName == packageName }
+        val updated = AppControlItem(
+            packageName = packageName,
+            name = existing?.name ?: packageName.split(".").last().capitalize(),
+            icon = existing?.icon ?: "❓",
+            category = existing?.category ?: "기타",
+            blocked = blocked,
+            limitMinutes = limitMinutes,
+            limit = if (blocked) "차단" else if (limitMinutes == null || limitMinutes == 0) "무제한" else "${limitMinutes / 60}시간 ${limitMinutes % 60}분"
+        )
+        items.removeAll { it.packageName == packageName }
+        items.add(updated)
+        return updated
+    }
+
+    override suspend fun deleteAppControl(childId: String, packageName: String) {
+        items.removeAll { it.packageName == packageName }
+    }
 }

@@ -1,10 +1,12 @@
 package com.hack.kidhack.data.repository
 
+import com.hack.kidhack.data.remote.dto.AppControlDto
 import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.GeofenceDto
+import com.hack.kidhack.data.remote.dto.InstalledAppDto
 import com.hack.kidhack.data.remote.dto.LocationDto
 import com.hack.kidhack.data.remote.dto.NotificationDto
 import com.hack.kidhack.data.remote.dto.NotificationSettingsDto
@@ -156,3 +158,19 @@ fun SubscriptionDto.toDomain(): Subscription = Subscription(planId, status, meth
 fun AppUsageDto.toDomain(): AppUsage = AppUsage(appName, durationSec, category)
 
 fun PairingCodeDto.toDomain(): PairingCode = PairingCode(pairingCode, expiresIn)
+
+fun AppControlDto.toDomain(): com.hack.kidhack.domain.model.AppControlItem = com.hack.kidhack.domain.model.AppControlItem(
+    packageName = packageName,
+    name = appName,
+    icon = icon ?: "❓",
+    category = category ?: "기타",
+    blocked = blocked,
+    limitMinutes = limitMinutes,
+    limit = if (blocked) "차단" else if (limitMinutes == null || limitMinutes == 0) "무제한" else "${limitMinutes / 60}시간 ${limitMinutes % 60}분"
+)
+
+fun InstalledAppDto.toDomain(): com.hack.kidhack.domain.model.InstalledApp = com.hack.kidhack.domain.model.InstalledApp(
+    packageName = packageName,
+    appName = appName,
+    category = category
+)

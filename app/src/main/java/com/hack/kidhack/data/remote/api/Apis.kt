@@ -2,6 +2,8 @@ package com.hack.kidhack.data.remote.api
 
 import com.hack.kidhack.data.remote.ApiEnvelope
 import com.hack.kidhack.data.remote.PageResponse
+import com.hack.kidhack.data.remote.dto.AppControlDto
+import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
 import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
@@ -18,6 +20,8 @@ import com.hack.kidhack.data.remote.dto.FindIdResponse
 import com.hack.kidhack.data.remote.dto.GeofenceDto
 import com.hack.kidhack.data.remote.dto.GpsStatusRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
+import com.hack.kidhack.data.remote.dto.InstalledAppDto
+import com.hack.kidhack.data.remote.dto.InstalledAppsResponse
 import com.hack.kidhack.data.remote.dto.LocationDto
 import com.hack.kidhack.data.remote.dto.LoginRequest
 import com.hack.kidhack.data.remote.dto.NotificationDto
@@ -297,5 +301,25 @@ interface AppUsageApi {
     suspend fun report(
         @Path("childId") childId: String,
         @Body body: AppUsageReportRequest,
+    ): ApiEnvelope<Unit>
+}
+
+interface AppControlApi {
+    @GET("children/{childId}/installed-apps")
+    suspend fun getInstalledApps(@Path("childId") childId: String): ApiEnvelope<InstalledAppsResponse>
+
+    @GET("children/{childId}/app-control")
+    suspend fun getAppControlList(@Path("childId") childId: String): ApiEnvelope<List<AppControlDto>>
+
+    @POST("children/{childId}/app-control")
+    suspend fun updateAppControl(
+        @Path("childId") childId: String,
+        @Body body: AppControlUpdateRequest,
+    ): ApiEnvelope<AppControlDto>
+
+    @DELETE("children/{childId}/app-control/{packageName}")
+    suspend fun deleteAppControl(
+        @Path("childId") childId: String,
+        @Path("packageName") packageName: String,
     ): ApiEnvelope<Unit>
 }

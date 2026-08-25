@@ -131,6 +131,14 @@ interface AppUsageRepository {
 
 interface AppControlRepository {
     suspend fun items(childId: String): List<AppControlItem>
+    suspend fun getInstalledApps(childId: String): List<com.hack.kidhack.domain.model.InstalledApp>
+    suspend fun updateAppControl(
+        childId: String,
+        packageName: String,
+        blocked: Boolean,
+        limitMinutes: Int?
+    ): AppControlItem
+    suspend fun deleteAppControl(childId: String, packageName: String)
 }
 
 interface SessionRepository {

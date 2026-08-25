@@ -8,6 +8,7 @@ import com.hack.kidhack.data.local.ChildOnboardingStoreImpl
 import com.hack.kidhack.data.local.SelectedChildRepositoryImpl
 import com.hack.kidhack.data.local.SessionEventsImpl
 import com.hack.kidhack.data.local.SessionRepositoryImpl
+import com.hack.kidhack.data.remote.api.AppControlApi
 import com.hack.kidhack.data.remote.api.AppUsageApi
 import com.hack.kidhack.data.remote.api.AuthApi
 import com.hack.kidhack.data.remote.api.BlocklistApi
@@ -172,6 +173,7 @@ val appModule = module {
     single { get<Retrofit>().create(PointApi::class.java) }
     single { get<Retrofit>().create(SubscriptionApi::class.java) }
     single { get<Retrofit>().create(AppUsageApi::class.java) }
+    single { get<Retrofit>().create(AppControlApi::class.java) }
 
     single<AuthRepository> {
         if (useMock) FakeAuthRepository(get(), get()) else RealAuthRepository(get(), get(), get())
@@ -202,7 +204,7 @@ val appModule = module {
     }
     single<AppUsageRepository> { if (useMock) FakeAppUsageRepository() else RealAppUsageRepository(get()) }
     single<AppControlRepository> {
-        if (useMock) FakeAppControlRepository() else RealAppControlRepository()
+        if (useMock) FakeAppControlRepository() else RealAppControlRepository(get())
     }
 
     viewModel { LoginViewModel(get()) }
@@ -213,7 +215,7 @@ val appModule = module {
     viewModel { LocationViewModel(get(), get(), get()) }
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
     viewModel { ParentChatViewModel(get(), get(), get()) }
-    viewModel { NotificationsViewModel(get()) }
+    viewModel { NotificationsViewModel(get(), get()) }
     viewModel { MypageViewModel(get(), get(), get()) }
     viewModel { AppControlViewModel(get(), get(), get()) }
     viewModel { ScreenshotViewModel(get(), get(), get()) }

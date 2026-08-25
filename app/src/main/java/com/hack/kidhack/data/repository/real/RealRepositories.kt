@@ -4,6 +4,7 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import com.hack.kidhack.data.remote.api.AppControlApi
 import com.hack.kidhack.data.remote.api.AppUsageApi
 import com.hack.kidhack.data.remote.api.AuthApi
 import com.hack.kidhack.data.remote.api.BlocklistApi
@@ -19,6 +20,7 @@ import com.hack.kidhack.data.remote.api.PointApi
 import com.hack.kidhack.data.remote.api.ScreenshotApi
 import com.hack.kidhack.data.remote.api.SubscriptionApi
 import com.hack.kidhack.data.remote.api.UserApi
+import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
 import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
@@ -313,11 +315,24 @@ class RealAppUsageRepository(private val api: AppUsageApi) : AppUsageRepository 
     }
 }
 
-class RealAppControlRepository : AppControlRepository {
+class RealAppControlRepository(private val api: AppControlApi) : AppControlRepository {
     override suspend fun items(childId: String): List<AppControlItem> =
-        FakeLocalAppControl.items
-}
+        api.getAppControlList(childId).unwrap().map { it.toDomain() }
 
-private object FakeLocalAppControl {
-    val items = emptyList<AppControlItem>()
+    override suspend fun getInstalledApps(childId: String): List<com.hack.kidhack.domain.model.InstalledApp> =
+        api.getInstalledApps(childId).unwrap().apps.map { it.toDomain() }
+
+    override suspend fun updateAppControl(
+        childId: String,
+        packageName: String,
+        blocked: Boolean,
+        limitMinutes: Int?
+    ): AppControlItem = api.updateAppControl(
+        childId,
+        AppControlUpdateRequest(packageName, blocked, limitMinutes)
+    ).unwrap().toDomain()
+
+    override suspend fun deleteAppControl(childId: String, packageName: String) {
+        api.deleteAppControl(childId, packageName).unwrapOrNull()
+    }
 }
