@@ -25,6 +25,7 @@ sealed class Route(val path: String) {
     data object ParentNotice : Route("parent/notice")
     data object ParentContact : Route("parent/contact")
     data object ParentPay : Route("parent/pay")
+    data object ParentCards : Route("parent/cards")
     data object ParentGeofence : Route("parent/geofence")
 
     data object ChildGraph : Route("child")

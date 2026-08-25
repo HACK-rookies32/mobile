@@ -295,7 +295,7 @@ data class CreateInquiryRequest(
 )
 
 @Serializable
-data class ChargePrepareRequest(val amount: Int, val method: String)
+data class ChargePrepareRequest(val amount: Int, val method: String, val cardId: String)
 
 @Serializable
 data class ChargePrepareResponse(

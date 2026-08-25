@@ -73,6 +73,7 @@
     <string name="parent_mypage_contact">관리자 문의</string>
     <string name="parent_mypage_service">서비스</string>
     <string name="parent_mypage_pay">루키즈 페이</string>
+    <string name="parent_mypage_cards">카드 관리</string>
     <string name="parent_mypage_payments">결제 내역</string>
     <string name="parent_mypage_other">기타</string>
     <string name="parent_mypage_terms">이용약관</string>

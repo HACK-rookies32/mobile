@@ -78,6 +78,7 @@ import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
+import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
@@ -293,17 +294,17 @@ class RealWalletRepository(
     override suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction> =
         walletApi.transactions(type = type, page = page).unwrap().content.map { it.toDomain() }
 
-    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResponse =
-        walletApi.transfer(TransferRequest(childId, amount, memo)).unwrap()
+    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult =
+        walletApi.transfer(TransferRequest(childId, amount, memo)).unwrap().toDomain()
 
-    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResponse =
-        walletApi.reclaim(TransferRequest(childId, amount)).unwrap()
+    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult =
+        walletApi.reclaim(TransferRequest(childId, amount)).unwrap().toDomain()
 
     override suspend fun getChildWallet(childId: String): Wallet =
         walletApi.childWallet(childId).unwrap().toDomain()
 
-    override suspend fun prepareCharge(amount: Int, method: String): com.hack.kidhack.domain.model.Charge =
-        chargeApi.prepare(ChargePrepareRequest(amount, method)).unwrap().toDomain()
+    override suspend fun prepareCharge(amount: Int, method: String, cardId: String): com.hack.kidhack.domain.model.Charge =
+        chargeApi.prepare(ChargePrepareRequest(amount, method, cardId)).unwrap().toDomain()
 
     override suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet =
         chargeApi.confirm(ChargeConfirmRequest(chargeId, paymentKey, amount)).unwrap().let { resp ->

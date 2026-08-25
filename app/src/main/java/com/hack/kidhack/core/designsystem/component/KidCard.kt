@@ -18,13 +18,14 @@ import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 @Composable
 fun KidCard(
     modifier: Modifier = Modifier,
+    containerColor: androidx.compose.ui.graphics.Color? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = LocalKidhackColors.current
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = colors.card,
+        color = containerColor ?: colors.card,
         border = BorderStroke(1.dp, colors.border),
         shadowElevation = 1.dp,
         tonalElevation = 0.dp,

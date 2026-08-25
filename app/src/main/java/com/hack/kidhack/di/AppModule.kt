@@ -96,6 +96,7 @@ import com.hack.kidhack.feature.auth.forgot.ForgotViewModel
 import com.hack.kidhack.feature.auth.login.LoginViewModel
 import com.hack.kidhack.feature.auth.register.RegisterViewModel
 import com.hack.kidhack.feature.parent.AppControlViewModel
+import com.hack.kidhack.feature.parent.CardViewModel
 import com.hack.kidhack.feature.parent.ChildProfileViewModel
 import com.hack.kidhack.feature.parent.CommunityDetailViewModel
 import com.hack.kidhack.feature.parent.CommunityListViewModel
@@ -193,7 +194,7 @@ val appModule = module {
     single { get<Retrofit>().create(CardApi::class.java) }
 
     single<AuthRepository> {
-        if (useMock) FakeAuthRepository(get(), get()) else RealAuthRepository(get(), get(), get())
+        if (useMock) FakeAuthRepository(get()) else RealAuthRepository(get(), get(), get())
     }
     single<UserRepository> { if (useMock) FakeUserRepository() else RealUserRepository(get()) }
     single<PairingRepository> { if (useMock) FakePairingRepository() else RealPairingRepository(get()) }
@@ -253,7 +254,8 @@ val appModule = module {
     viewModel { CommunityWriteViewModel(get()) }
     viewModel { NoticeViewModel() }
     viewModel { ContactViewModel(get<InquiryRepository>()) }
-    viewModel { PayViewModel(get(), get()) }
+    viewModel { PayViewModel(get(), get(), get()) }
+    viewModel { CardViewModel(get()) }
 
     viewModel { ChildHomeViewModel(get()) }
     viewModel { ChildChatViewModel(get()) }

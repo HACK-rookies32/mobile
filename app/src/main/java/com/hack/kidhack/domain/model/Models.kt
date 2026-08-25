@@ -37,6 +37,8 @@ data class LocationPoint(
     val label: String? = null,
 )
 
+fun LocationPoint.toDto(): com.hack.kidhack.data.remote.dto.LocationDto = com.hack.kidhack.data.remote.dto.LocationDto(lat, lng, recordedAt, label)
+
 data class Geofence(
     val id: String,
     val name: String,
@@ -190,7 +192,7 @@ data class Wallet(
 
 data class WalletTransaction(
     val txId: String,
-    val type: String, // CHARGE, TRANSFER_IN, TRANSFER_OUT, PAYMENT, REFUND, RECLAIM, ADJUST
+    val type: String,
     val amount: Int,
     val balanceAfter: Int,
     val refId: String?,
@@ -210,4 +212,10 @@ data class Card(
     val last4: String,
     val expiry: String,
     val ownerName: String
+)
+
+data class TransferResult(
+    val parentBalance: Int,
+    val childBalance: Int,
+    val txId: String
 )

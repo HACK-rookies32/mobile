@@ -23,6 +23,7 @@ import com.hack.kidhack.data.remote.dto.PostDto
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SubscriptionDto
 import com.hack.kidhack.data.remote.dto.TokenResponse
+import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UserDto
 import com.hack.kidhack.data.remote.dto.WalletDto
 import com.hack.kidhack.data.remote.dto.WalletTransactionDto
@@ -48,6 +49,7 @@ import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
+import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
@@ -237,7 +239,7 @@ fun ChargePrepareResponse.toDomain(): Charge = Charge(
     amount = amount,
     status = status,
     paymentKey = paymentKey,
-    method = "" // Response에는 없으므로 필요시 별도 처리
+    method = ""
 )
 
 fun CardDto.toDomain(): Card = Card(
@@ -245,4 +247,10 @@ fun CardDto.toDomain(): Card = Card(
     last4 = last4,
     expiry = expiry,
     ownerName = ownerName
+)
+
+fun TransferResponse.toDomain(): TransferResult = TransferResult(
+    parentBalance = parentBalance,
+    childBalance = childBalance,
+    txId = txId
 )

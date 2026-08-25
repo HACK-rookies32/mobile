@@ -30,6 +30,7 @@ import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
+import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
@@ -60,7 +61,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 class FakeAuthRepository(
     private val sessionRepository: SessionRepository,
-    private val fakeUserRepository: UserRepository,
 ) : AuthRepository {
     override suspend fun signup(
         loginId: String,
@@ -309,16 +309,16 @@ class FakeWalletRepository : WalletRepository {
         WalletTransaction("tx1", "CHARGE", 50000, 50000, null, "08.15"),
         WalletTransaction("tx2", "TRANSFER_OUT", -5000, 45000, "child-minjun", "08.20")
     )
-    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResponse {
+    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult {
         balance -= amount
-        return TransferResponse(balance, 10000 + amount, "tx-${System.currentTimeMillis()}")
+        return TransferResult(balance, 10000 + amount, "tx-${System.currentTimeMillis()}")
     }
-    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResponse {
+    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult {
         balance += amount
-        return TransferResponse(balance, 10000 - amount, "tx-${System.currentTimeMillis()}")
+        return TransferResult(balance, 10000 - amount, "tx-${System.currentTimeMillis()}")
     }
     override suspend fun getChildWallet(childId: String): Wallet = Wallet("w-child", 10000, "방금")
-    override suspend fun prepareCharge(amount: Int, method: String): Charge = Charge("c1", amount, "PENDING", "key1", method)
+    override suspend fun prepareCharge(amount: Int, method: String, cardId: String): Charge = Charge("c1", amount, "PENDING", "key1", method)
     override suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet {
         balance += amount
         return Wallet("w-parent", balance, "방금")

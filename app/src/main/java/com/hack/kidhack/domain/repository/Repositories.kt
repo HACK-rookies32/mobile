@@ -5,12 +5,12 @@ import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
+import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
-import com.hack.kidhack.domain.model.Card
-import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
@@ -26,6 +26,7 @@ import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
+import com.hack.kidhack.domain.model.TransferResult
 import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {
@@ -125,12 +126,10 @@ interface InquiryRepository {
 interface WalletRepository {
     suspend fun getMyWallet(): Wallet
     suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction>
-    suspend fun transferToChild(childId: String, amount: Int, memo: String?): com.hack.kidhack.data.remote.dto.TransferResponse
-    suspend fun reclaimFromChild(childId: String, amount: Int): com.hack.kidhack.data.remote.dto.TransferResponse
+    suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult
+    suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult
     suspend fun getChildWallet(childId: String): Wallet
-    
-    // PG 충전 관련
-    suspend fun prepareCharge(amount: Int, method: String): Charge
+    suspend fun prepareCharge(amount: Int, method: String, cardId: String): Charge
     suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet
 }
 
