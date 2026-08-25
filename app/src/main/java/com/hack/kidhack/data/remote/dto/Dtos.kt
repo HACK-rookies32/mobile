@@ -88,6 +88,8 @@ data class ChildUpdateRequest(
     val name: String? = null,
     val alias: String? = null,
     val profileImageUrl: String? = null,
+    val birthDate: String? = null,
+    val school: String? = null,
 )
 
 @Serializable

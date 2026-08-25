@@ -216,7 +216,7 @@ val appModule = module {
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
     viewModel { ParentChatViewModel(get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get()) }
-    viewModel { MypageViewModel(get(), get(), get()) }
+    viewModel { MypageViewModel(get(), get(), get(), get(), get()) }
     viewModel { AppControlViewModel(get(), get(), get()) }
     viewModel { ScreenshotViewModel(get(), get(), get()) }
     viewModel { ChildProfileViewModel(get(), get()) }

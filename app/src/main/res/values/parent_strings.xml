@@ -102,6 +102,7 @@
     <string name="parent_screenshot_request">캡처 요청 보내기</string>
     <string name="parent_screenshot_requesting">캡처 요청 중...</string>
     <string name="parent_screenshot_recent">최근 캡처 내역</string>
+    <string name="parent_screenshot_empty">아직 캡처된 화면이 없어요</string>
     <string name="parent_screenshot_view">보기</string>
 
     <string name="parent_profile_title">자녀 프로필 관리</string>

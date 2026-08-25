@@ -56,7 +56,14 @@ interface PairingRepository {
 interface ChildRepository {
     suspend fun children(): List<ChildProfile>
     suspend fun child(childId: String): ChildProfile
-    suspend fun updateChild(childId: String, name: String?, alias: String?, profileImageUrl: String?): ChildProfile
+    suspend fun updateChild(
+        childId: String,
+        name: String?,
+        alias: String?,
+        profileImageUrl: String?,
+        birthDate: String?,
+        school: String?
+    ): ChildProfile
 }
 
 interface LocationRepository {

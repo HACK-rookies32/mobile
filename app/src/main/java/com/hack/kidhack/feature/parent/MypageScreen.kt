@@ -1,6 +1,9 @@
 package com.hack.kidhack.feature.parent
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -10,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,9 +39,12 @@ import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AuthRepository
+import com.hack.kidhack.domain.repository.ChildRepository
+import com.hack.kidhack.domain.repository.SelectedChildRepository
 import com.hack.kidhack.domain.repository.SubscriptionRepository
 import com.hack.kidhack.domain.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +57,8 @@ import org.koin.androidx.compose.koinViewModel
 data class MypageUiState(
     val user: User? = null,
     val subscription: Subscription? = null,
+    val children: List<ChildProfile> = emptyList(),
+    val selectedChildId: String? = null,
     val editing: Boolean = false,
     val name: String = "",
     val phone: String = "",
@@ -61,12 +71,21 @@ class MypageViewModel(
     private val userRepository: UserRepository,
     private val subscriptionRepository: SubscriptionRepository,
     private val authRepository: AuthRepository,
+    private val childRepository: ChildRepository,
+    private val selectedChildRepository: SelectedChildRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(MypageUiState())
     val state: StateFlow<MypageUiState> = _state.asStateFlow()
 
-    init { load() }
+    init {
+        load()
+        viewModelScope.launch {
+            selectedChildRepository.selectedChildId.collect { id ->
+                _state.update { it.copy(selectedChildId = id) }
+            }
+        }
+    }
 
     fun load() {
         viewModelScope.launch {
@@ -74,15 +93,29 @@ class MypageViewModel(
             runCatching {
                 val user = userRepository.me()
                 val sub = runCatching { subscriptionRepository.me() }.getOrNull()
-                user to sub
-            }.onSuccess { (user, sub) ->
+                val children = childRepository.children()
+                val selectedId = selectedChildRepository.resolveId(children)
+                Triple(user, sub, children to selectedId)
+            }.onSuccess { (user, sub, childInfo) ->
                 _state.update {
-                    it.copy(loading = false, user = user, subscription = sub, name = user.name, phone = user.phone)
+                    it.copy(
+                        loading = false,
+                        user = user,
+                        subscription = sub,
+                        children = childInfo.first,
+                        selectedChildId = childInfo.second,
+                        name = user.name,
+                        phone = user.phone
+                    )
                 }
             }.onFailure { t ->
                 _state.update { it.copy(loading = false, error = t.message) }
             }
         }
+    }
+
+    fun selectChild(id: String) {
+        viewModelScope.launch { selectedChildRepository.select(id) }
     }
 
     fun toggleEdit() = _state.update { it.copy(editing = !it.editing, message = null) }
@@ -171,21 +204,54 @@ fun ParentMypageScreen(
             ListRow(stringResource(R.string.parent_mypage_change_password), subtitle = stringResource(R.string.parent_mypage_password_stub), onClick = null)
             ListRow(stringResource(R.string.parent_mypage_notif_settings), onClick = onOpenNotifications, showDivider = false)
         }
+
         GroupCard(stringResource(R.string.parent_mypage_child_manage)) {
+            // 자녀 선택기 추가
+            if (state.children.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    state.children.forEach { child ->
+                        val selected = child.id == state.selectedChildId
+                        Text(
+                            text = child.name,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(99.dp))
+                                .background(if (selected) colors.brand else colors.surface)
+                                .clickable { viewModel.selectChild(child.id) }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            color = if (selected) Color.White else colors.text,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                HorizontalDivider(color = colors.border.copy(alpha = 0.5f))
+                Spacer(Modifier.height(8.dp))
+            }
+
             ListRow(stringResource(R.string.parent_mypage_app_control), leading = "🛡️", onClick = onOpenAppControl)
             ListRow(stringResource(R.string.parent_mypage_screenshot), leading = "📸", onClick = onOpenScreenshot)
             ListRow(stringResource(R.string.parent_mypage_child_profile), leading = "👦", onClick = onOpenProfile)
-            ListRow(stringResource(R.string.parent_mypage_harmful), leading = "🚫", onClick = onOpenHarmful)
-            ListRow(stringResource(R.string.parent_mypage_pairing), leading = "🔗", onClick = onOpenPairing, showDivider = false)
+            ListRow(stringResource(R.string.parent_mypage_harmful), leading = "🚫", onClick = onOpenHarmful, showDivider = false)
         }
+
         GroupCard(stringResource(R.string.parent_mypage_community_group)) {
             ListRow(stringResource(R.string.parent_mypage_community), leading = "👨‍👩‍👧", onClick = onOpenCommunity)
             ListRow(stringResource(R.string.parent_mypage_notice), leading = "📢", onClick = onOpenNotice)
             ListRow(stringResource(R.string.parent_mypage_contact), leading = "📮", onClick = onOpenContact, showDivider = false)
         }
+
         GroupCard(stringResource(R.string.parent_mypage_service)) {
             ListRow(stringResource(R.string.parent_mypage_pay), leading = "💳", onClick = onOpenPay)
-            ListRow(stringResource(R.string.parent_mypage_payments), leading = "🧾", onClick = onOpenPay, showDivider = false)
+            ListRow(stringResource(R.string.parent_mypage_payments), leading = "🧾", onClick = onOpenPay)
+            ListRow(stringResource(R.string.parent_mypage_pairing), leading = "🔗", onClick = onOpenPairing, showDivider = false)
         }
         GroupCard(stringResource(R.string.parent_mypage_other)) {
             ListRow(stringResource(R.string.parent_mypage_terms), onClick = {})

@@ -140,10 +140,14 @@ class FakeChildRepository : ChildRepository {
         name: String?,
         alias: String?,
         profileImageUrl: String?,
+        birthDate: String?,
+        school: String?
     ): ChildProfile = child(childId).copy(
         name = name ?: child(childId).name,
         alias = alias ?: child(childId).alias,
         profileImageUrl = profileImageUrl ?: child(childId).profileImageUrl,
+        birthDate = birthDate ?: child(childId).birthDate,
+        school = school ?: child(childId).school
     )
 }
 

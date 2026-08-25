@@ -164,7 +164,12 @@ class RealChildRepository(private val api: ChildApi) : ChildRepository {
         name: String?,
         alias: String?,
         profileImageUrl: String?,
-    ): ChildProfile = api.update(childId, ChildUpdateRequest(name, alias, profileImageUrl)).unwrap().toDomain()
+        birthDate: String?,
+        school: String?,
+    ): ChildProfile = api.update(
+        childId,
+        ChildUpdateRequest(name, alias, profileImageUrl, birthDate, school)
+    ).unwrap().toDomain()
 }
 
 class RealLocationRepository(private val api: LocationApi) : LocationRepository {
