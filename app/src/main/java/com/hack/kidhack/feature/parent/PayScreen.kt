@@ -221,29 +221,46 @@ fun ParentPayScreen(
     ParentScreenScaffold(
         header = {
             ParentHeaderBar("루키즈 페이", onBack)
-            Spacer(Modifier.height(12.dp))
-            KidCard(containerColor = Color.White.copy(alpha = 0.15f)) {
-                Column(Modifier.padding(4.dp)) {
-                    Text("내 지갑 잔액", color = Color.White.copy(alpha = 0.7f), fontWeight = FontBold, fontSize = 12.sp)
-                    Text(
-                        "₩ ${formatWon(state.wallet?.balance ?: 0)}",
-                        color = Color.White,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBlack,
-                        fontSize = 28.sp,
-                    )
-                    
-                    if (state.childId != null) {
-                        Spacer(Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("자녀 지갑 잔액", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, modifier = Modifier.weight(1f))
-                            Text("₩ ${formatWon(state.childWallet?.balance ?: 0)}", color = Color.White, fontWeight = FontBold, fontSize = 13.sp)
-                        }
+            Spacer(Modifier.height(16.dp))
+            // 오렌지 헤더 위에 흰 불투명 카드를 얹어 경계를 확실히 드러낸다.
+            KidCard {
+                Text("내 지갑 잔액", color = colors.muted, fontWeight = FontBold, fontSize = 12.sp)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "₩ ${formatWon(state.wallet?.balance ?: 0)}",
+                    color = colors.brand,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBlack,
+                    fontSize = 28.sp,
+                )
+
+                if (state.childId != null) {
+                    Spacer(Modifier.height(12.dp))
+                    HorizontalDivider(color = colors.border)
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("👶", fontSize = 18.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "자녀 지갑 잔액",
+                            modifier = Modifier.weight(1f),
+                            color = colors.muted,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 13.sp,
+                        )
+                        Text(
+                            "₩ ${formatWon(state.childWallet?.balance ?: 0)}",
+                            color = colors.text,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 16.sp,
+                        )
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 PayTabBtn("보내기", state.tab == PayTab.SEND, Modifier.weight(1f)) { viewModel.onTab(PayTab.SEND) }
                 PayTabBtn("회수하기", state.tab == PayTab.RECLAIM, Modifier.weight(1f)) { viewModel.onTab(PayTab.RECLAIM) }
                 PayTabBtn("충전", state.tab == PayTab.CHARGE, Modifier.weight(1f)) { viewModel.onTab(PayTab.CHARGE) }
@@ -401,14 +418,15 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun PayTabBtn(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val colors = LocalKidhackColors.current
     Text(
         label,
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) Color.White.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.2f))
+            .background(if (selected) Color.White else Color.White.copy(alpha = 0.15f))
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
-        color = Color.White,
+        color = if (selected) colors.brand else Color.White,
         fontFamily = KidhackFontFamily,
         fontWeight = FontBold,
         fontSize = 11.sp,
