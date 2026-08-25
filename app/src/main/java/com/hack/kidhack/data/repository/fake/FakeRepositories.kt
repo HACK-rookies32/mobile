@@ -91,13 +91,13 @@ class FakeAuthRepository(
         return session
     }
 
-    override suspend fun login(loginId: String, password: String, preferredRole: Role?): Session {
+    override suspend fun login(username: String, password: String, preferredRole: Role?): Session {
         delay(250)
-        require(loginId.isNotBlank() && password.isNotBlank()) { "아이디와 비밀번호를 입력해 주세요" }
+        require(username.isNotBlank() && password.isNotBlank()) { "아이디와 비밀번호를 입력해 주세요" }
         val user = when {
-            preferredRole == Role.CHILD || loginId.contains("minjun") || loginId.startsWith("child") ->
-                FakeData.childUser.copy(loginId = loginId.ifBlank { FakeData.childUser.loginId })
-            else -> FakeData.parent.copy(loginId = loginId.ifBlank { FakeData.parent.loginId })
+            preferredRole == Role.CHILD || username.contains("minjun") || username.startsWith("child") ->
+                FakeData.childUser.copy(loginId = username.ifBlank { FakeData.childUser.loginId })
+            else -> FakeData.parent.copy(loginId = username.ifBlank { FakeData.parent.loginId })
         }
         val session = FakeData.sessionFor(user)
         sessionRepository.save(session)

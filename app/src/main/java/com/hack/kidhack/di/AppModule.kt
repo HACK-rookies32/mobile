@@ -174,7 +174,7 @@ val appModule = module {
     single { get<Retrofit>().create(AppUsageApi::class.java) }
 
     single<AuthRepository> {
-        if (useMock) FakeAuthRepository(get(), get()) else RealAuthRepository(get(), get(), get())
+        if (useMock) FakeAuthRepository(get(), get()) else RealAuthRepository(get(), get(), get(), get())
     }
     single<UserRepository> { if (useMock) FakeUserRepository() else RealUserRepository(get()) }
     single<PairingRepository> { if (useMock) FakePairingRepository() else RealPairingRepository(get()) }

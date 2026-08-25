@@ -2,6 +2,8 @@ package com.hack.kidhack.feature.auth.register
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hack.kidhack.core.common.formatPhoneNumber
+import com.hack.kidhack.data.remote.userMessage
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.repository.AuthRepository
@@ -51,7 +53,9 @@ class RegisterViewModel(
     fun back() = _state.update { it.copy(step = (it.step - 1).coerceAtLeast(0), error = null) }
     fun onNickname(v: String) = _state.update { it.copy(nickname = v) }
     fun onUsername(v: String) = _state.update { it.copy(username = v) }
-    fun onPhoneNumber(v: String) = _state.update { it.copy(phoneNumber = v) }
+    fun onPhoneNumber(v: String) = _state.update {
+        it.copy(phoneNumber = formatPhoneNumber(v))
+    }
     fun onEmail(v: String) = _state.update { it.copy(email = v) }
     fun onBirthDate(v: String) = _state.update { it.copy(birthDate = v) }
     fun onAddress(v: String) = _state.update { it.copy(address = v) }
@@ -116,7 +120,9 @@ class RegisterViewModel(
                 }.onSuccess { session ->
                     _state.update { it.copy(loading = false, step = 3, session = session) }
                 }.onFailure { t ->
-                    _state.update { it.copy(loading = false, error = t.message ?: "가입에 실패했어요") }
+                    _state.update {
+                        it.copy(loading = false, error = t.userMessage("가입에 실패했어요"))
+                    }
                 }
             }
         }

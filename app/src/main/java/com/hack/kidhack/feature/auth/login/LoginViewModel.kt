@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.repository.AuthRepository
+import com.hack.kidhack.data.remote.userMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,11 +41,20 @@ class LoginViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
-                authRepository.login(current.loginId.trim(), current.password, current.role)
+                authRepository.login(
+                    username = current.loginId.trim(),
+                    password = current.password,
+                    preferredRole = current.role,
+                )
             }.onSuccess { session ->
                 _state.update { it.copy(loading = false, session = session) }
             }.onFailure { t ->
-                _state.update { it.copy(loading = false, error = t.message ?: "로그인에 실패했어요") }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        error = t.userMessage("로그인에 실패했어요"),
+                    )
+                }
             }
         }
     }
