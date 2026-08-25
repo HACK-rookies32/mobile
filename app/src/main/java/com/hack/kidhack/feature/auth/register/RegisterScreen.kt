@@ -34,8 +34,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
+import com.hack.kidhack.core.designsystem.component.KidDateField
 import com.hack.kidhack.core.designsystem.component.KidTextField
-import com.hack.kidhack.core.designsystem.component.PinCodeInput
 import com.hack.kidhack.core.designsystem.component.StepProgressBar
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
@@ -68,27 +68,16 @@ fun RegisterScreen(
     ) {
         when {
             state.step == 0 -> RoleStep(onParent = { viewModel.selectRole(Role.PARENT) }, onChild = { viewModel.selectRole(Role.CHILD) }, onLogin = onLogin)
-            state.step == 1 && role == Role.PARENT -> InfoStep(
-                badge = "🛡️ 부모님으로 가입",
-                nameLabel = "이름",
-                namePlaceholder = "홍길동",
+            state.step == 1 && role != null -> InfoStep(
+                badge = if (role == Role.PARENT) "🛡️ 부모님으로 가입" else "😊 자녀로 가입",
+                nicknameLabel = if (role == Role.PARENT) "닉네임 (선택)" else "닉네임 (선택)",
+                nicknamePlaceholder = if (role == Role.PARENT) "홍길동" else "나의 이름",
+                emailRequired = role != Role.CHILD,
+                showParentId = role == Role.CHILD,
                 state = state,
                 viewModel = viewModel,
             )
-            state.step == 1 && role == Role.CHILD -> {
-                InfoStep(
-                    badge = "😊 자녀로 가입",
-                    nameLabel = "이름 (닉네임)",
-                    namePlaceholder = "나의 이름",
-                    state = state,
-                    viewModel = viewModel,
-                )
-                KidCard {
-                    Text("👪  부모님 연결 코드", color = colors.brandDark, fontWeight = FontBold, fontSize = 14.sp)
-                    Text("다음 단계에서 부모님이 보내준 코드를 입력해요", color = colors.muted, fontSize = 12.sp)
-                }
-            }
-            state.step == 2 -> PasswordStep(state = state, viewModel = viewModel)
+            state.step == 2 -> TermsStep(state = state, viewModel = viewModel)
             state.step == 3 && state.session != null -> DoneStep(session = state.session!!, onStart = { onRegistered(state.session!!) })
         }
         if (state.error != null) {
@@ -149,25 +138,16 @@ private fun RoleCard(emoji: String, title: String, desc: String, onClick: () -> 
 @Composable
 private fun InfoStep(
     badge: String,
-    nameLabel: String,
-    namePlaceholder: String,
+    nicknameLabel: String,
+    nicknamePlaceholder: String,
+    emailRequired: Boolean,
+    showParentId: Boolean,
     state: RegisterUiState,
     viewModel: RegisterViewModel,
 ) {
-    Text(badge, color = LocalKidhackColors.current.brandDark, fontWeight = FontBold, fontSize = 14.sp)
-    KidTextField(state.name, viewModel::onName, nameLabel, placeholder = namePlaceholder)
-    KidTextField(state.loginId, viewModel::onLoginId, "아이디", placeholder = "아이디를 입력하세요")
-    KidTextField(state.phone, viewModel::onPhone, "휴대폰 번호", placeholder = "010-0000-0000", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
-    KidTextField(state.email, viewModel::onEmail, "이메일 (선택)", placeholder = "example@email.com", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        KidButton("← 이전", viewModel::back, Modifier.weight(1f), KidButtonVariant.Ghost)
-        KidButton("다음 →", viewModel::nextFromInfo, Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun PasswordStep(state: RegisterUiState, viewModel: RegisterViewModel) {
     val colors = LocalKidhackColors.current
+    Text(badge, color = colors.brandDark, fontWeight = FontBold, fontSize = 14.sp)
+    KidTextField(state.username, viewModel::onUsername, "아이디", placeholder = "로그인에 사용할 아이디")
     KidTextField(
         state.password,
         viewModel::onPassword,
@@ -184,10 +164,53 @@ private fun PasswordStep(state: RegisterUiState, viewModel: RegisterViewModel) {
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
     )
-    if (state.role == Role.CHILD) {
-        Text("부모님 연결 코드", color = colors.muted, fontWeight = FontBold, fontSize = 12.sp)
-        PinCodeInput(value = state.pairingCode, onValueChange = viewModel::onPairingCode)
-        Text("부모님 앱에 표시된 6자리 코드를 입력해요", color = colors.muted, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+    KidTextField(state.nickname, viewModel::onNickname, nicknameLabel, placeholder = nicknamePlaceholder)
+    KidTextField(
+        state.phoneNumber,
+        viewModel::onPhoneNumber,
+        "휴대폰 번호",
+        placeholder = "010-0000-0000",
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+    )
+    KidTextField(
+        state.email,
+        viewModel::onEmail,
+        if (emailRequired) "이메일" else "이메일 (선택)",
+        placeholder = "example@email.com",
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+    )
+    KidDateField(
+        value = state.birthDate,
+        onValueChange = viewModel::onBirthDate,
+        label = "생년월일",
+        placeholder = "달력에서 선택하세요",
+    )
+    KidTextField(state.address, viewModel::onAddress, "주소 (선택)", placeholder = "서울시 강남구")
+    if (showParentId) {
+        KidCard {
+            Text("👪  부모님 연결", color = colors.brandDark, fontWeight = FontBold, fontSize = 14.sp)
+            Text("부모님이 가입할 때 발급된 회원 번호를 입력해요", color = colors.muted, fontSize = 12.sp)
+        }
+        KidTextField(
+            state.parentId,
+            viewModel::onParentId,
+            "부모님 회원 번호",
+            placeholder = "예: 1001",
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        KidButton("← 이전", viewModel::back, Modifier.weight(1f), KidButtonVariant.Ghost)
+        KidButton("다음 →", viewModel::nextFromInfo, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun TermsStep(state: RegisterUiState, viewModel: RegisterViewModel) {
+    val colors = LocalKidhackColors.current
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("약관 동의", fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 24.sp, color = colors.text)
+        Text("가입을 완료하려면 약관에 동의해 주세요", color = colors.muted, fontSize = 14.sp)
     }
     Row(
         modifier = Modifier
@@ -195,6 +218,7 @@ private fun PasswordStep(state: RegisterUiState, viewModel: RegisterViewModel) {
             .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
             .border(1.dp, colors.border, RoundedCornerShape(12.dp))
+            .clickable { viewModel.onAgreed(!state.agreed) }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -208,7 +232,7 @@ private fun PasswordStep(state: RegisterUiState, viewModel: RegisterViewModel) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         KidButton("← 이전", viewModel::back, Modifier.weight(1f), KidButtonVariant.Ghost)
         KidButton(
-            text = if (state.loading) "처리 중..." else if (state.role == Role.CHILD) "완료 →" else "다음 →",
+            text = if (state.loading) "처리 중..." else "가입하기",
             onClick = viewModel::submit,
             modifier = Modifier.weight(1f),
             enabled = !state.loading,

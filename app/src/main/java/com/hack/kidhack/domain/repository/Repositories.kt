@@ -25,13 +25,16 @@ import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {
     suspend fun signup(
-        loginId: String,
+        username: String,
         password: String,
-        name: String,
-        role: Role,
-        phone: String,
+        nickname: String?,
         email: String?,
-        pairingCode: String?,
+        phoneNumber: String,
+        birthDate: String,
+        address: String?,
+        profileImageUrl: String? = null,
+        role: Role,
+        parentId: Long?,
     ): Session
 
     suspend fun login(loginId: String, password: String, preferredRole: Role? = null): Session

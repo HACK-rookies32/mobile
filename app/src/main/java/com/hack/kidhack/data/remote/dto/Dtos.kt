@@ -7,12 +7,16 @@ data class LoginRequest(val loginId: String, val password: String)
 
 @Serializable
 data class SignupRequest(
-    val loginId: String,
+    val username: String,
     val password: String,
-    val name: String,
-    val role: String,
-    val phone: String,
+    val nickname: String? = null,
     val email: String? = null,
+    val phoneNumber: String,
+    val birthDate: String,
+    val address: String? = null,
+    val profileImageUrl: String? = null,
+    val role: String,
+    val parentId: Long? = null,
 )
 
 @Serializable

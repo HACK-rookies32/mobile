@@ -98,21 +98,32 @@ class RealAuthRepository(
     private val sessionEvents: SessionEvents,
 ) : AuthRepository {
     override suspend fun signup(
-        loginId: String,
+        username: String,
         password: String,
-        name: String,
-        role: Role,
-        phone: String,
+        nickname: String?,
         email: String?,
-        pairingCode: String?,
+        phoneNumber: String,
+        birthDate: String,
+        address: String?,
+        profileImageUrl: String?,
+        role: Role,
+        parentId: Long?,
     ): Session {
         val session = api.signup(
-            SignupRequest(loginId, password, name, role.name, phone, email),
+            SignupRequest(
+                username = username,
+                password = password,
+                nickname = nickname,
+                email = email,
+                phoneNumber = phoneNumber,
+                birthDate = birthDate,
+                address = address,
+                profileImageUrl = profileImageUrl,
+                role = role.name,
+                parentId = parentId,
+            ),
         ).unwrap().toSession()
         sessionRepository.save(session)
-        if (role == Role.CHILD && !pairingCode.isNullOrBlank()) {
-            // Pairing requires CHILD JWT; connect is invoked by PairingRepository after signup.
-        }
         return session
     }
 
