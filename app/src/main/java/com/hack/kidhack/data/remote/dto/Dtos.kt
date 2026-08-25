@@ -224,3 +224,31 @@ data class AppUsageDto(
 
 @Serializable
 data class AppUsageReportRequest(val usages: List<AppUsageDto>)
+
+/**
+ * 부모가 보낸 원격 요청.
+ *
+ * 명세 4.x 에 아직 없는 **신규 제안 계약**이다(GAP-11: 202 만 있고 페이로드 미정의).
+ * 백엔드와 키 이름을 맞출 때 이 DTO 와 [RemoteCommandAckRequest] 만 고치면 된다.
+ */
+@Serializable
+data class RemoteCommandDto(
+    val requestId: String,
+    val type: String,
+    val childId: String = "",
+    val requestedBy: String? = null,
+    val requestedAt: String? = null,
+)
+
+@Serializable
+data class RemoteCommandAckRequest(
+    val status: String,
+    val message: String? = null,
+)
+
+@Serializable
+data class ChildPhotoDto(
+    val id: String,
+    val capturedAt: String,
+    val imageUrl: String? = null,
+)

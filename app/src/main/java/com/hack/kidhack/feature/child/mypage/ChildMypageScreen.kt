@@ -41,6 +41,7 @@ fun ChildMypageScreen(
     onServices: () -> Unit = {},
     onScreenshot: () -> Unit = {},
     onCamera: () -> Unit = {},
+    onPay: () -> Unit = {},
     viewModel: ChildMypageViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -175,6 +176,15 @@ fun ChildMypageScreen(
                 fontWeight = FontBold,
                 fontSize = 12.sp,
             )
+            ListRow(
+                title = stringResource(R.string.child_mypage_menu_pay),
+                leading = "💳",
+                subtitle = stringResource(
+                    R.string.child_mypage_menu_pay_balance,
+                    formatPoint(state.payBalance),
+                ),
+                onClick = onPay,
+            )
             ListRow(title = stringResource(R.string.child_mypage_menu_services), onClick = onServices)
             ListRow(title = stringResource(R.string.child_mypage_menu_screenshots), onClick = onScreenshot)
             ListRow(
@@ -216,6 +226,10 @@ fun ChildMypageScreen(
         Spacer(Modifier.height(8.dp))
     }
 }
+
+/** 1234567 → "1,234,567" */
+private fun formatPoint(value: Int): String =
+    value.toString().reversed().chunked(3).joinToString(",").reversed()
 
 @Composable
 private fun TodayStat(

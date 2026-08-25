@@ -9,11 +9,13 @@ import com.hack.kidhack.data.remote.api.AuthApi
 import com.hack.kidhack.data.remote.api.BlocklistApi
 import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
+import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.GeofenceApi
 import com.hack.kidhack.data.remote.api.LocationApi
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
+import com.hack.kidhack.data.remote.api.PhotoApi
 import com.hack.kidhack.data.remote.api.PaymentApi
 import com.hack.kidhack.data.remote.api.PointApi
 import com.hack.kidhack.data.remote.api.ScreenshotApi
@@ -32,6 +34,7 @@ import com.hack.kidhack.data.remote.dto.GpsStatusRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
 import com.hack.kidhack.data.remote.dto.LoginRequest
 import com.hack.kidhack.data.remote.dto.PairingConnectRequest
+import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.SignupRequest
 import com.hack.kidhack.data.remote.dto.SubscribeRequest
@@ -45,12 +48,14 @@ import com.hack.kidhack.data.repository.toDto
 import com.hack.kidhack.data.repository.toSession
 import com.hack.kidhack.data.ws.ChatWebSocketClient
 import com.hack.kidhack.data.ws.ChatWsEvent
+import com.hack.kidhack.data.ws.ChildCommandSocket
 import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
+import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.LocationPoint
@@ -60,6 +65,7 @@ import com.hack.kidhack.domain.model.Payment
 import com.hack.kidhack.domain.model.PointBalance
 import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
+import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
@@ -71,12 +77,14 @@ import com.hack.kidhack.domain.repository.AuthRepository
 import com.hack.kidhack.domain.repository.BlocklistRepository
 import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
+import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.GeofenceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
+import com.hack.kidhack.domain.repository.PhotoRepository
 import com.hack.kidhack.domain.repository.PointRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
 import com.hack.kidhack.domain.repository.SessionEvents
@@ -89,6 +97,12 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -226,6 +240,18 @@ class RealScreenshotRepository(private val api: ScreenshotApi) : ScreenshotRepos
     override suspend fun requestCapture(childId: String) {
         api.requestCapture(childId).unwrapOrNull()
     }
+
+    override suspend fun upload(
+        childId: String,
+        file: File,
+        capturedAt: String,
+        trigger: String,
+    ): Screenshot = api.upload(
+        childId = childId,
+        file = file.toImagePart(),
+        capturedAt = capturedAt.toPlainBody(),
+        trigger = trigger.toPlainBody(),
+    ).unwrap().toDomain()
 }
 
 class RealCommunityRepository(private val api: CommunityApi) : CommunityRepository {
@@ -321,3 +347,48 @@ class RealAppControlRepository : AppControlRepository {
 private object FakeLocalAppControl {
     val items = emptyList<AppControlItem>()
 }
+
+class RealPhotoRepository(private val api: PhotoApi) : PhotoRepository {
+    override suspend fun upload(
+        childId: String,
+        file: File,
+        capturedAt: String,
+        requestId: String?,
+    ): ChildPhoto = api.upload(
+        childId = childId,
+        file = file.toImagePart(),
+        capturedAt = capturedAt.toPlainBody(),
+        requestId = requestId?.toPlainBody(),
+    ).unwrap().toDomain()
+}
+
+/**
+ * 실시간 경로는 [ChildCommandSocket], 백업 경로는 `GET .../commands/pending` 폴링.
+ *
+ * 폴링 엔드포인트가 아직 서버에 없으면 [pending] 은 빈 목록으로 떨어지고
+ * 소켓 경로만 살아 있게 된다(요청 자체가 유실되지는 않는다).
+ */
+class RealCommandRepository(
+    private val api: CommandApi,
+    private val socket: ChildCommandSocket,
+) : CommandRepository {
+
+    override fun observe(): Flow<RemoteCommand> = socket.commands
+        .onStart { socket.start() }
+
+    override fun disconnect() = socket.stop()
+
+    override suspend fun pending(childId: String): List<RemoteCommand> =
+        runCatching { api.pending(childId).unwrap().map { it.toDomain() } }
+            .getOrDefault(emptyList())
+
+    override suspend fun ack(childId: String, requestId: String, status: String, message: String?) {
+        socket.ack(requestId, status, message)
+        runCatching { api.ack(childId, requestId, RemoteCommandAckRequest(status, message)).unwrapOrNull() }
+    }
+}
+
+private fun File.toImagePart(): MultipartBody.Part =
+    MultipartBody.Part.createFormData("file", name, asRequestBody("image/jpeg".toMediaType()))
+
+private fun String.toPlainBody(): RequestBody = toRequestBody("text/plain".toMediaType())

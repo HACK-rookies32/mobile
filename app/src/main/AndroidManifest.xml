@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission
@@ -39,6 +41,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.Kidhack"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -53,10 +56,27 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
+        <!-- 부모 캡처 요청 → 화면 녹화 동의를 받는 투명 액티비티. 알림 탭이 이 화면으로 들어온다. -->
+        <activity
+            android:name=".background.capture.MediaProjectionRequestActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Kidhack.Transparent" />
+
         <service
             android:name=".background.capture.ScreenCaptureService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
+
+        <!--
+            Firebase 없이 부모 요청을 실시간 수신하는 WebSocket 상주 서비스.
+            운영 배포 시에는 dataSync 대신 specialUse 선언을 검토할 것(안드로이드 15의 dataSync 하루 6시간 제한).
+        -->
+        <service
+            android:name=".background.command.ChildCommandService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <service
             android:name=".background.accessibility.HarmfulBlockAccessibilityService"

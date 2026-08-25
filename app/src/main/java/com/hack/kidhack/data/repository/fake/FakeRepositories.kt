@@ -11,6 +11,7 @@ import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
+import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.LocationPoint
@@ -20,6 +21,7 @@ import com.hack.kidhack.domain.model.Payment
 import com.hack.kidhack.domain.model.PointBalance
 import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
+import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
@@ -31,12 +33,14 @@ import com.hack.kidhack.domain.repository.AuthRepository
 import com.hack.kidhack.domain.repository.BlocklistRepository
 import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
+import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.GeofenceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
+import com.hack.kidhack.domain.repository.PhotoRepository
 import com.hack.kidhack.domain.repository.PointRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
 import com.hack.kidhack.domain.repository.SessionEvents
@@ -46,7 +50,9 @@ import com.hack.kidhack.domain.repository.UserRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.filter
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -212,16 +218,35 @@ class FakeBlocklistRepository : BlocklistRepository {
 }
 
 class FakeScreenshotRepository : ScreenshotRepository {
-    private val items = listOf(
+    private val items = mutableListOf(
         Screenshot("s1", "오늘 14:22", "YouTube 시청 중", "MANUAL"),
         Screenshot("s2", "오늘 11:05", "카카오톡", "MANUAL"),
         Screenshot("s3", "어제 18:40", "Chrome", "SCHEDULED"),
     )
     override fun paged(childId: String): Flow<PagingData<Screenshot>> = Pager(PagingConfig(20)) {
-        PageResponsePagingSource { page, size -> PageResponse(items, page, size, items.size.toLong(), 1) }
+        PageResponsePagingSource { page, size ->
+            PageResponse(items.toList(), page, size, items.size.toLong(), 1)
+        }
     }.flow
-    override suspend fun list(childId: String) = items
+    override suspend fun list(childId: String) = items.toList()
     override suspend fun requestCapture(childId: String) = Unit
+
+    override suspend fun upload(
+        childId: String,
+        file: File,
+        capturedAt: String,
+        trigger: String,
+    ): Screenshot {
+        val shot = Screenshot(
+            id = "s-${'$'}{System.currentTimeMillis()}",
+            capturedAt = capturedAt,
+            description = "방금 캡처",
+            trigger = trigger,
+            imageUrl = file.toURI().toString(),
+        )
+        items.add(0, shot)
+        return shot
+    }
 }
 
 class FakeCommunityRepository : CommunityRepository {
@@ -319,13 +344,67 @@ class FakePaymentRepository : PaymentRepository {
     override suspend fun history() = FakeData.payments
 }
 
+/** 목 모드에서도 잔액이 실제로 깎이도록 상태를 들고 있는다(자녀 QR 결제 데모용). */
 class FakePointRepository : PointRepository {
-    override suspend fun balance() = FakeData.pointBalance
-    override suspend fun history() = listOf(
-        PointHistory("ph1", "충전", 50_000, "08.15"),
-        PointHistory("ph2", "구독 결제", -9_900, "08.01"),
+    private var current = FakeData.pointBalance.balance
+    private val log = mutableListOf(
+        PointHistory("ph1", "엄마가 보낸 용돈", 50_000, "08.15"),
+        PointHistory("ph2", "편의점 결제", -3_500, "08.18"),
+        PointHistory("ph3", "문구점 결제", -1_500, "08.20"),
     )
-    override suspend fun use(productId: Int, point: Int) = Unit
+
+    override suspend fun balance() = PointBalance(current)
+
+    override suspend fun history() = log.toList()
+
+    override suspend fun use(productId: Int, point: Int) {
+        require(point in 1..current) { "잔액이 부족해요" }
+        current -= point
+        log.add(0, PointHistory("ph-${'$'}{System.currentTimeMillis()}", "QR 결제", -point, "오늘"))
+    }
+}
+
+class FakePhotoRepository : PhotoRepository {
+    override suspend fun upload(
+        childId: String,
+        file: File,
+        capturedAt: String,
+        requestId: String?,
+    ): ChildPhoto {
+        delay(300)
+        return ChildPhoto(
+            id = "photo-${'$'}{System.currentTimeMillis()}",
+            capturedAt = capturedAt,
+            imageUrl = file.toURI().toString(),
+        )
+    }
+}
+
+/**
+ * 목 모드용 요청 채널.
+ *
+ * 서버가 없어도 캡처/촬영 플로우 전체를 손으로 돌려 볼 수 있게 [emit] 을 열어 뒀다.
+ * `ChildServicesScreen` 의 「요청 시뮬레이션」 버튼이 이걸 호출한다.
+ */
+class FakeCommandRepository : CommandRepository {
+    private val stream = MutableSharedFlow<RemoteCommand>(extraBufferCapacity = 8)
+    private val queue = mutableListOf<RemoteCommand>()
+
+    override fun observe(): Flow<RemoteCommand> = stream.asSharedFlow()
+
+    override fun disconnect() = Unit
+
+    override suspend fun pending(childId: String): List<RemoteCommand> {
+        val snapshot = queue.toList()
+        queue.clear()
+        return snapshot
+    }
+
+    override suspend fun ack(childId: String, requestId: String, status: String, message: String?) = Unit
+
+    fun emit(command: RemoteCommand) {
+        if (!stream.tryEmit(command)) queue.add(command)
+    }
 }
 
 class FakeSubscriptionRepository : SubscriptionRepository {

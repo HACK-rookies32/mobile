@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,8 +26,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.R
+import com.hack.kidhack.background.capture.MediaProjectionRequestActivity
+import com.hack.kidhack.background.capture.ScreenCaptureService
+import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
@@ -42,6 +47,13 @@ fun ChildScreenshotScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
+    val context = LocalContext.current
+
+    // 동의 → 캡처 → 업로드를 마치고 돌아오면 목록이 최신이어야 한다.
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
 
     ChildScreenScaffold(
         header = {
@@ -89,9 +101,27 @@ fun ChildScreenshotScreen(
                         fontSize = 14.sp,
                     )
                     Text(
-                        text = stringResource(R.string.child_screenshot_banner_body),
+                        text = stringResource(
+                            R.string.child_screenshot_banner_body_from,
+                            state.requestedBy?.takeIf { it.isNotBlank() }
+                                ?: stringResource(R.string.child_request_default_sender),
+                        ),
                         color = colors.muted,
                         fontSize = 12.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    KidButton(
+                        text = stringResource(R.string.child_screenshot_allow),
+                        onClick = {
+                            context.startActivity(
+                                MediaProjectionRequestActivity.intent(
+                                    context = context,
+                                    requestId = state.pendingRequestId.orEmpty(),
+                                    trigger = ScreenCaptureService.TRIGGER_MANUAL,
+                                ),
+                            )
+                            viewModel.onCaptureLaunched()
+                        },
                     )
                 }
                 Text(

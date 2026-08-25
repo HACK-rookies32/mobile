@@ -13,12 +13,14 @@ import com.hack.kidhack.data.remote.api.AuthApi
 import com.hack.kidhack.data.remote.api.BlocklistApi
 import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
+import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.GeofenceApi
 import com.hack.kidhack.data.remote.api.LocationApi
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
 import com.hack.kidhack.data.remote.api.PaymentApi
+import com.hack.kidhack.data.remote.api.PhotoApi
 import com.hack.kidhack.data.remote.api.PointApi
 import com.hack.kidhack.data.remote.api.ScreenshotApi
 import com.hack.kidhack.data.remote.api.SubscriptionApi
@@ -31,12 +33,14 @@ import com.hack.kidhack.data.repository.fake.FakeAuthRepository
 import com.hack.kidhack.data.repository.fake.FakeBlocklistRepository
 import com.hack.kidhack.data.repository.fake.FakeChatRepository
 import com.hack.kidhack.data.repository.fake.FakeChildRepository
+import com.hack.kidhack.data.repository.fake.FakeCommandRepository
 import com.hack.kidhack.data.repository.fake.FakeCommunityRepository
 import com.hack.kidhack.data.repository.fake.FakeGeofenceRepository
 import com.hack.kidhack.data.repository.fake.FakeLocationRepository
 import com.hack.kidhack.data.repository.fake.FakeNotificationRepository
 import com.hack.kidhack.data.repository.fake.FakePairingRepository
 import com.hack.kidhack.data.repository.fake.FakePaymentRepository
+import com.hack.kidhack.data.repository.fake.FakePhotoRepository
 import com.hack.kidhack.data.repository.fake.FakePointRepository
 import com.hack.kidhack.data.repository.fake.FakeScreenshotRepository
 import com.hack.kidhack.data.repository.fake.FakeSubscriptionRepository
@@ -47,17 +51,20 @@ import com.hack.kidhack.data.repository.real.RealAuthRepository
 import com.hack.kidhack.data.repository.real.RealBlocklistRepository
 import com.hack.kidhack.data.repository.real.RealChatRepository
 import com.hack.kidhack.data.repository.real.RealChildRepository
+import com.hack.kidhack.data.repository.real.RealCommandRepository
 import com.hack.kidhack.data.repository.real.RealCommunityRepository
 import com.hack.kidhack.data.repository.real.RealGeofenceRepository
 import com.hack.kidhack.data.repository.real.RealLocationRepository
 import com.hack.kidhack.data.repository.real.RealNotificationRepository
 import com.hack.kidhack.data.repository.real.RealPairingRepository
 import com.hack.kidhack.data.repository.real.RealPaymentRepository
+import com.hack.kidhack.data.repository.real.RealPhotoRepository
 import com.hack.kidhack.data.repository.real.RealPointRepository
 import com.hack.kidhack.data.repository.real.RealScreenshotRepository
 import com.hack.kidhack.data.repository.real.RealSubscriptionRepository
 import com.hack.kidhack.data.repository.real.RealUserRepository
 import com.hack.kidhack.data.ws.ChatWebSocketClient
+import com.hack.kidhack.data.ws.ChildCommandSocket
 import com.hack.kidhack.domain.repository.AppControlRepository
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.AuthRepository
@@ -65,12 +72,14 @@ import com.hack.kidhack.domain.repository.BlocklistRepository
 import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildOnboardingStore
 import com.hack.kidhack.domain.repository.ChildRepository
+import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.GeofenceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
+import com.hack.kidhack.domain.repository.PhotoRepository
 import com.hack.kidhack.domain.repository.PointRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
@@ -101,7 +110,9 @@ import com.hack.kidhack.feature.parent.ScreenshotViewModel
 import com.hack.kidhack.feature.child.chat.ChildChatViewModel
 import com.hack.kidhack.feature.child.home.ChildHomeViewModel
 import com.hack.kidhack.feature.child.mypage.ChildMypageViewModel
+import com.hack.kidhack.feature.child.camera.ChildCameraViewModel
 import com.hack.kidhack.feature.child.onboarding.ChildOnboardingViewModel
+import com.hack.kidhack.feature.child.pay.ChildPayViewModel
 import com.hack.kidhack.feature.child.screenshot.ChildScreenshotViewModel
 import com.hack.kidhack.feature.child.services.ChildServicesViewModel
 import okhttp3.MediaType.Companion.toMediaType
@@ -172,6 +183,8 @@ val appModule = module {
     single { get<Retrofit>().create(PointApi::class.java) }
     single { get<Retrofit>().create(SubscriptionApi::class.java) }
     single { get<Retrofit>().create(AppUsageApi::class.java) }
+    single { get<Retrofit>().create(CommandApi::class.java) }
+    single { get<Retrofit>().create(PhotoApi::class.java) }
 
     single<AuthRepository> {
         if (useMock) FakeAuthRepository(get(), get()) else RealAuthRepository(get(), get(), get())
@@ -205,6 +218,13 @@ val appModule = module {
         if (useMock) FakeAppControlRepository() else RealAppControlRepository()
     }
 
+    // FCM 대체 푸시 채널 (WebSocket + 폴링 백업)
+    single { ChildCommandSocket(get(), get(), BuildConfig.BASE_URL) }
+    single<CommandRepository> {
+        if (useMock) FakeCommandRepository() else RealCommandRepository(get(), get())
+    }
+    single<PhotoRepository> { if (useMock) FakePhotoRepository() else RealPhotoRepository(get()) }
+
     viewModel { LoginViewModel(get()) }
     viewModel { RegisterViewModel(get(), get()) }
     viewModel { ForgotViewModel(get()) }
@@ -229,8 +249,10 @@ val appModule = module {
 
     viewModel { ChildHomeViewModel(get()) }
     viewModel { ChildChatViewModel(get()) }
-    viewModel { ChildServicesViewModel(get(), get()) }
-    viewModel { ChildMypageViewModel(get(), get(), get()) }
-    viewModel { ChildScreenshotViewModel(get()) }
+    viewModel { ChildServicesViewModel(get(), get(), get()) }
+    viewModel { ChildMypageViewModel(get(), get(), get(), get()) }
+    viewModel { ChildScreenshotViewModel(get(), get(), get()) }
     viewModel { ChildOnboardingViewModel(get()) }
+    viewModel { ChildCameraViewModel(get(), get(), get()) }
+    viewModel { ChildPayViewModel(get(), get()) }
 }

@@ -34,8 +34,12 @@ sealed class Route(val path: String) {
     data object ChildChat : Route("child/chat")
     data object ChildServices : Route("child/services")
     data object ChildCamera : Route("child/camera")
+    data object ChildCameraRequest : Route("child/camera?requestId={requestId}") {
+        fun create(requestId: String) = "child/camera?requestId=$requestId"
+    }
     data object ChildMypage : Route("child/mypage")
     data object ChildScreenshot : Route("child/screenshot")
+    data object ChildPay : Route("child/pay")
 }
 
 data class TabItem(

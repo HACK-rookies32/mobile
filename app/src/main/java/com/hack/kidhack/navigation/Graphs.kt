@@ -13,9 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
+import androidx.navigation.navArgument
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
@@ -28,6 +30,7 @@ import com.hack.kidhack.feature.child.chat.ChildChatScreen
 import com.hack.kidhack.feature.child.home.ChildHomeScreen
 import com.hack.kidhack.feature.child.mypage.ChildMypageScreen
 import com.hack.kidhack.feature.child.onboarding.ChildOnboardingScreen
+import com.hack.kidhack.feature.child.pay.ChildPayScreen
 import com.hack.kidhack.feature.child.onboarding.ChildStartRoute
 import com.hack.kidhack.feature.child.screenshot.ChildScreenshotScreen
 import com.hack.kidhack.feature.child.services.ChildServicesScreen
@@ -168,12 +171,26 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
         }
         childTab(Route.ChildChat.path, navController) { ChildChatScreen() }
         childTab(Route.ChildServices.path, navController) { ChildServicesScreen() }
-        childTab(Route.ChildCamera.path, navController) { ChildCameraScreen() }
+        composable(
+            route = Route.ChildCameraRequest.path,
+            arguments = listOf(
+                navArgument(ARG_REQUEST_ID) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { entry ->
+            ChildShell(navController) {
+                ChildCameraScreen(requestId = entry.arguments?.getString(ARG_REQUEST_ID))
+            }
+        }
         childTab(Route.ChildMypage.path, navController) {
             ChildMypageScreen(
                 onServices = { navController.navigateChildTab(Route.ChildServices.path) },
                 onScreenshot = { navController.navigate(Route.ChildScreenshot.path) },
                 onCamera = { navController.navigateChildTab(Route.ChildCamera.path) },
+                onPay = { navController.navigate(Route.ChildPay.path) },
             )
         }
         composable(Route.ChildScreenshot.path) {
@@ -181,8 +198,15 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
                 ChildScreenshotScreen(onBack = { navController.popBackStack() })
             }
         }
+        composable(Route.ChildPay.path) {
+            ChildShell(navController) {
+                ChildPayScreen(onBack = { navController.popBackStack() })
+            }
+        }
     }
 }
+
+internal const val ARG_REQUEST_ID = "requestId"
 
 private fun NavHostController.navigateChildTab(route: String) {
     navigate(route) {
@@ -237,7 +261,8 @@ private fun TabShell(
 ) {
     val colors = LocalKidhackColors.current
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
+    // 카메라 탭은 `child/camera?requestId={requestId}` 패턴으로 등록돼 있어 쿼리부를 떼고 비교한다.
+    val currentRoute = navBackStackEntry?.destination?.route?.substringBefore('?')
     val showBar = tabs.any { it.route.path == currentRoute }
     Scaffold(
         bottomBar = {

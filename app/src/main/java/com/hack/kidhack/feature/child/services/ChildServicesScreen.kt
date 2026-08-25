@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.R
+import com.hack.kidhack.core.designsystem.component.KidButton
+import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.UsageBar
 import com.hack.kidhack.core.designsystem.theme.FontBlack
@@ -32,6 +34,7 @@ import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.feature.child.components.ChildScreenScaffold
 import com.hack.kidhack.feature.child.formatDurationSec
 import org.koin.androidx.compose.koinViewModel
@@ -205,6 +208,30 @@ fun ChildServicesScreen(
                 fontWeight = FontSemibold,
                 fontSize = 12.sp,
             )
+        }
+
+        if (state.simulationAvailable) {
+            KidCard {
+                ServiceHeader(
+                    emoji = "🧪",
+                    title = stringResource(R.string.child_services_sim_title),
+                    subtitle = stringResource(R.string.child_services_sim_desc),
+                )
+                Spacer(Modifier.height(12.dp))
+                KidButton(
+                    text = stringResource(R.string.child_services_sim_capture),
+                    onClick = { viewModel.simulateRequest(RemoteCommandType.SCREEN_CAPTURE) },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = KidButtonVariant.Secondary,
+                )
+                Spacer(Modifier.height(8.dp))
+                KidButton(
+                    text = stringResource(R.string.child_services_sim_camera),
+                    onClick = { viewModel.simulateRequest(RemoteCommandType.CAMERA_SHOT) },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = KidButtonVariant.Secondary,
+                )
+            }
         }
         Spacer(Modifier.height(8.dp))
     }

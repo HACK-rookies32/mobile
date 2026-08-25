@@ -7,6 +7,7 @@ import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
+import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.LocationPoint
@@ -16,12 +17,14 @@ import com.hack.kidhack.domain.model.Payment
 import com.hack.kidhack.domain.model.PointBalance
 import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
+import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
 import kotlinx.coroutines.flow.Flow
+import java.io.File
 
 interface AuthRepository {
     suspend fun signup(
@@ -88,6 +91,40 @@ interface ScreenshotRepository {
     fun paged(childId: String): Flow<PagingData<Screenshot>>
     suspend fun list(childId: String): List<Screenshot>
     suspend fun requestCapture(childId: String)
+
+    /** 자녀 기기가 캡처한 이미지를 multipart 로 올린다. trigger 는 SCHEDULED | MANUAL. */
+    suspend fun upload(
+        childId: String,
+        file: File,
+        capturedAt: String,
+        trigger: String,
+    ): Screenshot
+}
+
+/** 자녀 카메라로 찍은 사진을 부모 계정으로 올린다. */
+interface PhotoRepository {
+    suspend fun upload(
+        childId: String,
+        file: File,
+        capturedAt: String,
+        requestId: String?,
+    ): ChildPhoto
+}
+
+/**
+ * 부모 → 자녀 원격 요청 수신 채널.
+ *
+ * Firebase(FCM)를 쓰지 않으므로 실시간 경로는 WebSocket, 백업 경로는 주기 폴링이다.
+ * [observe] 는 소켓 이벤트, [pending] 은 폴링에 쓴다.
+ */
+interface CommandRepository {
+    fun observe(): Flow<RemoteCommand>
+
+    /** 상주 소켓을 내린다. 자녀 세션이 끝날 때(로그아웃/역할 변경) 호출한다. */
+    fun disconnect()
+
+    suspend fun pending(childId: String): List<RemoteCommand>
+    suspend fun ack(childId: String, requestId: String, status: String, message: String? = null)
 }
 
 interface CommunityRepository {

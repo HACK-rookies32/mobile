@@ -10,6 +10,7 @@ import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
 import com.hack.kidhack.data.remote.dto.ChildDto
+import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
@@ -29,6 +30,8 @@ import com.hack.kidhack.data.remote.dto.PointBalanceDto
 import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
 import com.hack.kidhack.data.remote.dto.RefreshRequest
+import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
+import com.hack.kidhack.data.remote.dto.RemoteCommandDto
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SignupRequest
@@ -298,4 +301,34 @@ interface AppUsageApi {
         @Path("childId") childId: String,
         @Body body: AppUsageReportRequest,
     ): ApiEnvelope<Unit>
+}
+
+/**
+ * 부모 요청 폴링/응답 (신규 제안 계약, GAP-11).
+ *
+ * WebSocket 이 끊겨 있는 동안의 백업 경로다. 서버가 아직 이 경로를 제공하지 않으면
+ * 목 모드(FakeCommandRepository)로 동작하고, 실서버에서는 404 를 무시하고 폴링만 건너뛴다.
+ */
+interface CommandApi {
+    @GET("children/{childId}/commands/pending")
+    suspend fun pending(@Path("childId") childId: String): ApiEnvelope<List<RemoteCommandDto>>
+
+    @POST("children/{childId}/commands/{requestId}/ack")
+    suspend fun ack(
+        @Path("childId") childId: String,
+        @Path("requestId") requestId: String,
+        @Body body: RemoteCommandAckRequest,
+    ): ApiEnvelope<Unit>
+}
+
+/** 자녀 카메라 촬영본 업로드 (신규 제안 계약). */
+interface PhotoApi {
+    @Multipart
+    @POST("children/{childId}/photos")
+    suspend fun upload(
+        @Path("childId") childId: String,
+        @Part file: MultipartBody.Part,
+        @Part("capturedAt") capturedAt: RequestBody,
+        @Part("requestId") requestId: RequestBody?,
+    ): ApiEnvelope<ChildPhotoDto>
 }

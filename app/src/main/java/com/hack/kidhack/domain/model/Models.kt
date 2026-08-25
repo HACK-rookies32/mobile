@@ -145,3 +145,35 @@ data class AppControlItem(
     val blocked: Boolean,
     val limit: String,
 )
+
+/** 부모가 보낸 원격 요청 종류. Firebase 대신 WebSocket/폴링으로 전달된다. */
+enum class RemoteCommandType { SCREEN_CAPTURE, CAMERA_SHOT, UNKNOWN }
+
+data class RemoteCommand(
+    val requestId: String,
+    val type: RemoteCommandType,
+    val childId: String,
+    val requestedBy: String? = null,
+    val requestedAt: String? = null,
+)
+
+/** 요청 처리 결과를 서버에 되돌려 줄 때 쓰는 상태값. */
+object CommandAckStatus {
+    const val RECEIVED = "RECEIVED"
+    const val DONE = "DONE"
+    const val DENIED = "DENIED"
+    const val FAILED = "FAILED"
+}
+
+data class ChildPhoto(
+    val id: String,
+    val capturedAt: String,
+    val imageUrl: String? = null,
+)
+
+/** 자녀 모드 루키즈페이 QR 결제 토큰. */
+data class PayQrToken(
+    val payload: String,
+    val amount: Int,
+    val expiresAtMillis: Long,
+)

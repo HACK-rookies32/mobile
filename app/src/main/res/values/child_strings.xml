@@ -68,6 +68,10 @@
     <string name="child_services_usage">앱 사용 모니터링</string>
     <string name="child_services_usage_desc">어떤 앱을 얼마나 쓰는지 기록돼요</string>
     <string name="child_services_total">총 사용: %1$s</string>
+    <string name="child_services_sim_title">요청 테스트 (개발용)</string>
+    <string name="child_services_sim_desc">서버 없이 부모님 요청 알림을 직접 띄워 봐요</string>
+    <string name="child_services_sim_capture">화면 캡처 요청 보내기</string>
+    <string name="child_services_sim_camera">사진 촬영 요청 보내기</string>
 
     <string name="child_screenshot_title">화면 캡처 📸</string>
     <string name="child_screenshot_subtitle">부모님이 캡처 요청 시 기록돼요</string>
@@ -78,6 +82,8 @@
     <string name="child_screenshot_guide_title">화면 캡처 안내</string>
     <string name="child_screenshot_guide_body">부모님이 요청할 때 내 화면이 자동으로 캡처돼요.\n걱정 마세요 — 안전을 위한 기능이에요! 😊</string>
     <string name="child_screenshot_recent">최근 캡처 내역</string>
+    <string name="child_screenshot_banner_body_from">%1$s이 지금 화면을 보고 싶어 해요</string>
+    <string name="child_screenshot_allow">지금 캡처 허용</string>
     <string name="child_screenshot_mom">엄마 요청</string>
     <string name="child_screenshot_scheduled">예약 캡처</string>
 
@@ -95,6 +101,11 @@
     <string name="child_camera_study">공부 중</string>
     <string name="child_camera_dog">강아지</string>
     <string name="child_camera_sunset">노을</string>
+    <string name="child_camera_request_title">사진 촬영 요청이 왔어요!</string>
+    <string name="child_camera_request_body">%1$s이 지금 사진을 보고 싶어 해요. 찍으면 바로 전달돼요.</string>
+    <string name="child_camera_sending">전송 중...</string>
+    <string name="child_camera_sent">✓ 부모님께 전송했어요!</string>
+    <string name="child_camera_send_failed">전송에 실패했어요</string>
     <string name="child_camera_gallery">🖼️</string>
     <string name="child_camera_shutter">📸</string>
     <string name="child_camera_flip">🔄</string>
@@ -115,6 +126,8 @@
     <string name="child_mypage_edit_profile">프로필 수정</string>
     <string name="child_mypage_change_password">비밀번호 변경</string>
     <string name="child_mypage_section_service">서비스</string>
+    <string name="child_mypage_menu_pay">루키즈 페이</string>
+    <string name="child_mypage_menu_pay_balance">잔액 %1$sP</string>
     <string name="child_mypage_menu_services">백그라운드 서비스 현황</string>
     <string name="child_mypage_menu_screenshots">화면 캡처 내역</string>
     <string name="child_mypage_menu_gallery">카메라 갤러리</string>
@@ -133,6 +146,9 @@
     <string name="child_onboarding_notif_title">알림</string>
     <string name="child_onboarding_notif_body">캡처 요청과 부모님 메시지를 바로 알려드려요.</string>
     <string name="child_onboarding_notif_emoji">🔔</string>
+    <string name="child_onboarding_camera_title">카메라</string>
+    <string name="child_onboarding_camera_body">부모님이 사진을 요청하면 바로 찍어서 보낼 수 있어요.</string>
+    <string name="child_onboarding_camera_emoji">📷</string>
     <string name="child_onboarding_later_title">나중에 설정</string>
     <string name="child_onboarding_later_body">사용정보 접근, 접근성, 다른 앱 위에 표시는 보호 기능을 켤 때 안내할게요.</string>
     <string name="child_onboarding_later_emoji">🛡️</string>
@@ -145,4 +161,33 @@
     <string name="child_onboarding_skip">나중에</string>
     <string name="child_onboarding_done">시작하기</string>
     <string name="child_onboarding_step">%1$d / %2$d</string>
+    <string name="child_request_default_sender">부모님</string>
+    <string name="child_request_capture_title">화면 캡처 요청 📸</string>
+    <string name="child_request_capture_body">%1$s이 지금 화면을 보고 싶어 해요. 눌러서 허용해 주세요.</string>
+    <string name="child_request_camera_title">사진 촬영 요청 📷</string>
+    <string name="child_request_camera_body">%1$s이 지금 사진을 보고 싶어 해요. 눌러서 카메라를 켜 주세요.</string>
+
+    <string name="child_pay_back">←</string>
+    <string name="child_pay_title">루키즈 페이 💳</string>
+    <string name="child_pay_subtitle">받은 용돈으로 QR 결제를 할 수 있어요</string>
+    <string name="child_pay_balance_label">내 잔액</string>
+    <string name="child_pay_balance_value">%1$s P</string>
+    <string name="child_pay_balance_note">부모님이 보내 준 용돈이에요. 잔액 안에서만 결제돼요.</string>
+    <string name="child_pay_amount_title">얼마를 결제할까요?</string>
+    <string name="child_pay_quick">%1$sP</string>
+    <string name="child_pay_amount_label">결제 금액</string>
+    <string name="child_pay_amount_hint">직접 입력</string>
+    <string name="child_pay_over_limit">잔액보다 많은 금액은 결제할 수 없어요</string>
+    <string name="child_pay_issue">QR 만들기</string>
+    <string name="child_pay_qr_title">가게에 QR 을 보여 주세요</string>
+    <string name="child_pay_qr_amount">%1$s P</string>
+    <string name="child_pay_qr_expires">%1$d초 뒤 만료돼요</string>
+    <string name="child_pay_qr_guide">가게에서 QR 을 찍으면 결제가 끝나요.
+시간이 지나면 다시 만들어야 해요.</string>
+    <string name="child_pay_qr_desc">결제용 QR 코드</string>
+    <string name="child_pay_qr_error">QR 을 만들지 못했어요</string>
+    <string name="child_pay_confirm">결제 완료 확인</string>
+    <string name="child_pay_cancel">취소</string>
+    <string name="child_pay_history">사용 내역</string>
+    <string name="child_pay_history_empty">아직 사용 내역이 없어요</string>
 </resources>

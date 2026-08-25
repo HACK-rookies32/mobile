@@ -13,7 +13,8 @@ data class ChildOnboardingUiState(
     val step: Int = 0,
     val finished: Boolean = false,
 ) {
-    val totalSteps: Int = 3
+    /** 위치 → 알림 → 카메라 → 나중에 설정 안내 */
+    val totalSteps: Int = 4
 }
 
 class ChildOnboardingViewModel(

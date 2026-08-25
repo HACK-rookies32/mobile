@@ -4,6 +4,7 @@ import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.ChildDto
+import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.GeofenceDto
 import com.hack.kidhack.data.remote.dto.LocationDto
 import com.hack.kidhack.data.remote.dto.NotificationDto
@@ -13,6 +14,7 @@ import com.hack.kidhack.data.remote.dto.PaymentDto
 import com.hack.kidhack.data.remote.dto.PointBalanceDto
 import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
+import com.hack.kidhack.data.remote.dto.RemoteCommandDto
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SubscriptionDto
 import com.hack.kidhack.data.remote.dto.TokenResponse
@@ -21,6 +23,7 @@ import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
+import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.LocationPoint
@@ -30,6 +33,8 @@ import com.hack.kidhack.domain.model.Payment
 import com.hack.kidhack.domain.model.PointBalance
 import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
+import com.hack.kidhack.domain.model.RemoteCommand
+import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
@@ -156,3 +161,24 @@ fun SubscriptionDto.toDomain(): Subscription = Subscription(planId, status, meth
 fun AppUsageDto.toDomain(): AppUsage = AppUsage(appName, durationSec, category)
 
 fun PairingCodeDto.toDomain(): PairingCode = PairingCode(pairingCode, expiresIn)
+
+fun RemoteCommandDto.toDomain(): RemoteCommand = RemoteCommand(
+    requestId = requestId,
+    type = type.toRemoteCommandType(),
+    childId = childId,
+    requestedBy = requestedBy,
+    requestedAt = requestedAt,
+)
+
+/** 서버/소켓이 쓸 법한 이름들을 넉넉하게 받아 준다. 모르는 값은 UNKNOWN 으로 떨어뜨린다. */
+fun String?.toRemoteCommandType(): RemoteCommandType = when (this?.uppercase()) {
+    "SCREEN_CAPTURE", "CAPTURE", "CAPTURE_REQUEST", "SCREENSHOT" -> RemoteCommandType.SCREEN_CAPTURE
+    "CAMERA_SHOT", "CAMERA", "CAMERA_REQUEST", "PHOTO" -> RemoteCommandType.CAMERA_SHOT
+    else -> RemoteCommandType.UNKNOWN
+}
+
+fun ChildPhotoDto.toDomain(): ChildPhoto = ChildPhoto(
+    id = id,
+    capturedAt = capturedAt,
+    imageUrl = imageUrl,
+)

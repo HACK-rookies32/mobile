@@ -88,19 +88,27 @@ fun ChildOnboardingScreen(
         ActivityResultContracts.RequestPermission(),
     ) { viewModel.next() }
 
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { viewModel.next() }
+
+    val lastStep = state.totalSteps - 1
     val stepEmoji = when (state.step) {
         0 -> stringResource(R.string.child_onboarding_location_emoji)
         1 -> stringResource(R.string.child_onboarding_notif_emoji)
+        2 -> stringResource(R.string.child_onboarding_camera_emoji)
         else -> stringResource(R.string.child_onboarding_later_emoji)
     }
     val stepTitle = when (state.step) {
         0 -> stringResource(R.string.child_onboarding_location_title)
         1 -> stringResource(R.string.child_onboarding_notif_title)
+        2 -> stringResource(R.string.child_onboarding_camera_title)
         else -> stringResource(R.string.child_onboarding_later_title)
     }
     val stepBody = when (state.step) {
         0 -> stringResource(R.string.child_onboarding_location_body)
         1 -> stringResource(R.string.child_onboarding_notif_body)
+        2 -> stringResource(R.string.child_onboarding_camera_body)
         else -> stringResource(R.string.child_onboarding_later_body)
     }
 
@@ -161,7 +169,7 @@ fun ChildOnboardingScreen(
             )
         }
 
-        if (state.step == 2) {
+        if (state.step == lastStep) {
             listOf(
                 R.string.child_onboarding_later_usage,
                 R.string.child_onboarding_later_accessibility,
@@ -200,7 +208,7 @@ fun ChildOnboardingScreen(
 
         KidButton(
             text = when (state.step) {
-                2 -> stringResource(R.string.child_onboarding_done)
+                lastStep -> stringResource(R.string.child_onboarding_done)
                 else -> stringResource(R.string.child_onboarding_allow)
             },
             onClick = {
@@ -224,12 +232,22 @@ fun ChildOnboardingScreen(
                             notificationLauncher.launch(permission)
                         }
                     }
+                    2 -> {
+                        if (
+                            ContextCompat.checkSelfPermission(context, KidhackPermissions.camera) ==
+                            PackageManager.PERMISSION_GRANTED
+                        ) {
+                            viewModel.next()
+                        } else {
+                            cameraLauncher.launch(KidhackPermissions.camera)
+                        }
+                    }
                     else -> viewModel.finish()
                 }
             },
             modifier = Modifier.fillMaxWidth(),
         )
-        if (state.step < 2) {
+        if (state.step < lastStep) {
             KidButton(
                 text = stringResource(R.string.child_onboarding_skip),
                 onClick = viewModel::next,
