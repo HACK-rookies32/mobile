@@ -1,7 +1,9 @@
 package com.hack.kidhack.feature.auth.forgot
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -11,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.core.designsystem.component.KidButton
@@ -51,11 +54,19 @@ fun ForgotScreen(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
         )
         KidButton(
-            text = if (state.loading) "찾는 중..." else "아이디 찾기",
+            text = if (state.findLoading) "찾는 중..." else "아이디 찾기",
             onClick = viewModel::findId,
             modifier = Modifier.fillMaxWidth(),
-            enabled = !state.loading,
+            enabled = !state.findLoading,
         )
+        if (state.findInfo != null) {
+            Text(state.findInfo.orEmpty(), color = colors.safe, fontSize = 13.sp)
+        }
+        if (state.findError != null) {
+            Text(state.findError.orEmpty(), color = colors.danger, fontSize = 13.sp)
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         KidCard {
             Text("🔑  비밀번호 재설정", color = colors.brandDark, fontWeight = FontBold, fontSize = 14.sp)
@@ -71,15 +82,28 @@ fun ForgotScreen(
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         )
+        KidTextField(
+            state.newPasswordConfirm,
+            viewModel::onNewPasswordConfirm,
+            "새 비밀번호 확인",
+            placeholder = "비밀번호를 다시 입력하세요",
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        )
         KidButton(
-            text = "비밀번호 재설정",
+            text = if (state.resetLoading) "처리 중..." else "비밀번호 재설정",
             onClick = viewModel::resetPassword,
             modifier = Modifier.fillMaxWidth(),
             variant = KidButtonVariant.Secondary,
-            enabled = !state.loading,
+            enabled = !state.resetLoading,
         )
-        if (state.info != null) Text(state.info.orEmpty(), color = colors.safe, fontSize = 13.sp)
-        if (state.error != null) Text(state.error.orEmpty(), color = colors.danger, fontSize = 13.sp)
+        if (state.resetInfo != null) {
+            Text(state.resetInfo.orEmpty(), color = colors.safe, fontSize = 13.sp)
+        }
+        if (state.resetError != null) {
+            Text(state.resetError.orEmpty(), color = colors.danger, fontSize = 13.sp)
+        }
+
         Text(
             text = "← 로그인으로 돌아가기",
             modifier = Modifier
