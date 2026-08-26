@@ -87,6 +87,7 @@ data class UserDto(
     val phone: String? = null,
     val email: String? = null,
     val profileImageUrl: String? = null,
+    val parentId: Long? = null,
 )
 
 @Serializable
@@ -119,8 +120,13 @@ data class PairingConnectRequest(val pairingCode: String)
 
 @Serializable
 data class ChildDto(
+    /** Backend may send numeric id; accept string or number. */
+    @Serializable(with = FlexibleStringSerializer::class)
     val id: String,
-    val name: String,
+    /** App/domain field; list API may omit this and send username instead. */
+    val name: String? = null,
+    val username: String? = null,
+    val nickname: String? = null,
     val alias: String? = null,
     val profileImageUrl: String? = null,
     val school: String? = null,
@@ -229,20 +235,33 @@ data class ReportRequest(val reason: String, val detail: String? = null)
 
 @Serializable
 data class ChatRoomDto(
+    @Serializable(with = FlexibleStringSerializer::class)
     val id: String,
-    val title: String,
+    val title: String = "",
     val lastMessage: String = "",
     val lastAt: String = "",
     val online: Boolean = false,
+    val parentId: Long? = null,
+    val childId: Long? = null,
+    val createdAt: String? = null,
+)
+
+@Serializable
+data class CreateChatRoomRequest(
+    val parentId: Long,
+    val childId: Long,
 )
 
 @Serializable
 data class ChatMessageDto(
+    @Serializable(with = FlexibleStringSerializer::class)
     val id: String,
     val roomId: String,
-    val fromRole: String,
-    val text: String,
-    val sentAt: String,
+    val fromRole: String = "",
+    val text: String = "",
+    val sentAt: String = "",
+    val senderId: Long? = null,
+    val content: String? = null,
 )
 
 @Serializable

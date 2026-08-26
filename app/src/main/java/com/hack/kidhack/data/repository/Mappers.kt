@@ -77,9 +77,11 @@ fun UserDto.toDomain(): User {
         loginId = resolvedLogin,
         name = resolvedName,
         role = runCatching { Role.valueOf(role.orEmpty()) }.getOrDefault(Role.PARENT),
+        nickname = nickname,
         phone = phoneNumber?.takeIf { it.isNotBlank() } ?: phone.orEmpty(),
         email = email,
         profileImageUrl = profileImageUrl,
+        parentId = parentId,
     )
 }
 
@@ -91,8 +93,13 @@ fun LoginResponse.toSession(user: User): Session = Session(
 
 fun ChildDto.toDomain(): ChildProfile = ChildProfile(
     id = id,
-    name = name,
-    alias = alias,
+    // Backend ChildSummaryResponse: username / nickname (no name/alias).
+    name = name?.takeIf { it.isNotBlank() }
+        ?: username?.takeIf { it.isNotBlank() }
+        ?: nickname?.takeIf { it.isNotBlank() }
+        ?: "자녀",
+    alias = alias?.takeIf { it.isNotBlank() }
+        ?: nickname?.takeIf { it.isNotBlank() },
     ageLabel = ageLabel,
     school = school,
     birthDate = birthDate,
@@ -170,21 +177,37 @@ fun CommentDto.toDomain(): Comment = Comment(
     createdAt = createdAt
 )
 
-fun ChatRoomDto.toDomain(): ChatRoom = ChatRoom(
+fun ChatRoomDto.toDomain(titleOverride: String? = null): ChatRoom = ChatRoom(
     id = id,
-    title = title,
+    title = titleOverride?.takeIf { it.isNotBlank() } ?: title.ifBlank { "채팅" },
     lastMessage = lastMessage,
     lastAt = lastAt,
     online = online,
 )
 
-fun ChatMessageDto.toDomain(): ChatMessage = ChatMessage(
-    id = id,
-    roomId = roomId,
-    fromRole = runCatching { Role.valueOf(fromRole) }.getOrDefault(Role.PARENT),
-    text = text,
-    sentAt = sentAt,
-)
+fun ChatMessageDto.toDomain(myUserId: Long? = null, myRole: Role = Role.PARENT): ChatMessage {
+    val resolvedText = content?.takeIf { it.isNotBlank() } ?: text
+    val role = when {
+        fromRole.isNotBlank() ->
+            runCatching { Role.valueOf(fromRole) }.getOrDefault(Role.PARENT)
+        myUserId != null && senderId != null ->
+            if (senderId == myUserId) {
+                myRole
+            } else if (myRole == Role.PARENT) {
+                Role.CHILD
+            } else {
+                Role.PARENT
+            }
+        else -> Role.PARENT
+    }
+    return ChatMessage(
+        id = id,
+        roomId = roomId,
+        fromRole = role,
+        text = resolvedText,
+        sentAt = sentAt,
+    )
+}
 
 fun PaymentDto.toDomain(): Payment = Payment(
     id = id,

@@ -207,6 +207,8 @@ interface CardRepository {
 }
 
 interface ChatRepository {
+    /** 부모–자녀 1:1 방. 없으면 서버가 생성한다. */
+    suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom
     suspend fun rooms(): List<ChatRoom>
     suspend fun messages(roomId: String, before: String? = null, size: Int = 30): List<ChatMessage>
     fun observeMessages(roomId: String): Flow<ChatMessage>

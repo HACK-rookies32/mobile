@@ -20,6 +20,9 @@ class CachedChatRepository(
     private val store: ChatMessageStore,
 ) : ChatRepository {
 
+    override suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom =
+        delegate.getOrCreateRoom(parentId, childId).also { store.saveRooms(listOf(it)) }
+
     override suspend fun rooms(): List<ChatRoom> =
         runCatching { delegate.rooms() }
             .onSuccess { if (it.isNotEmpty()) store.saveRooms(it) }

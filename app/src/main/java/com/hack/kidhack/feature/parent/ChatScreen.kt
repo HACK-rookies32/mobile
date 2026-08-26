@@ -47,6 +47,8 @@ import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
+import com.hack.kidhack.domain.repository.SessionRepository
+import com.hack.kidhack.data.remote.userMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -68,11 +70,14 @@ class ParentChatViewModel(
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
     private val chatRepository: ChatRepository,
+    private val sessionRepository: SessionRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ParentChatUiState())
     val state: StateFlow<ParentChatUiState> = _state.asStateFlow()
     private var observeJob: Job? = null
+    /** childId → room (세션 동안 재사용) */
+    private val roomByChildId = mutableMapOf<String, ChatRoom>()
 
     init {
         loadRooms()
@@ -84,10 +89,33 @@ class ParentChatViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
-                val rooms = chatRepository.rooms()
-                _state.update { it.copy(loading = false, rooms = rooms, selectedRoom = null) }
+                val parentId = sessionRepository.current()?.user?.id?.toLongOrNull()
+                    ?: error("로그인 정보가 없어요")
+                val children = childRepository.children()
+                if (children.isEmpty()) {
+                    emptyList()
+                } else {
+                    children.map { child ->
+                        val childId = child.id.toLongOrNull()
+                            ?: error("자녀 회원 번호가 올바르지 않아요")
+                        val cached = roomByChildId[child.id]
+                        val room = cached ?: chatRepository.getOrCreateRoom(parentId, childId)
+                            .also { roomByChildId[child.id] = it }
+                        room.copy(
+                            title = child.name,
+                            online = child.online,
+                        )
+                    }
+                }
+            }.onSuccess { rooms ->
+                _state.update { it.copy(loading = false, rooms = rooms, selectedRoom = null, error = null) }
             }.onFailure { t ->
-                _state.update { it.copy(loading = false, error = t.message) }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        error = t.userMessage("채팅방을 준비하지 못했어요"),
+                    )
+                }
             }
         }
     }
@@ -96,25 +124,25 @@ class ParentChatViewModel(
         observeJob?.cancel()
         if (room == null) {
             _state.update { it.copy(selectedRoom = null, messages = emptyList()) }
-            loadRooms() // 목록으로 돌아올 때 마지막 메시지 등 최신 정보 반영
+            loadRooms()
             return
         }
 
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null, selectedRoom = room) }
             runCatching {
-                // 자녀 전환 동기화
                 val children = childRepository.children()
-                children.find { it.name == room.title }?.let {
-                    selectedChildRepository.select(it.id)
-                }
+                children.find { it.name == room.title || roomByChildId[it.id]?.id == room.id }
+                    ?.let { selectedChildRepository.select(it.id) }
 
                 val messages = chatRepository.messages(room.id)
                 _state.update { it.copy(loading = false, messages = messages) }
                 observe(room.id)
                 chatRepository.markRead(room.id, messages.lastOrNull()?.id)
             }.onFailure { t ->
-                _state.update { it.copy(loading = false, error = t.message) }
+                _state.update {
+                    it.copy(loading = false, error = t.userMessage("메시지를 불러오지 못했어요"))
+                }
             }
         }
     }
@@ -127,7 +155,11 @@ class ParentChatViewModel(
         viewModelScope.launch {
             runCatching { chatRepository.send(room.id, text) }
                 .onSuccess { append(it) }
-                .onFailure { t -> _state.update { it.copy(error = t.message, draft = text) } }
+                .onFailure { t ->
+                    _state.update {
+                        it.copy(error = t.userMessage("메시지를 보내지 못했어요"), draft = text)
+                    }
+                }
         }
     }
 

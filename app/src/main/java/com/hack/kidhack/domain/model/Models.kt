@@ -17,6 +17,8 @@ data class User(
     val phone: String = "",
     val email: String? = null,
     val profileImageUrl: String? = null,
+    /** 자녀 계정만. 연결된 부모 member id. */
+    val parentId: Long? = null,
 )
 
 data class ChildProfile(

@@ -2,9 +2,11 @@ package com.hack.kidhack.feature.child.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hack.kidhack.data.remote.userMessage
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.repository.ChatRepository
+import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,25 +22,24 @@ data class ChildChatUiState(
     val error: String? = null,
 ) {
     val online: Boolean get() = room?.online == true
-    val title: String get() = room?.title.orEmpty()
     val canSend: Boolean get() = room != null && draft.isNotBlank()
 }
 
 /**
  * 자녀 ↔ 부모 채팅.
  *
- * 방 id 를 상수로 박지 않고 `GET /chat/rooms` 로 해결한다.
- * 자녀 계정에는 보호자 방이 하나뿐이라 첫 방을 쓰고, 그 방을 WebSocket 으로 구독한다.
- * (실제 송수신은 [ChatRepository] 구현이 담당 — 목 모드는 인메모리, 실서버는 `wss://…/ws/chat`)
+ * 채팅 탭 첫 로드 시 [ChatRepository.getOrCreateRoom]으로 roomId를 확보한다.
  */
 class ChildChatViewModel(
     private val chatRepository: ChatRepository,
+    private val sessionRepository: SessionRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChildChatUiState())
     val state: StateFlow<ChildChatUiState> = _state.asStateFlow()
 
     private var observeJob: Job? = null
+    private var cachedRoom: ChatRoom? = null
 
     init {
         load()
@@ -48,17 +49,28 @@ class ChildChatViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
-                val room = chatRepository.rooms().firstOrNull()
+                val user = sessionRepository.current()?.user
+                    ?: error("로그인 정보가 없어요")
+                val childId = user.id.toLongOrNull()
+                    ?: error("회원 번호가 올바르지 않아요")
+                val parentId = user.parentId
                     ?: error("연결된 보호자가 없어요")
+                val room = cachedRoom
+                    ?: chatRepository.getOrCreateRoom(parentId, childId).also { cachedRoom = it }
                 val messages = chatRepository.messages(room.id)
                 room to messages
             }.onSuccess { (room, messages) ->
-                _state.update { it.copy(loading = false, room = room, messages = messages) }
+                _state.update {
+                    it.copy(loading = false, room = room, messages = messages, error = null)
+                }
                 observe(room.id)
                 runCatching { chatRepository.markRead(room.id, messages.lastOrNull()?.id) }
             }.onFailure { t ->
                 _state.update {
-                    it.copy(loading = false, error = t.message ?: "채팅을 불러오지 못했어요")
+                    it.copy(
+                        loading = false,
+                        error = t.userMessage("채팅방을 준비하지 못했어요"),
+                    )
                 }
             }
         }
@@ -74,7 +86,11 @@ class ChildChatViewModel(
         viewModelScope.launch {
             runCatching { chatRepository.send(room.id, text) }
                 .onSuccess { append(it) }
-                .onFailure { _state.update { s -> s.copy(draft = text, error = "메시지를 보내지 못했어요") } }
+                .onFailure {
+                    _state.update { s ->
+                        s.copy(draft = text, error = it.userMessage("메시지를 보내지 못했어요"))
+                    }
+                }
         }
     }
 
@@ -90,10 +106,6 @@ class ChildChatViewModel(
         }
     }
 
-    /**
-     * 낙관적으로 붙여 둔 로컬 메시지(`local-`/`fake-`)를 서버가 확정한 메시지로 갈아 끼운다.
-     * 같은 id 가 이미 있으면 무시한다(소켓 에코 중복 방지).
-     */
     private fun append(msg: ChatMessage) {
         _state.update { s ->
             if (s.messages.any { it.id == msg.id }) return@update s

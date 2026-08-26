@@ -104,15 +104,21 @@ class FakeAuthRepository(
         if (role == Role.CHILD) {
             require(parentId != null && parentId > 0) { "연결할 부모님 회원 번호를 입력해 주세요" }
         }
+        // 채팅 등 API가 member id를 Long으로 쓰므로 목업도 숫자 id를 쓴다.
+        val numericId = when (role) {
+            Role.CHILD -> if (loginId.equals("minjun", ignoreCase = true)) "101" else "102"
+            Role.PARENT -> "1"
+        }
         val user = User(
-            id = "user-$loginId",
+            id = numericId,
             loginId = loginId,
             name = username,
             role = role,
             phone = phoneNumber,
             email = email,
             profileImageUrl = profileImageUrl,
-         )
+            parentId = parentId.takeIf { role == Role.CHILD },
+        )
 
         val session = FakeData.sessionFor(user)
         sessionRepository.save(session)
@@ -120,8 +126,9 @@ class FakeAuthRepository(
     }
 
     override suspend fun login(loginId: String, password: String, preferredRole: Role?): Session {
+        val id = loginId.trim()
         val session = FakeData.sessionFor(
-            if (loginId == "minjun") FakeData.childUser else FakeData.parent,
+            if (id.equals("minjun", ignoreCase = true)) FakeData.childUser else FakeData.parent,
         )
         sessionRepository.save(session)
         return session
@@ -392,7 +399,7 @@ class FakeWalletRepository : WalletRepository {
     override suspend fun getMyWallet(): Wallet = Wallet("w-parent", balance, "방금")
     override suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction> = listOf(
         WalletTransaction("tx1", "CHARGE", 50000, 50000, null, "08.15"),
-        WalletTransaction("tx2", "TRANSFER_OUT", -5000, 45000, "child-minjun", "08.20")
+        WalletTransaction("tx2", "TRANSFER_OUT", -5000, 45000, "101", "08.20")
     )
     override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult {
         balance -= amount
@@ -439,6 +446,13 @@ class FakeChatRepository(
         "room-jia" to mutableListOf<ChatMessage>(),
     )
     private val incoming = MutableSharedFlow<ChatMessage>(extraBufferCapacity = 64)
+
+    override suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom {
+        return when (childId) {
+            102L -> ChatRoom("room-jia", "이지아", "아직 대화가 없어요", "", false)
+            else -> ChatRoom("room-minjun", "김민준", "학원 끝나요", "14:32", true)
+        }
+    }
 
     /** 방 제목은 보는 쪽 기준으로 바뀐다 — 부모는 자녀 이름을, 자녀는 보호자 이름을 본다. */
     override suspend fun rooms(): List<ChatRoom> = listOf(
@@ -596,8 +610,8 @@ class FakeAppControlRepository : AppControlRepository {
  * Koin `single` 이라 한 프로세스 안에서 부모 계정과 자녀 계정이 **같은 지갑**을 본다.
  * 덕분에 서버 없이도 「부모로 로그인 → 용돈 보내기 → 자녀로 로그인 → QR 결제」가 그대로 재현된다.
  *
- * 목 데이터의 부모용 childId(`child-minjun`)와 자녀 세션의 userId(`user-child`)가 서로 달라서
- * childId 로 지갑을 나누면 두 역할이 다른 잔액을 보게 된다. 그래서 여기서는 **지갑 하나만** 쓴다.
+ * 목 데이터의 부모용 childId와 자녀 세션 userId를 동일하게 `101`로 맞춰
+ * 두 역할이 같은 용돈 지갑을 보게 한다.
  * 실서버 구현([RealAllowanceRepository])은 childId 별로 정상 분리된다.
  */
 class FakeAllowanceRepository : AllowanceRepository {

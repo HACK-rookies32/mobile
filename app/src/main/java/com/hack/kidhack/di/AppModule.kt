@@ -245,7 +245,7 @@ val appModule = module {
     single<InquiryRepository> {
         if (useMock) FakeInquiryRepository() else RealInquiryRepository(get())
     }
-    single { ChatWebSocketClient(get(), get(), BuildConfig.BASE_URL) }
+    single { ChatWebSocketClient(get(), BuildConfig.BASE_URL) }
     // 어떤 구현을 쓰든 대화 기록은 기기에 남는다(앱을 완전히 종료해도 유지).
     single<ChatRepository> {
         val delegate = if (useMock) {
@@ -290,7 +290,7 @@ val appModule = module {
     viewModel { DashboardViewModel(get(), get(), get(), get(), get()) }
     viewModel { LocationViewModel(get(), get(), get()) }
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
-    viewModel { ParentChatViewModel(get(), get(), get()) }
+    viewModel { ParentChatViewModel(get(), get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get()) }
     viewModel { MypageViewModel(get(), get(), get(), get(), get()) }
     viewModel { EditProfileViewModel(get()) }
@@ -308,7 +308,7 @@ val appModule = module {
     viewModel { CardViewModel(get()) }
 
     viewModel { ChildHomeViewModel(get(), get(), get(), get(), get(), get()) }
-    viewModel { ChildChatViewModel(get()) }
+    viewModel { ChildChatViewModel(get(), get()) }
     viewModel { ChildServicesViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildMypageViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildScreenshotViewModel(get(), get(), get()) }

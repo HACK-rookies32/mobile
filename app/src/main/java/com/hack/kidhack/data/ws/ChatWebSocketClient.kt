@@ -1,12 +1,14 @@
 package com.hack.kidhack.data.ws
 
+import android.util.Log
 import com.hack.kidhack.core.common.KidhackJson
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.repository.SessionRepository
+import io.reactivex.disposables.CompositeDisposable
+import io.reactivex.disposables.Disposable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -15,22 +17,21 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
+import kotlinx.serialization.Serializable
+import ua.naiksoftware.stomp.Stomp
+import ua.naiksoftware.stomp.StompClient
+import ua.naiksoftware.stomp.dto.LifecycleEvent
+import ua.naiksoftware.stomp.dto.StompHeader
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * OkHttp WebSocket client for `wss://…/ws/chat`.
+ * STOMP over SockJS client for Spring endpoint `/ws-chat`.
  *
- * Auth is attached as `Authorization: Bearer` and as a `token` query param.
- * Reconnects with exponential backoff while [start] observers remain.
+ * - CONNECT → `{origin}/ws-chat/websocket`
+ * - SUBSCRIBE → `/topic/chat/{roomId}`
+ * - SEND → `/app/chat/{roomId}` body `{ senderId, content }`
  */
 class ChatWebSocketClient(
-    private val okHttpClient: OkHttpClient,
     private val sessionRepository: SessionRepository,
     private val baseUrl: String,
 ) {
@@ -43,18 +44,21 @@ class ChatWebSocketClient(
     val events: SharedFlow<ChatWsEvent> = _events.asSharedFlow()
 
     @Volatile
-    private var socket: WebSocket? = null
+    private var stomp: StompClient? = null
 
     @Volatile
     private var wanted: Boolean = false
 
-    private var attempt: Int = 0
-    private var reconnectJob: Job? = null
+    @Volatile
+    private var activeRoomId: String? = null
+
+    private val disposables = CompositeDisposable()
+    private var topicDisposable: Disposable? = null
 
     fun start() {
         if (observers.getAndIncrement() == 0) {
             wanted = true
-            scope.launch { connect() }
+            scope.launch { ensureConnected() }
         }
     }
 
@@ -62,136 +66,185 @@ class ChatWebSocketClient(
         if (observers.decrementAndGet() <= 0) {
             observers.set(0)
             wanted = false
-            reconnectJob?.cancel()
-            socket?.close(1000, "idle")
-            socket = null
+            scope.launch { disconnect() }
         }
     }
 
-    fun send(roomId: String, content: String) {
-        val frame = ChatSocketFrame(
-            type = ChatSocketFrame.SEND,
-            roomId = roomId,
-            content = content,
+    /** 특정 방 토픽을 구독한다. 방이 바뀌면 이전 구독을 교체한다. */
+    fun subscribeRoom(roomId: String) {
+        activeRoomId = roomId
+        scope.launch {
+            ensureConnected()
+            subscribeTopic(roomId)
+        }
+    }
+
+    fun send(roomId: String, senderId: Long, content: String) {
+        val body = json.encodeToString(
+            StompChatSendBody.serializer(),
+            StompChatSendBody(senderId = senderId, content = content),
         )
-        val body = json.encodeToString(ChatSocketFrame.serializer(), frame)
-        val sent = socket?.send(body) == true
-        if (!sent) {
-            scope.launch {
-                connect(force = true)
-                socket?.send(body)
+        scope.launch {
+            ensureConnected()
+            val client = stomp
+            if (client == null || !client.isConnected) {
+                _events.tryEmit(ChatWsEvent.Error("채팅 연결이 없어요"))
+                return@launch
             }
+            disposables.add(
+                client.send("/app/chat/$roomId", body)
+                    .subscribe(
+                        { _events.tryEmit(ChatWsEvent.Send(roomId, content)) },
+                        { t ->
+                            Log.w(TAG, "stomp send failed", t)
+                            _events.tryEmit(ChatWsEvent.Error(t.message ?: "전송 실패"))
+                        },
+                    ),
+            )
         }
-        _events.tryEmit(ChatWsEvent.Send(roomId, content))
     }
 
+    /** 서버 미지원 — no-op (호환용). */
     fun read(roomId: String, messageId: String?) {
-        val frame = ChatSocketFrame(
-            type = ChatSocketFrame.READ,
-            roomId = roomId,
-            messageId = messageId,
-        )
-        val body = json.encodeToString(ChatSocketFrame.serializer(), frame)
-        if (socket?.send(body) != true) {
-            scope.launch {
-                connect(force = true)
-                socket?.send(body)
-            }
-        }
         _events.tryEmit(ChatWsEvent.Read(roomId, messageId))
     }
 
-    private suspend fun connect(force: Boolean = false) {
+    private suspend fun ensureConnected() {
         mutex.withLock {
-            if (!wanted && !force) return
-            socket?.cancel()
+            if (!wanted) return
+            val existing = stomp
+            if (existing != null && existing.isConnected) return
+
+            existing?.disconnect()
+            disposables.clear()
+
             val token = sessionRepository.accessToken()
-            val request = Request.Builder()
-                .url(buildWsUrl(token))
-                .apply {
-                    if (!token.isNullOrBlank()) header("Authorization", "Bearer $token")
-                }
-                .build()
-            socket = okHttpClient.newWebSocket(request, listener)
+            val url = buildStompUrl()
+            val client = Stomp.over(Stomp.ConnectionProvider.OKHTTP, url)
+            stomp = client
+
+            disposables.add(
+                client.lifecycle().subscribe { event ->
+                    when (event.type) {
+                        LifecycleEvent.Type.OPENED -> {
+                            Log.d(TAG, "stomp opened")
+                            activeRoomId?.let { roomId -> subscribeTopic(roomId) }
+                        }
+                        LifecycleEvent.Type.ERROR -> {
+                            Log.w(TAG, "stomp error", event.exception)
+                            _events.tryEmit(
+                                ChatWsEvent.Error(event.exception?.message ?: "채팅 연결 오류"),
+                            )
+                        }
+                        LifecycleEvent.Type.CLOSED -> {
+                            Log.d(TAG, "stomp closed")
+                            if (wanted) {
+                                scope.launch {
+                                    delay(2_000)
+                                    if (wanted) ensureConnected()
+                                }
+                            }
+                        }
+                        LifecycleEvent.Type.FAILED_SERVER_HEARTBEAT -> {
+                            _events.tryEmit(ChatWsEvent.Error("채팅 하트비트 실패"))
+                        }
+                    }
+                },
+            )
+
+            val headers = mutableListOf<StompHeader>()
+            if (!token.isNullOrBlank()) {
+                headers.add(StompHeader("Authorization", "Bearer $token"))
+            }
+            client.connect(headers)
         }
     }
 
-    private fun buildWsUrl(token: String?): String {
+    private fun subscribeTopic(roomId: String) {
+        val client = stomp ?: return
+        if (!client.isConnected) return
+        synchronized(this) {
+            topicDisposable?.dispose()
+            topicDisposable = client.topic("/topic/chat/$roomId").subscribe(
+                { message ->
+                    val payload = runCatching {
+                        json.decodeFromString(
+                            StompChatMessagePayload.serializer(),
+                            message.payload,
+                        )
+                    }.getOrElse {
+                        _events.tryEmit(ChatWsEvent.Error("잘못된 채팅 메시지"))
+                        return@subscribe
+                    }
+                    scope.launch {
+                        val session = sessionRepository.current()
+                        val myId = session?.user?.id?.toLongOrNull()
+                        val myRole = session?.user?.role ?: Role.PARENT
+                        val fromRole = when {
+                            payload.senderId != null && myId != null ->
+                                if (payload.senderId == myId) myRole
+                                else if (myRole == Role.PARENT) Role.CHILD else Role.PARENT
+                            else -> Role.PARENT
+                        }
+                        val chat = ChatMessage(
+                            id = payload.id ?: "stomp-${System.currentTimeMillis()}",
+                            roomId = payload.roomId ?: roomId,
+                            fromRole = fromRole,
+                            text = payload.content.orEmpty(),
+                            sentAt = payload.sentAt.orEmpty(),
+                        )
+                        _events.tryEmit(ChatWsEvent.Message(chat))
+                    }
+                },
+                { t ->
+                    Log.w(TAG, "stomp subscribe failed", t)
+                    _events.tryEmit(ChatWsEvent.Error(t.message ?: "구독 실패"))
+                },
+            )
+            topicDisposable?.let { disposables.add(it) }
+        }
+    }
+
+    private suspend fun disconnect() {
+        mutex.withLock {
+            topicDisposable?.dispose()
+            topicDisposable = null
+            disposables.clear()
+            stomp?.disconnect()
+            stomp = null
+            activeRoomId = null
+        }
+    }
+
+    /**
+     * SockJS WebSocket transport URL.
+     * BASE_URL 예: `http://192.168.x.x:8080/api` → `ws://192.168.x.x:8080/ws-chat/websocket`
+     */
+    private fun buildStompUrl(): String {
         val origin = baseUrl.trimEnd('/')
             .removeSuffix("/api/v1")
+            .removeSuffix("/api")
             .replace(Regex("^https://"), "wss://")
             .replace(Regex("^http://"), "ws://")
-        val raw = "$origin/ws/chat"
-        val parsed = raw.toHttpUrlOrNull()
-        return if (parsed != null && !token.isNullOrBlank()) {
-            parsed.newBuilder().addQueryParameter("token", token).build().toString()
-        } else {
-            raw
-        }
+        return "$origin/ws-chat/websocket"
     }
 
-    private fun scheduleReconnect() {
-        if (!wanted) return
-        reconnectJob?.cancel()
-        val delayMs = (1_000L * (1L shl attempt.coerceAtMost(5))).coerceAtMost(30_000L)
-        attempt += 1
-        reconnectJob = scope.launch {
-            delay(delayMs)
-            if (wanted) connect()
-        }
-    }
-
-    private val listener = object : WebSocketListener() {
-        override fun onOpen(webSocket: WebSocket, response: Response) {
-            attempt = 0
-        }
-
-        override fun onMessage(webSocket: WebSocket, text: String) {
-            val frame = runCatching {
-                json.decodeFromString(ChatSocketFrame.serializer(), text)
-            }.getOrElse {
-                _events.tryEmit(ChatWsEvent.Error("invalid frame"))
-                return
-            }
-            when (frame.type.uppercase()) {
-                ChatSocketFrame.MESSAGE -> {
-                    val roomId = frame.roomId ?: return
-                    val body = frame.content ?: frame.text.orEmpty()
-                    val role = runCatching { Role.valueOf(frame.fromRole.orEmpty()) }
-                        .getOrDefault(Role.PARENT)
-                    val message = ChatMessage(
-                        id = frame.id ?: frame.messageId ?: "ws-${System.currentTimeMillis()}",
-                        roomId = roomId,
-                        fromRole = role,
-                        text = body,
-                        sentAt = frame.sentAt.orEmpty(),
-                    )
-                    _events.tryEmit(ChatWsEvent.Message(message))
-                }
-                ChatSocketFrame.READ -> {
-                    _events.tryEmit(ChatWsEvent.Read(frame.roomId.orEmpty(), frame.messageId ?: frame.id))
-                }
-                ChatSocketFrame.ERROR -> {
-                    _events.tryEmit(ChatWsEvent.Error(frame.message ?: frame.content ?: "chat error"))
-                }
-                ChatSocketFrame.SEND -> {
-                    val roomId = frame.roomId ?: return
-                    _events.tryEmit(ChatWsEvent.Send(roomId, frame.content ?: frame.text.orEmpty()))
-                }
-            }
-        }
-
-        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-            webSocket.close(code, reason)
-        }
-
-        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-            if (wanted) scheduleReconnect()
-        }
-
-        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            _events.tryEmit(ChatWsEvent.Error(t.message ?: "socket failure"))
-            if (wanted) scheduleReconnect()
-        }
+    companion object {
+        private const val TAG = "ChatStomp"
     }
 }
+
+@Serializable
+data class StompChatSendBody(
+    val senderId: Long,
+    val content: String,
+)
+
+@Serializable
+data class StompChatMessagePayload(
+    val id: String? = null,
+    val roomId: String? = null,
+    val senderId: Long? = null,
+    val content: String? = null,
+    val sentAt: String? = null,
+)

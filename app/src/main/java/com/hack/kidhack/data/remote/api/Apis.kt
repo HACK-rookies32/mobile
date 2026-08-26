@@ -24,6 +24,7 @@ import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
+import com.hack.kidhack.data.remote.dto.CreateChatRoomRequest
 import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
@@ -282,6 +283,9 @@ interface CommunityApi {
 }
 
 interface ChatApi {
+    @POST("chat/rooms")
+    suspend fun createOrGetRoom(@Body body: CreateChatRoomRequest): ApiEnvelope<ChatRoomDto>
+
     @GET("chat/rooms")
     suspend fun rooms(): ApiEnvelope<List<ChatRoomDto>>
 
@@ -290,7 +294,8 @@ interface ChatApi {
         @Path("roomId") roomId: String,
         @Query("before") before: String? = null,
         @Query("size") size: Int = 30,
-    ): ApiEnvelope<List<ChatMessageDto>>
+        @Query("page") page: Int = 0,
+    ): ApiEnvelope<PageResponse<ChatMessageDto>>
 }
 
 interface PaymentApi {

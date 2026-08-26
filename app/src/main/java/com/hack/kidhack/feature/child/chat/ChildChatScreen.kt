@@ -69,7 +69,8 @@ fun ChildChatScreen(
 
     LaunchedEffect(state.error) {
         val message = state.error
-        if (message != null) {
+        // 방 로드 실패는 화면에 다시 시도를 보여 주므로 토스트만 띄우고 clear 하지 않음
+        if (message != null && state.room != null) {
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             viewModel.clearError()
         }
@@ -95,7 +96,7 @@ fun ChildChatScreen(
                 Spacer(Modifier.size(12.dp))
                 Column {
                     Text(
-                        text = state.title.ifBlank { stringResource(R.string.child_chat_mom) },
+                        text = stringResource(R.string.child_chat_mom),
                         color = Color.White,
                         fontFamily = KidhackFontFamily,
                         fontWeight = FontBold,
@@ -111,6 +112,34 @@ fun ChildChatScreen(
                 }
             }
         }
+        if (!state.loading && state.room == null) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = state.error ?: stringResource(R.string.child_chat_empty),
+                        color = colors.muted,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontSemibold,
+                        fontSize = 14.sp,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = "다시 시도",
+                        color = colors.brand,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 15.sp,
+                        modifier = Modifier.clickable(onClick = viewModel::load),
+                    )
+                }
+            }
+        } else {
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -196,6 +225,7 @@ fun ChildChatScreen(
                 )
             }
         }
+        } // end room-ready branch
     }
 }
 
