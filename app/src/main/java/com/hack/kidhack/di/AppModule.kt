@@ -312,13 +312,9 @@ val appModule = module {
     viewModel { ChildServicesViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildMypageViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildScreenshotViewModel(get(), get(), get()) }
-    viewModel { ChildOnboardingViewModel(get(), get()) }
     viewModel { ChildCameraViewModel(get(), get(), get(), get()) }
     viewModel { ChildPayViewModel(get(), get()) }
     viewModel { ChildProfileEditViewModel(get(), get()) }
-    viewModel { ChildServicesViewModel(get(), get()) }
-    viewModel { ChildMypageViewModel(get(), get(), get()) }
-    viewModel { ChildScreenshotViewModel(get()) }
     viewModel { (persistDone: Boolean) ->
         ChildOnboardingViewModel(get(), get(), persistDone)
     }

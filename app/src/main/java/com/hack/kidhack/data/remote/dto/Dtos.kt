@@ -362,6 +362,8 @@ data class AllowancePaymentDto(
     val balanceAfter: Int,
     val approvedAt: String,
     val merchant: String? = null,
+)
+
 @Serializable
 data class InstalledAppDto(val packageName: String, val appName: String, val category: String?)
 

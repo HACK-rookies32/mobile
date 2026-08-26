@@ -60,6 +60,7 @@ import com.hack.kidhack.domain.repository.PaymentRepository
 import com.hack.kidhack.domain.repository.PhotoRepository
 import com.hack.kidhack.domain.repository.PointRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
+import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
 import com.hack.kidhack.domain.repository.SubscriptionRepository
 import com.hack.kidhack.domain.repository.UserRepository
@@ -77,6 +78,7 @@ import java.util.Locale
 
 class FakeAuthRepository(
     private val sessionRepository: SessionRepository,
+    private val sessionEvents: SessionEvents,
 ) : AuthRepository {
     override suspend fun signup(
         loginId: String,
@@ -127,6 +129,7 @@ class FakeAuthRepository(
 
     override suspend fun logout() {
         sessionRepository.clear()
+        sessionEvents.emitLogout()
     }
 
     override suspend fun findId(name: String, phone: String): String = "parent01"
@@ -143,27 +146,11 @@ class FakeAuthRepository(
 class FakeUserRepository(
     private val sessionRepository: SessionRepository,
 ) : UserRepository {
-    private var settings = NotificationSettings(true, true, false, true)
+    private var settings = NotificationSettings(location = true, harmfulAccess = true, appUsage = true, notice = true)
 
     override suspend fun me(): User =
         sessionRepository.current()?.user ?: FakeData.parent
 
-    override suspend fun updateMe(name: String?, phone: String?, email: String?): User {
-        delay(200)
-        val current = me()
-        return current.copy(
-            name = name?.takeIf { it.isNotBlank() } ?: current.name,
-            phone = phone ?: current.phone,
-            email = email,
-        )
-    }
-
-    override suspend fun deleteMe() = Unit
-    override suspend fun notificationSettings(): NotificationSettings = settings
-class FakeUserRepository : UserRepository {
-    private var mySettings = NotificationSettings(location = true, harmfulAccess = true, appUsage = true, notice = true)
-    private var currentUser: User = FakeData.parent
-    override suspend fun me(): User = currentUser
     override suspend fun updateMe(
         nickname: String?,
         name: String?,
@@ -171,21 +158,23 @@ class FakeUserRepository : UserRepository {
         email: String?,
         profileImageUrl: String?,
     ): User {
-        currentUser = currentUser.copy(
-            nickname = nickname ?: currentUser.nickname,
-            name = name ?: currentUser.name,
-            phone = phone ?: currentUser.phone,
-            email = email ?: currentUser.email,
-            profileImageUrl = profileImageUrl ?: currentUser.profileImageUrl,
+        delay(200)
+        val current = me()
+        return current.copy(
+            nickname = nickname ?: current.nickname,
+            name = name?.takeIf { it.isNotBlank() } ?: current.name,
+            phone = phone ?: current.phone,
+            email = email,
+            profileImageUrl = profileImageUrl ?: current.profileImageUrl,
         )
-        return currentUser
     }
+
     override suspend fun changePassword(newPassword: String) {}
-    override suspend fun deleteMe() {}
-    override suspend fun notificationSettings(): NotificationSettings = mySettings
+    override suspend fun deleteMe() = Unit
+    override suspend fun notificationSettings(): NotificationSettings = settings
     override suspend fun patchNotificationSettings(settings: NotificationSettings): NotificationSettings {
-        mySettings = settings
-        return mySettings
+        this.settings = settings
+        return settings
     }
 }
 
@@ -292,19 +281,6 @@ class FakeScreenshotRepository(
         description = "화면 캡처",
         trigger = trigger,
     )
-class FakeScreenshotRepository : ScreenshotRepository {
-    override fun paged(childId: String): Flow<PagingData<Screenshot>> = Pager(PagingConfig(20)) {
-        PageResponsePagingSource { page, size ->
-            PageResponse(list(childId), page, size, 2, 1)
-        }
-    }.flow
-    override suspend fun list(childId: String): List<Screenshot> = listOf(
-        Screenshot("s1", "14:30", "게임 중", "MANUAL", null),
-        Screenshot("s2", "11:15", "웹 서핑", "AUTO", null),
-    )
-    override suspend fun requestCapture(childId: String) {
-        delay(1500)
-    }
 }
 
 class FakeCommunityRepository : CommunityRepository {
@@ -465,19 +441,6 @@ class FakeChatRepository(
     private val incoming = MutableSharedFlow<ChatMessage>(extraBufferCapacity = 64)
 
     /** 방 제목은 보는 쪽 기준으로 바뀐다 — 부모는 자녀 이름을, 자녀는 보호자 이름을 본다. */
-    override suspend fun rooms(): List<ChatRoom> {
-        val role = sessionRepository.current()?.user?.role ?: Role.PARENT
-        return synchronized(lock) {
-            if (role == Role.CHILD) {
-                listOf(roomOf("room-minjun", "엄마 (" + FakeData.parent.name + ")", true))
-            } else {
-                listOf(
-                    roomOf("room-minjun", "김민준", true),
-                    roomOf("room-jia", "이지아", false),
-                )
-            }
-        }
-    }
     override suspend fun rooms(): List<ChatRoom> = listOf(
         ChatRoom("room-minjun", "김민준", "학원 끝나요", "14:32", true),
         ChatRoom("room-jia", "이지아", "아직 대화가 없어요", "", false),
@@ -568,12 +531,6 @@ class FakeCommandRepository : CommandRepository {
     fun emit(command: RemoteCommand) {
         if (!stream.tryEmit(command)) queue.add(command)
     }
-    override suspend fun balance(): PointBalance = FakeData.pointBalance
-    override suspend fun history(): List<PointHistory> = listOf(
-        PointHistory("ph1", "이벤트 참여", 1000, "08.20"),
-        PointHistory("ph2", "포인트 전환", -500, "08.18")
-    )
-    override suspend fun use(productId: Int, point: Int) {}
 }
 
 class FakeSubscriptionRepository : SubscriptionRepository {

@@ -42,8 +42,13 @@ fun KidhackNavHost() {
         commandBus.pending.collect { command ->
             when (command.type) {
                 RemoteCommandType.CAMERA_SHOT -> {
+                    // 부모 촬영 요청 카메라는 현재 탭 위에 쌓지 않고 그래프 최상위로 연다.
+                    // 그러지 않으면 현재 탭(예: 서비스) 백스택에 카메라가 얹혀 저장되고,
+                    // 나중에 그 탭을 다시 누르면 restoreState 로 카메라가 되살아난다.
                     navController.navigate(Route.ChildCameraRequest.create(command.requestId)) {
+                        popUpTo(Route.ChildGraph.path) { saveState = true }
                         launchSingleTop = true
+                        restoreState = false
                     }
                     commandBus.consume()
                 }

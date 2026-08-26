@@ -59,10 +59,8 @@ import com.hack.kidhack.data.remote.dto.SignupRequest
 import com.hack.kidhack.data.remote.dto.SubscribeRequest
 import com.hack.kidhack.data.remote.dto.SubscriptionDto
 import com.hack.kidhack.data.remote.dto.UsePointRequest
-import com.hack.kidhack.data.remote.dto.TokenResponse
 import com.hack.kidhack.data.remote.dto.TransferRequest
 import com.hack.kidhack.data.remote.dto.TransferResponse
-import com.hack.kidhack.data.remote.dto.UsePointRequest
 import com.hack.kidhack.data.remote.dto.UserDto
 import com.hack.kidhack.data.remote.dto.UserUpdateRequest
 import com.hack.kidhack.data.remote.dto.WalletDto
@@ -407,6 +405,8 @@ interface AllowanceApi {
         @Path("childId") childId: String,
         @Body body: AllowancePaymentRequest,
     ): ApiEnvelope<AllowancePaymentDto>
+}
+
 interface AppControlApi {
     @GET("children/{childId}/installed-apps")
     suspend fun getInstalledApps(@Path("childId") childId: String): ApiEnvelope<InstalledAppsResponse>
