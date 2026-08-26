@@ -44,6 +44,7 @@ import com.hack.kidhack.feature.parent.ParentCommunityScreen
 import com.hack.kidhack.feature.parent.ParentCommunityWriteScreen
 import com.hack.kidhack.feature.parent.ParentContactScreen
 import com.hack.kidhack.feature.parent.ParentDashboardScreen
+import com.hack.kidhack.feature.parent.ParentEditProfileScreen
 import com.hack.kidhack.feature.parent.ParentGeofenceScreen
 import com.hack.kidhack.feature.parent.ParentHarmfulScreen
 import com.hack.kidhack.feature.parent.ParentLocationScreen
@@ -95,6 +96,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
         }
         parentTab(Route.ParentMypage.path, navController) {
             ParentMypageScreen(
+                onOpenEditProfile = { navController.navigate(Route.ParentEditProfile.path) },
                 onOpenNotifications = { navController.navigate(Route.ParentNotifications.path) },
                 onOpenAppControl = { navController.navigate(Route.ParentAppControl.path) },
                 onOpenScreenshot = { navController.navigate(Route.ParentScreenshot.path) },
@@ -108,6 +110,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 onOpenCards = { navController.navigate(Route.ParentCards.path) },
             )
         }
+        composable(Route.ParentEditProfile.path) { ParentShell(navController) { ParentEditProfileScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentAppControl.path) { ParentShell(navController) { ParentAppControlScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentScreenshot.path) { ParentShell(navController) { ParentScreenshotScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentChildProfile.path) { ParentShell(navController) { ParentChildProfileScreen(onBack = { navController.popBackStack() }) } }

@@ -10,6 +10,7 @@ import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.BlocklistResponse
 import com.hack.kidhack.data.remote.dto.CardDto
 import com.hack.kidhack.data.remote.dto.CardRegisterRequest
+import com.hack.kidhack.data.remote.dto.ChangePasswordRequest
 import com.hack.kidhack.data.remote.dto.ChargeCancelRequest
 import com.hack.kidhack.data.remote.dto.ChargeConfirmRequest
 import com.hack.kidhack.data.remote.dto.ChargeConfirmResponse
@@ -42,6 +43,7 @@ import com.hack.kidhack.data.remote.dto.PointBalanceDto
 import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
 import com.hack.kidhack.data.remote.dto.RefreshRequest
+import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SignupRequest
@@ -93,6 +95,9 @@ interface UserApi {
 
     @PATCH("users/me")
     suspend fun updateMe(@Body body: UserUpdateRequest): ApiEnvelope<UserDto>
+
+    @PATCH("users/me/password")
+    suspend fun changePassword(@Body body: ChangePasswordRequest): ApiEnvelope<Unit>
 
     @DELETE("users/me")
     suspend fun deleteMe(): ApiEnvelope<Unit>
@@ -249,6 +254,19 @@ interface CommunityApi {
 
     @POST("community/posts/{postId}/like")
     suspend fun like(@Path("postId") postId: String): ApiEnvelope<Unit>
+
+    @POST("community/posts/{postId}/report")
+    suspend fun reportPost(
+        @Path("postId") postId: String,
+        @Body body: ReportRequest,
+    ): ApiEnvelope<Unit>
+
+    @POST("community/posts/{postId}/comments/{commentId}/report")
+    suspend fun reportComment(
+        @Path("postId") postId: String,
+        @Path("commentId") commentId: String,
+        @Body body: ReportRequest,
+    ): ApiEnvelope<Unit>
 
     @Multipart
     @POST("community/attachments")

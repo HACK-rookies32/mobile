@@ -44,6 +44,7 @@ data class UserDto(
     val loginId: String,
     val name: String,
     val role: String,
+    val nickname: String? = null,
     val phone: String = "",
     val email: String? = null,
     val profileImageUrl: String? = null,
@@ -51,9 +52,16 @@ data class UserDto(
 
 @Serializable
 data class UserUpdateRequest(
+    val nickname: String? = null,
     val name: String? = null,
     val phone: String? = null,
     val email: String? = null,
+    val profileImageUrl: String? = null,
+)
+
+@Serializable
+data class ChangePasswordRequest(
+    val newPassword: String,
 )
 
 @Serializable
@@ -176,6 +184,9 @@ data class CreatePostRequest(
 
 @Serializable
 data class CommentRequest(val body: String)
+
+@Serializable
+data class ReportRequest(val reason: String, val detail: String? = null)
 
 @Serializable
 data class ChatRoomDto(

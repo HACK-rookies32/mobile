@@ -23,12 +23,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,6 +66,7 @@ import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Post
 import com.hack.kidhack.domain.repository.CommunityRepository
+import com.hack.kidhack.domain.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -96,22 +99,43 @@ class CommunityListViewModel(
     }
 }
 
+enum class ReportReason { SPAM, ABUSE, ADULT, FALSE_INFO, ETC }
+
+sealed interface ReportTarget {
+    data object PostTarget : ReportTarget
+    data class CommentTarget(val commentId: String) : ReportTarget
+}
+
 data class CommunityDetailUiState(
     val post: Post? = null,
     val comments: List<Comment> = emptyList(),
     val draft: String = "",
     val loading: Boolean = true,
     val error: String? = null,
+    val reportTarget: ReportTarget? = null,
+    val pendingReason: ReportReason? = null,
+    val reportDetail: String = "",
+    val reportDone: Boolean = false,
 )
 
 class CommunityDetailViewModel(
     private val postId: String,
     private val communityRepository: CommunityRepository,
+    private val userRepository: UserRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(CommunityDetailUiState())
     val state: StateFlow<CommunityDetailUiState> = _state.asStateFlow()
 
-    init { load() }
+    private var myNickname: String = "나"
+
+    init {
+        load()
+        viewModelScope.launch {
+            runCatching { userRepository.me() }.getOrNull()?.let { user ->
+                myNickname = user.nickname?.takeIf { it.isNotBlank() } ?: user.name
+            }
+        }
+    }
 
     fun onDraft(v: String) = _state.update { it.copy(draft = v) }
 
@@ -146,7 +170,7 @@ class CommunityDetailViewModel(
                 .onSuccess {
                     val newComment = Comment(
                         id = "local-${System.currentTimeMillis()}",
-                        author = "나", // TODO: 실제 사용자 이름으로 연동
+                        author = myNickname,
                         text = text,
                         createdAt = "방금"
                     )
@@ -159,6 +183,36 @@ class CommunityDetailViewModel(
                     }
                 }
                 .onFailure { t -> _state.update { it.copy(error = t.message) } }
+        }
+    }
+
+    fun openReportPost() =
+        _state.update { it.copy(reportTarget = ReportTarget.PostTarget, pendingReason = null, reportDetail = "") }
+    fun openReportComment(commentId: String) =
+        _state.update { it.copy(reportTarget = ReportTarget.CommentTarget(commentId), pendingReason = null, reportDetail = "") }
+
+    // 사유 선택 → 바로 신고하지 않고 확인 단계로 이동
+    fun selectReason(reason: ReportReason) = _state.update { it.copy(pendingReason = reason) }
+    fun onReportDetail(v: String) = _state.update { it.copy(reportDetail = v) }
+    fun cancelReport() = _state.update { it.copy(reportTarget = null, pendingReason = null, reportDetail = "") }
+    fun dismissReportDone() = _state.update { it.copy(reportDone = false) }
+
+    fun confirmReport() {
+        val target = _state.value.reportTarget ?: return
+        val reason = _state.value.pendingReason ?: return
+        val detail = if (reason == ReportReason.ETC) _state.value.reportDetail.trim().ifBlank { null } else null
+        viewModelScope.launch {
+            runCatching {
+                when (target) {
+                    is ReportTarget.PostTarget -> communityRepository.reportPost(postId, reason.name, detail)
+                    is ReportTarget.CommentTarget ->
+                        communityRepository.reportComment(postId, target.commentId, reason.name, detail)
+                }
+            }.onSuccess {
+                _state.update { it.copy(reportTarget = null, pendingReason = null, reportDetail = "", reportDone = true) }
+            }.onFailure { t ->
+                _state.update { it.copy(reportTarget = null, pendingReason = null, reportDetail = "", error = t.message) }
+            }
         }
     }
 }
@@ -269,6 +323,7 @@ fun ParentCommunityScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParentCommunityDetailScreen(
     postId: String,
@@ -372,7 +427,11 @@ fun ParentCommunityDetailScreen(
                 }
 
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
                         stringResource(R.string.parent_community_like) + " ${post.likeCount}",
                         modifier = Modifier.clickable(onClick = viewModel::like),
@@ -380,12 +439,22 @@ fun ParentCommunityDetailScreen(
                         fontWeight = FontBold,
                     )
                     Text(stringResource(R.string.parent_community_comments, post.commentCount), color = colors.muted)
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        stringResource(R.string.parent_community_report),
+                        modifier = Modifier.clickable(onClick = viewModel::openReportPost),
+                        color = colors.muted,
+                        fontSize = 12.sp,
+                    )
                 }
             }
             state.comments.forEach { c ->
                 KidCard {
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Text(
                                 text = c.author,
                                 fontFamily = KidhackFontFamily,
@@ -399,6 +468,13 @@ fun ParentCommunityDetailScreen(
                                 color = colors.muted,
                                 fontSize = 11.sp
                             )
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                text = stringResource(R.string.parent_community_report),
+                                modifier = Modifier.clickable { viewModel.openReportComment(c.id) },
+                                color = colors.muted,
+                                fontSize = 11.sp,
+                            )
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(c.text, fontSize = 14.sp, color = colors.text)
@@ -407,6 +483,107 @@ fun ParentCommunityDetailScreen(
             }
         }
     }
+
+    if (state.reportTarget != null && state.pendingReason == null) {
+        ReportReasonSheet(
+            onDismiss = viewModel::cancelReport,
+            onSelect = viewModel::selectReason,
+        )
+    }
+
+    val pendingReason = state.pendingReason
+    if (state.reportTarget != null && pendingReason != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::cancelReport,
+            title = { Text(stringResource(R.string.parent_community_report_confirm_title), fontWeight = FontBold) },
+            text = {
+                Column {
+                    Text(
+                        stringResource(R.string.parent_community_report_confirm_reason, reportReasonLabel(pendingReason)),
+                        color = colors.text,
+                    )
+                    if (pendingReason == ReportReason.ETC) {
+                        Spacer(Modifier.height(12.dp))
+                        KidTextField(
+                            value = state.reportDetail,
+                            onValueChange = viewModel::onReportDetail,
+                            label = stringResource(R.string.parent_community_report_detail_label),
+                            placeholder = stringResource(R.string.parent_community_report_detail_placeholder),
+                            singleLine = false,
+                            minLines = 3,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmReport) {
+                    Text(stringResource(R.string.parent_community_report_confirm_ok), color = colors.danger, fontWeight = FontBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::cancelReport) {
+                    Text(stringResource(R.string.parent_community_report_confirm_cancel), color = colors.muted)
+                }
+            },
+        )
+    }
+
+    if (state.reportDone) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissReportDone,
+            title = { Text(stringResource(R.string.parent_community_report_done_title), fontWeight = FontBold) },
+            text = { Text(stringResource(R.string.parent_community_report_done_message)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissReportDone) {
+                    Text(stringResource(R.string.parent_community_report_done_ok), color = colors.brand, fontWeight = FontBold)
+                }
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReportReasonSheet(
+    onDismiss: () -> Unit,
+    onSelect: (ReportReason) -> Unit,
+) {
+    val colors = LocalKidhackColors.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
+            Text(
+                stringResource(R.string.parent_community_report_title),
+                modifier = Modifier.padding(16.dp),
+                fontWeight = FontBold,
+                fontSize = 18.sp,
+            )
+            HorizontalDivider(color = colors.border)
+            ReportReason.entries.forEach { reason ->
+                Text(
+                    text = reportReasonLabel(reason),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelect(reason) }
+                        .padding(16.dp),
+                    color = colors.text,
+                    fontWeight = FontSemibold,
+                    fontSize = 15.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun reportReasonLabel(reason: ReportReason): String = when (reason) {
+    ReportReason.SPAM -> stringResource(R.string.parent_community_report_reason_spam)
+    ReportReason.ABUSE -> stringResource(R.string.parent_community_report_reason_abuse)
+    ReportReason.ADULT -> stringResource(R.string.parent_community_report_reason_adult)
+    ReportReason.FALSE_INFO -> stringResource(R.string.parent_community_report_reason_false)
+    ReportReason.ETC -> stringResource(R.string.parent_community_report_reason_etc)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

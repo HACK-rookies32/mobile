@@ -13,6 +13,7 @@ data class User(
     val loginId: String,
     val name: String,
     val role: Role,
+    val nickname: String? = null,
     val phone: String = "",
     val email: String? = null,
     val profileImageUrl: String? = null,

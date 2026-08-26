@@ -15,8 +15,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -54,17 +59,21 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
+enum class PasswordError { EMPTY, MISMATCH }
+
 data class MypageUiState(
     val user: User? = null,
     val subscription: Subscription? = null,
     val children: List<ChildProfile> = emptyList(),
     val selectedChildId: String? = null,
-    val editing: Boolean = false,
-    val name: String = "",
-    val phone: String = "",
-    val message: String? = null,
     val loading: Boolean = true,
     val error: String? = null,
+    val changingPassword: Boolean = false,
+    val newPassword: String = "",
+    val confirmPassword: String = "",
+    val passwordError: PasswordError? = null,
+    val showPasswordConfirm: Boolean = false,
+    val passwordChanged: Boolean = false,
 )
 
 class MypageViewModel(
@@ -104,8 +113,6 @@ class MypageViewModel(
                         subscription = sub,
                         children = childInfo.first,
                         selectedChildId = childInfo.second,
-                        name = user.name,
-                        phone = user.phone
                     )
                 }
             }.onFailure { t ->
@@ -118,17 +125,55 @@ class MypageViewModel(
         viewModelScope.launch { selectedChildRepository.select(id) }
     }
 
-    fun toggleEdit() = _state.update { it.copy(editing = !it.editing, message = null) }
-    fun onName(v: String) = _state.update { it.copy(name = v) }
-    fun onPhone(v: String) = _state.update { it.copy(phone = v) }
+    fun togglePasswordChange() = _state.update {
+        val opening = !it.changingPassword
+        it.copy(
+            changingPassword = opening,
+            newPassword = "",
+            confirmPassword = "",
+            passwordError = null,
+            passwordChanged = false,
+        )
+    }
 
-    fun saveProfile() {
+    fun onNewPassword(v: String) = _state.update { it.copy(newPassword = v, passwordError = null) }
+    fun onConfirmPassword(v: String) = _state.update { it.copy(confirmPassword = v, passwordError = null) }
+
+    fun requestPasswordChange() {
+        val s = _state.value
+        val error = when {
+            s.newPassword.isBlank() -> PasswordError.EMPTY
+            s.newPassword != s.confirmPassword -> PasswordError.MISMATCH
+            else -> null
+        }
+        if (error != null) {
+            _state.update { it.copy(passwordError = error) }
+        } else {
+            _state.update { it.copy(showPasswordConfirm = true) }
+        }
+    }
+
+    fun dismissPasswordConfirm() = _state.update { it.copy(showPasswordConfirm = false) }
+
+    fun confirmPasswordChange() {
+        val newPassword = _state.value.newPassword
         viewModelScope.launch {
-            runCatching { userRepository.updateMe(_state.value.name, _state.value.phone, null) }
-                .onSuccess { user ->
-                    _state.update { it.copy(user = user, editing = false, message = "ok") }
+            runCatching { userRepository.changePassword(newPassword) }
+                .onSuccess {
+                    _state.update {
+                        it.copy(
+                            showPasswordConfirm = false,
+                            changingPassword = false,
+                            newPassword = "",
+                            confirmPassword = "",
+                            passwordError = null,
+                            passwordChanged = true,
+                        )
+                    }
                 }
-                .onFailure { t -> _state.update { it.copy(error = t.message) } }
+                .onFailure { t ->
+                    _state.update { it.copy(showPasswordConfirm = false, error = t.message) }
+                }
         }
     }
 
@@ -139,6 +184,7 @@ class MypageViewModel(
 
 @Composable
 fun ParentMypageScreen(
+    onOpenEditProfile: () -> Unit = {},
     onOpenNotifications: () -> Unit = {},
     onOpenAppControl: () -> Unit = {},
     onOpenScreenshot: () -> Unit = {},
@@ -190,19 +236,66 @@ fun ParentMypageScreen(
         },
     ) {
         ParentLoadingOrError(state.loading && user == null, state.error, viewModel::load)
-        if (state.editing) {
+        if (state.changingPassword) {
             KidCard {
-                KidTextField(state.name, viewModel::onName, stringResource(R.string.parent_mypage_name))
-                KidTextField(state.phone, viewModel::onPhone, stringResource(R.string.parent_mypage_phone))
-                KidButton(stringResource(R.string.parent_mypage_save), viewModel::saveProfile, Modifier.fillMaxWidth())
+                FormHeader(stringResource(R.string.parent_mypage_change_password), viewModel::togglePasswordChange)
+                KidTextField(
+                    state.newPassword,
+                    viewModel::onNewPassword,
+                    stringResource(R.string.parent_mypage_new_password),
+                    placeholder = stringResource(R.string.parent_mypage_password_placeholder),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    isError = state.passwordError == PasswordError.EMPTY,
+                )
+                Spacer(Modifier.height(8.dp))
+                KidTextField(
+                    state.confirmPassword,
+                    viewModel::onConfirmPassword,
+                    stringResource(R.string.parent_mypage_new_password_confirm),
+                    placeholder = stringResource(R.string.parent_mypage_password_confirm_placeholder),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    isError = state.passwordError == PasswordError.MISMATCH,
+                )
+                state.passwordError?.let { err ->
+                    val msg = when (err) {
+                        PasswordError.EMPTY -> stringResource(R.string.parent_mypage_password_error_empty)
+                        PasswordError.MISMATCH -> stringResource(R.string.parent_mypage_password_error_mismatch)
+                    }
+                    Text(msg, color = colors.danger, fontSize = 12.sp, fontWeight = FontBold)
+                }
+                Spacer(Modifier.height(8.dp))
+                KidButton(
+                    stringResource(R.string.parent_mypage_password_change),
+                    viewModel::requestPasswordChange,
+                    Modifier.fillMaxWidth(),
+                )
             }
         }
-        if (state.message == "ok") {
-            Text(stringResource(R.string.parent_mypage_saved), color = colors.safe, fontSize = 12.sp, fontWeight = FontBold)
+        if (state.passwordChanged) {
+            Text(stringResource(R.string.parent_mypage_password_changed), color = colors.safe, fontSize = 12.sp, fontWeight = FontBold)
+        }
+        if (state.showPasswordConfirm) {
+            AlertDialog(
+                onDismissRequest = viewModel::dismissPasswordConfirm,
+                title = { Text(stringResource(R.string.parent_mypage_password_confirm_title), fontWeight = FontBold) },
+                text = { Text(stringResource(R.string.parent_mypage_password_confirm_message)) },
+                confirmButton = {
+                    TextButton(onClick = viewModel::confirmPasswordChange) {
+                        Text(stringResource(R.string.parent_mypage_password_confirm_ok), color = colors.brand, fontWeight = FontBold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = viewModel::dismissPasswordConfirm) {
+                        Text(stringResource(R.string.parent_mypage_password_confirm_cancel), color = colors.muted)
+                    }
+                },
+            )
         }
         GroupCard(stringResource(R.string.parent_mypage_account)) {
-            ListRow(stringResource(R.string.parent_mypage_edit_profile), onClick = viewModel::toggleEdit)
-            ListRow(stringResource(R.string.parent_mypage_change_password), subtitle = stringResource(R.string.parent_mypage_password_stub), onClick = null)
+            ListRow(stringResource(R.string.parent_mypage_edit_profile), onClick = onOpenEditProfile)
+            ListRow(stringResource(R.string.parent_mypage_change_password), subtitle = stringResource(R.string.parent_mypage_password_stub), onClick = viewModel::togglePasswordChange)
             ListRow(stringResource(R.string.parent_mypage_notif_settings), onClick = onOpenNotifications, showDivider = false)
         }
 
@@ -266,6 +359,35 @@ fun ParentMypageScreen(
         )
         Spacer(Modifier.height(8.dp))
     }
+}
+
+@Composable
+private fun FormHeader(title: String, onClose: () -> Unit) {
+    val colors = LocalKidhackColors.current
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            modifier = Modifier.weight(1f),
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 14.sp,
+            color = colors.text,
+        )
+        Text(
+            "✕",
+            modifier = Modifier
+                .clip(RoundedCornerShape(99.dp))
+                .clickable(onClick = onClose)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            color = colors.muted,
+            fontSize = 16.sp,
+            fontWeight = FontBold,
+        )
+    }
+    Spacer(Modifier.height(8.dp))
 }
 
 @Composable

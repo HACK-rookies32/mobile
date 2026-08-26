@@ -48,7 +48,14 @@ interface AuthRepository {
 
 interface UserRepository {
     suspend fun me(): User
-    suspend fun updateMe(name: String?, phone: String?, email: String?): User
+    suspend fun updateMe(
+        nickname: String?,
+        name: String?,
+        phone: String?,
+        email: String?,
+        profileImageUrl: String?,
+    ): User
+    suspend fun changePassword(newPassword: String)
     suspend fun deleteMe()
     suspend fun notificationSettings(): NotificationSettings
     suspend fun patchNotificationSettings(settings: NotificationSettings): NotificationSettings
@@ -115,6 +122,8 @@ interface CommunityRepository {
     ): Post
     suspend fun like(postId: String)
     suspend fun comment(postId: String, body: String)
+    suspend fun reportPost(postId: String, reason: String, detail: String? = null)
+    suspend fun reportComment(postId: String, commentId: String, reason: String, detail: String? = null)
 }
 
 interface InquiryRepository {

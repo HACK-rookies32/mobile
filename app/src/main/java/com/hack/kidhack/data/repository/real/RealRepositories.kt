@@ -29,6 +29,7 @@ import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.CardRegisterRequest
+import com.hack.kidhack.data.remote.dto.ChangePasswordRequest
 import com.hack.kidhack.data.remote.dto.ChargeConfirmRequest
 import com.hack.kidhack.data.remote.dto.ChargePrepareRequest
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
@@ -42,6 +43,7 @@ import com.hack.kidhack.data.remote.dto.GpsStatusRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
 import com.hack.kidhack.data.remote.dto.LoginRequest
 import com.hack.kidhack.data.remote.dto.PairingConnectRequest
+import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.SignupRequest
 import com.hack.kidhack.data.remote.dto.SubscribeRequest
@@ -155,8 +157,17 @@ class RealAuthRepository(
 
 class RealUserRepository(private val api: UserApi) : UserRepository {
     override suspend fun me(): User = api.me().unwrap().toDomain()
-    override suspend fun updateMe(name: String?, phone: String?, email: String?): User =
-        api.updateMe(UserUpdateRequest(name, phone, email)).unwrap().toDomain()
+    override suspend fun updateMe(
+        nickname: String?,
+        name: String?,
+        phone: String?,
+        email: String?,
+        profileImageUrl: String?,
+    ): User =
+        api.updateMe(UserUpdateRequest(nickname, name, phone, email, profileImageUrl)).unwrap().toDomain()
+    override suspend fun changePassword(newPassword: String) {
+        api.changePassword(ChangePasswordRequest(newPassword)).unwrap()
+    }
     override suspend fun deleteMe() { api.deleteMe().unwrapOrNull() }
     override suspend fun notificationSettings(): NotificationSettings =
         api.notificationSettings().unwrap().toDomain()
@@ -267,6 +278,12 @@ class RealCommunityRepository(private val api: CommunityApi) : CommunityReposito
     override suspend fun like(postId: String) { api.like(postId).unwrapOrNull() }
     override suspend fun comment(postId: String, body: String) {
         api.comment(postId, CommentRequest(body)).unwrapOrNull()
+    }
+    override suspend fun reportPost(postId: String, reason: String, detail: String?) {
+        api.reportPost(postId, ReportRequest(reason, detail)).unwrapOrNull()
+    }
+    override suspend fun reportComment(postId: String, commentId: String, reason: String, detail: String?) {
+        api.reportComment(postId, commentId, ReportRequest(reason, detail)).unwrapOrNull()
     }
 }
 

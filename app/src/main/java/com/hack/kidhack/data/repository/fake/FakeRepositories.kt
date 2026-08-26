@@ -96,12 +96,25 @@ class FakeAuthRepository(
 
 class FakeUserRepository : UserRepository {
     private var mySettings = NotificationSettings(location = true, harmfulAccess = true, appUsage = true, notice = true)
-    override suspend fun me(): User = FakeData.parent
-    override suspend fun updateMe(name: String?, phone: String?, email: String?): User = FakeData.parent.copy(
-        name = name ?: FakeData.parent.name,
-        phone = phone ?: FakeData.parent.phone,
-        email = email ?: FakeData.parent.email,
-    )
+    private var currentUser: User = FakeData.parent
+    override suspend fun me(): User = currentUser
+    override suspend fun updateMe(
+        nickname: String?,
+        name: String?,
+        phone: String?,
+        email: String?,
+        profileImageUrl: String?,
+    ): User {
+        currentUser = currentUser.copy(
+            nickname = nickname ?: currentUser.nickname,
+            name = name ?: currentUser.name,
+            phone = phone ?: currentUser.phone,
+            email = email ?: currentUser.email,
+            profileImageUrl = profileImageUrl ?: currentUser.profileImageUrl,
+        )
+        return currentUser
+    }
+    override suspend fun changePassword(newPassword: String) {}
     override suspend fun deleteMe() {}
     override suspend fun notificationSettings(): NotificationSettings = mySettings
     override suspend fun patchNotificationSettings(settings: NotificationSettings): NotificationSettings {
@@ -222,7 +235,7 @@ class FakeCommunityRepository : CommunityRepository {
         val created = Post(
             id = "p-${items.size + 1}",
             title = title,
-            author = FakeData.parent.name,
+            author = FakeData.parent.nickname ?: FakeData.parent.name,
             commentCount = 0,
             likeCount = 0,
             createdAtLabel = "방금",
@@ -245,7 +258,7 @@ class FakeCommunityRepository : CommunityRepository {
             val p = items[i]
             val newComment = com.hack.kidhack.domain.model.Comment(
                 id = "c-${System.currentTimeMillis()}",
-                author = "나",
+                author = FakeData.parent.nickname ?: FakeData.parent.name,
                 text = body,
                 createdAt = "방금"
             )
@@ -254,6 +267,12 @@ class FakeCommunityRepository : CommunityRepository {
                 comments = p.comments + newComment
             )
         }
+    }
+    override suspend fun reportPost(postId: String, reason: String, detail: String?) {
+        // 모의(mock): 신고 접수만 처리하고 별도 저장은 하지 않음
+    }
+    override suspend fun reportComment(postId: String, commentId: String, reason: String, detail: String?) {
+        // 모의(mock): 신고 접수만 처리하고 별도 저장은 하지 않음
     }
 }
 

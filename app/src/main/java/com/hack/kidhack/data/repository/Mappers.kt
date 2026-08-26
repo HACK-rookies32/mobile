@@ -59,6 +59,7 @@ fun UserDto.toDomain(): User = User(
     loginId = loginId,
     name = name,
     role = runCatching { Role.valueOf(role) }.getOrDefault(Role.PARENT),
+    nickname = nickname,
     phone = phone,
     email = email,
     profileImageUrl = profileImageUrl,

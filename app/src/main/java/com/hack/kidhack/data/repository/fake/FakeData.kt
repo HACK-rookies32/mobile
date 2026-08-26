@@ -30,6 +30,7 @@ object FakeData {
         loginId = "parent01",
         name = "김지영",
         role = Role.PARENT,
+        nickname = "지영맘",
         phone = "010-1234-5678",
         email = "kim@email.com",
     )

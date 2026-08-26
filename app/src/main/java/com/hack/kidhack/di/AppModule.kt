@@ -102,6 +102,7 @@ import com.hack.kidhack.feature.parent.CommunityDetailViewModel
 import com.hack.kidhack.feature.parent.CommunityListViewModel
 import com.hack.kidhack.feature.parent.CommunityWriteViewModel
 import com.hack.kidhack.feature.parent.ContactViewModel
+import com.hack.kidhack.feature.parent.EditProfileViewModel
 import com.hack.kidhack.feature.parent.DashboardViewModel
 import com.hack.kidhack.feature.parent.GeofenceViewModel
 import com.hack.kidhack.feature.parent.HarmfulViewModel
@@ -244,13 +245,14 @@ val appModule = module {
     viewModel { ParentChatViewModel(get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get()) }
     viewModel { MypageViewModel(get(), get(), get(), get(), get()) }
+    viewModel { EditProfileViewModel(get()) }
     viewModel { AppControlViewModel(get(), get(), get()) }
     viewModel { ScreenshotViewModel(get(), get(), get()) }
     viewModel { ChildProfileViewModel(get(), get()) }
     viewModel { HarmfulViewModel(get(), get(), get()) }
     viewModel { PairingViewModel(get(), get()) }
     viewModel { CommunityListViewModel(get()) }
-    viewModel { params -> CommunityDetailViewModel(params.get(), get()) }
+    viewModel { params -> CommunityDetailViewModel(params.get(), get(), get()) }
     viewModel { CommunityWriteViewModel(get()) }
     viewModel { NoticeViewModel() }
     viewModel { ContactViewModel(get<InquiryRepository>()) }
