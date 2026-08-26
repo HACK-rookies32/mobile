@@ -31,6 +31,13 @@ val apiBaseUrl: String =
         ?: "http://10.0.2.2:8080/api"
 logger.lifecycle("kidhack BASE_URL = $apiBaseUrl")
 
+// local.properties에서 Google Maps API 키를 읽어옴 (git에 커밋되지 않음)
+val mapsApiKey: String = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}.getProperty("MAPS_API_KEY", "")
+
+
 android {
     namespace = "com.hack.kidhack"
     compileSdk {
@@ -48,6 +55,9 @@ android {
 
         buildConfigField("String", "BASE_URL", "\"$apiBaseUrl\"")
         manifestPlaceholders["usesCleartextTraffic"] = "false"
+
+        // AndroidManifest의 ${MAPS_API_KEY} 자리에 주입
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {
@@ -121,6 +131,8 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.play.services.location)
+    implementation(libs.play.services.maps)
+    implementation(libs.maps.compose)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)

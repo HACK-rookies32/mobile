@@ -12,6 +12,7 @@ sealed class Route(val path: String) {
     data object ParentChat : Route("parent/chat")
     data object ParentNotifications : Route("parent/notifications")
     data object ParentMypage : Route("parent/mypage")
+    data object ParentEditProfile : Route("parent/editprofile")
     data object ParentAppControl : Route("parent/appcontrol")
     data object ParentScreenshot : Route("parent/screenshot")
     data object ParentChildProfile : Route("parent/profile")
@@ -25,6 +26,7 @@ sealed class Route(val path: String) {
     data object ParentNotice : Route("parent/notice")
     data object ParentContact : Route("parent/contact")
     data object ParentPay : Route("parent/pay")
+    data object ParentCards : Route("parent/cards")
     data object ParentGeofence : Route("parent/geofence")
 
     data object ChildGraph : Route("child")

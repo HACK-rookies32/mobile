@@ -5,10 +5,13 @@ import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
+import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -21,6 +24,9 @@ import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
+import com.hack.kidhack.domain.model.Wallet
+import com.hack.kidhack.domain.model.WalletTransaction
+import com.hack.kidhack.domain.model.TransferResult
 import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {
@@ -46,7 +52,14 @@ interface AuthRepository {
 
 interface UserRepository {
     suspend fun me(): User
-    suspend fun updateMe(name: String?, phone: String?, email: String?): User
+    suspend fun updateMe(
+        nickname: String?,
+        name: String?,
+        phone: String?,
+        email: String?,
+        profileImageUrl: String?,
+    ): User
+    suspend fun changePassword(newPassword: String)
     suspend fun deleteMe()
     suspend fun notificationSettings(): NotificationSettings
     suspend fun patchNotificationSettings(settings: NotificationSettings): NotificationSettings
@@ -60,7 +73,14 @@ interface PairingRepository {
 interface ChildRepository {
     suspend fun children(): List<ChildProfile>
     suspend fun child(childId: String): ChildProfile
-    suspend fun updateChild(childId: String, name: String?, alias: String?, profileImageUrl: String?): ChildProfile
+    suspend fun updateChild(
+        childId: String,
+        name: String?,
+        alias: String?,
+        profileImageUrl: String?,
+        birthDate: String?,
+        school: String?
+    ): ChildProfile
 }
 
 interface LocationRepository {
@@ -98,9 +118,45 @@ interface CommunityRepository {
     fun pagedPosts(): Flow<PagingData<Post>>
     suspend fun posts(): List<Post>
     suspend fun post(postId: String): Post
-    suspend fun create(title: String, body: String): Post
+    suspend fun create(
+        title: String,
+        body: String,
+        imageUrls: List<String>? = null,
+        links: List<String>? = null
+    ): Post
     suspend fun like(postId: String)
     suspend fun comment(postId: String, body: String)
+    suspend fun reportPost(postId: String, reason: String, detail: String? = null)
+    suspend fun reportComment(postId: String, commentId: String, reason: String, detail: String? = null)
+}
+
+interface InquiryRepository {
+    suspend fun list(): List<Inquiry>
+    suspend fun create(title: String, body: String, imageUrls: List<String>? = null, links: List<String>? = null): Inquiry
+    suspend fun get(id: String): Inquiry
+}
+
+interface WalletRepository {
+    suspend fun getMyWallet(): Wallet
+    suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction>
+    suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult
+    suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult
+    suspend fun getChildWallet(childId: String): Wallet
+    suspend fun prepareCharge(amount: Int, method: String, cardId: String): Charge
+    suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet
+}
+
+interface CardRepository {
+    suspend fun register(
+        cardNumber: String,
+        expiry: String,
+        cvc: String,
+        cardPassword2: String,
+        birthDate: String,
+        ownerName: String
+    ): Card
+    suspend fun list(): List<Card>
+    suspend fun delete(cardId: String)
 }
 
 interface ChatRepository {
@@ -135,6 +191,14 @@ interface AppUsageRepository {
 
 interface AppControlRepository {
     suspend fun items(childId: String): List<AppControlItem>
+    suspend fun getInstalledApps(childId: String): List<com.hack.kidhack.domain.model.InstalledApp>
+    suspend fun updateAppControl(
+        childId: String,
+        packageName: String,
+        blocked: Boolean,
+        limitMinutes: Int?
+    ): AppControlItem
+    suspend fun deleteAppControl(childId: String, packageName: String)
 }
 
 interface SessionRepository {

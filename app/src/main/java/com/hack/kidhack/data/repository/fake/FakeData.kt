@@ -7,6 +7,7 @@ import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
+import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
@@ -29,6 +30,7 @@ object FakeData {
         loginId = "parent01",
         name = "김지영",
         role = Role.PARENT,
+        nickname = "지영맘",
         phone = "010-1234-5678",
         email = "kim@email.com",
     )
@@ -65,6 +67,8 @@ object FakeData {
     )
 
     val children = listOf(minjun, jia)
+    // 자녀 없을 때 테스트 (empty)
+    //val children = emptyList<ChildProfile>()
 
     val usages = listOf(
         AppUsage("YouTube", 80 * 60, "동영상"),
@@ -80,7 +84,18 @@ object FakeData {
     )
 
     val posts = listOf(
-        Post("p1", "유튜브 시청 시간 제한, 어떻게 하시나요?", "행복한엄마", 8, 24, "2시간 전"),
+        Post(
+            id = "p1",
+            title = "유튜브 시청 시간 제한, 어떻게 하시나요?",
+            author = "행복한엄마",
+            commentCount = 2,
+            likeCount = 24,
+            createdAtLabel = "2시간 전",
+            comments = listOf(
+                Comment("c1", "도전맘", "저는 하루 1시간으로 정해두고 있어요.", "1시간 전"),
+                Comment("c2", "민준아빠", "약속을 정하는 게 가장 중요한 것 같아요.", "30분 전")
+            )
+        ),
         Post("p2", "스마트폰 처음 사준 시기가 언제예요?", "두아이아빠", 15, 37, "5시간 전"),
         Post("p3", "루키즈 앱 쓰고 마음이 편해졌어요 후기", "워킹맘", 5, 18, "어제"),
     )

@@ -91,9 +91,16 @@ data class UserDto(
 
 @Serializable
 data class UserUpdateRequest(
+    val nickname: String? = null,
     val name: String? = null,
     val phone: String? = null,
     val email: String? = null,
+    val profileImageUrl: String? = null,
+)
+
+@Serializable
+data class ChangePasswordRequest(
+    val newPassword: String,
 )
 
 @Serializable
@@ -128,6 +135,8 @@ data class ChildUpdateRequest(
     val name: String? = null,
     val alias: String? = null,
     val profileImageUrl: String? = null,
+    val birthDate: String? = null,
+    val school: String? = null,
 )
 
 @Serializable
@@ -183,6 +192,14 @@ data class ScreenshotDto(
 )
 
 @Serializable
+data class CommentDto(
+    val id: String,
+    val author: String,
+    val body: String,
+    val createdAt: String,
+)
+
+@Serializable
 data class PostDto(
     val id: String,
     val title: String,
@@ -191,13 +208,24 @@ data class PostDto(
     val likeCount: Int = 0,
     val createdAtLabel: String = "",
     val liked: Boolean = false,
+    val imageUrls: List<String> = emptyList(),
+    val links: List<String> = emptyList(),
+    val comments: List<CommentDto> = emptyList(),
 )
 
 @Serializable
-data class CreatePostRequest(val title: String, val body: String)
+data class CreatePostRequest(
+    val title: String,
+    val body: String,
+    val imageUrls: List<String>? = null,
+    val links: List<String>? = null,
+)
 
 @Serializable
 data class CommentRequest(val body: String)
+
+@Serializable
+data class ReportRequest(val reason: String, val detail: String? = null)
 
 @Serializable
 data class ChatRoomDto(
@@ -264,3 +292,131 @@ data class AppUsageDto(
 
 @Serializable
 data class AppUsageReportRequest(val usages: List<AppUsageDto>)
+
+@Serializable
+data class InstalledAppDto(val packageName: String, val appName: String, val category: String?)
+
+@Serializable
+data class InstalledAppsResponse(val apps: List<InstalledAppDto>)
+
+@Serializable
+data class AppControlDto(
+    val packageName: String,
+    val appName: String,
+    val icon: String? = null,
+    val category: String? = null,
+    val blocked: Boolean,
+    val limitMinutes: Int? = null,
+)
+
+@Serializable
+data class AppControlUpdateRequest(
+    val packageName: String,
+    val blocked: Boolean,
+    val limitMinutes: Int? = null,
+)
+
+@Serializable
+data class InquiryDto(
+    val id: String,
+    val title: String,
+    val body: String,
+    val status: String,
+    val createdAt: String,
+    val imageUrls: List<String> = emptyList(),
+    val links: List<String> = emptyList(),
+    val answers: List<InquiryAnswerDto> = emptyList(),
+)
+
+@Serializable
+data class InquiryAnswerDto(
+    val id: String,
+    val author: String,
+    val body: String,
+    val createdAt: String,
+)
+
+@Serializable
+data class CreateInquiryRequest(
+    val title: String,
+    val body: String,
+    val imageUrls: List<String>? = null,
+    val links: List<String>? = null,
+)
+
+@Serializable
+data class ChargePrepareRequest(val amount: Int, val method: String, val cardId: String)
+
+@Serializable
+data class ChargePrepareResponse(
+    val chargeId: String,
+    val paymentKey: String,
+    val amount: Int,
+    val status: String
+)
+
+@Serializable
+data class ChargeConfirmRequest(
+    val chargeId: String,
+    val paymentKey: String,
+    val amount: Int
+)
+
+@Serializable
+data class ChargeConfirmResponse(
+    val chargeId: String,
+    val status: String,
+    val walletBalance: Int
+)
+
+@Serializable
+data class ChargeCancelRequest(val reason: String)
+
+@Serializable
+data class WalletDto(
+    val walletId: String,
+    val balance: Int,
+    val updatedAt: String
+)
+
+@Serializable
+data class WalletTransactionDto(
+    val txId: String,
+    val type: String,
+    val amount: Int,
+    val balanceAfter: Int,
+    val refId: String?,
+    val createdAt: String
+)
+
+@Serializable
+data class TransferRequest(
+    val childId: String,
+    val amount: Int,
+    val memo: String? = null
+)
+
+@Serializable
+data class TransferResponse(
+    val parentBalance: Int,
+    val childBalance: Int,
+    val txId: String
+)
+
+@Serializable
+data class CardDto(
+    val cardId: String,
+    val last4: String,
+    val expiry: String,
+    val ownerName: String
+)
+
+@Serializable
+data class CardRegisterRequest(
+    val cardNumber: String,
+    val expiry: String,
+    val cvc: String,
+    val cardPassword2: String,
+    val birthDate: String,
+    val ownerName: String
+)
