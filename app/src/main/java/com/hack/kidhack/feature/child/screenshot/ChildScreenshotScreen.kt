@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import com.hack.kidhack.R
 import com.hack.kidhack.background.capture.MediaProjectionRequestActivity
 import com.hack.kidhack.core.common.KoreanParticles
@@ -41,6 +44,7 @@ import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.feature.child.components.ChildScreenScaffold
 import com.hack.kidhack.feature.child.components.RetryCard
 import org.koin.androidx.compose.koinViewModel
+import java.io.File
 
 @Composable
 fun ChildScreenshotScreen(
@@ -206,7 +210,18 @@ fun ChildScreenshotScreen(
                             .background(Brush.linearGradient(listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)))),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("🖼️", fontSize = 20.sp)
+                        // 기기에 남은 캡처본이면 실제 이미지를, 없으면 자리표시자를 그린다.
+                        val localFile = item.imageUrl?.let(::File)?.takeIf { it.exists() }
+                        if (localFile != null) {
+                            AsyncImage(
+                                model = localFile,
+                                contentDescription = item.description,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                        } else {
+                            Text("🖼️", fontSize = 20.sp)
+                        }
                     }
                     Spacer(Modifier.size(12.dp))
                     Column(modifier = Modifier.weight(1f)) {

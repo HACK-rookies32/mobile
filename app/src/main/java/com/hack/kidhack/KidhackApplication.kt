@@ -2,10 +2,12 @@ package com.hack.kidhack
 
 import android.app.Application
 import com.hack.kidhack.background.ChildPlatformController
+import com.hack.kidhack.data.local.CapturedShotStore
 import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.data.local.ChildPhotoStore
-import com.hack.kidhack.domain.repository.SessionEvents
+import com.hack.kidhack.data.local.ProfileScopeStore
+import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -35,14 +37,21 @@ class KidhackApplication : Application() {
         startupScope.launch {
             val koin = GlobalContext.get()
             koin.get<ChildPlatformController>().bind()
-            // 로그아웃하면 다음 계정에 이전 대화가 남지 않도록 캐시를 비운다.
+            // 로컬 기록은 **계정이 바뀔 때만** 비운다.
+            // 로그아웃마다 지우면 같은 자녀가 다시 로그인했을 때 최근 알림·대화가 사라진다.
             val chatStore = koin.get<ChatMessageStore>()
             val alertStore = koin.get<ChildAlertStore>()
             val photoStore = koin.get<ChildPhotoStore>()
-            koin.get<SessionEvents>().logout.collect {
-                chatStore.clear()
-                alertStore.clear()
-                photoStore.clear()
+            val shotStore = koin.get<CapturedShotStore>()
+            val profileScope = koin.get<ProfileScopeStore>()
+            koin.get<SessionRepository>().session.collect { session ->
+                val userId = session?.user?.id ?: return@collect
+                if (profileScope.switchTo(userId)) {
+                    chatStore.clear()
+                    alertStore.clear()
+                    photoStore.clear()
+                    shotStore.clear()
+                }
             }
         }
     }

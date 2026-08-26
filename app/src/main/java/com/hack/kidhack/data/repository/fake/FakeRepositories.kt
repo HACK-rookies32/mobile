@@ -3,6 +3,7 @@ package com.hack.kidhack.data.repository.fake
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import com.hack.kidhack.data.local.CapturedShotStore
 import com.hack.kidhack.data.remote.PageResponse
 import com.hack.kidhack.data.remote.paging.PageResponsePagingSource
 import com.hack.kidhack.domain.model.Allowance
@@ -243,37 +244,17 @@ class FakeBlocklistRepository : BlocklistRepository {
     override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) = Unit
 }
 
-/**
- * 자녀가 올린 캡처·촬영본이 모이는 목 저장소.
- *
- * Koin 싱글턴 두 개([FakeScreenshotRepository], [FakePhotoRepository])가 같은 목록에 쓴다.
- * 덕분에 서버 없이도 「자녀 계정에서 촬영 → 부모 계정 화면 캡처 내역에 표시」가 그대로 재현된다.
- */
-object FakeCapturedMedia {
-    private val lock = Any()
-    private val items = mutableListOf(
-        Screenshot("s1", "오늘 14:22", "YouTube 시청 중", "MANUAL"),
-        Screenshot("s2", "오늘 11:05", "카카오톡", "MANUAL"),
-        Screenshot("s3", "어제 18:40", "Chrome", "SCHEDULED"),
-    )
-
-    fun snapshot(): List<Screenshot> = synchronized(lock) { items.toList() }
-
-    fun add(item: Screenshot): Screenshot = synchronized(lock) {
-        items.add(0, item)
-        item
-    }
-}
-
-class FakeScreenshotRepository : ScreenshotRepository {
+class FakeScreenshotRepository(
+    private val store: CapturedShotStore,
+) : ScreenshotRepository {
     override fun paged(childId: String): Flow<PagingData<Screenshot>> = Pager(PagingConfig(20)) {
         PageResponsePagingSource { page, size ->
-            val items = FakeCapturedMedia.snapshot()
+            val items = store.list()
             PageResponse(items, page, size, items.size.toLong(), 1)
         }
     }.flow
 
-    override suspend fun list(childId: String) = FakeCapturedMedia.snapshot()
+    override suspend fun list(childId: String) = store.list()
 
     override suspend fun requestCapture(childId: String) = Unit
 
@@ -282,14 +263,10 @@ class FakeScreenshotRepository : ScreenshotRepository {
         file: File,
         capturedAt: String,
         trigger: String,
-    ): Screenshot = FakeCapturedMedia.add(
-        Screenshot(
-            id = "s-" + System.currentTimeMillis(),
-            capturedAt = SimpleDateFormat("MM.dd HH:mm", Locale.getDefault()).format(Date()),
-            description = "화면 캡처",
-            trigger = trigger,
-            imageUrl = file.toURI().toString(),
-        ),
+    ): Screenshot = store.add(
+        source = file,
+        description = "화면 캡처",
+        trigger = trigger,
     )
 }
 
@@ -415,7 +392,9 @@ class FakePointRepository : PointRepository {
     }
 }
 
-class FakePhotoRepository : PhotoRepository {
+class FakePhotoRepository(
+    private val store: CapturedShotStore,
+) : PhotoRepository {
     override suspend fun upload(
         childId: String,
         file: File,
@@ -424,15 +403,7 @@ class FakePhotoRepository : PhotoRepository {
     ): ChildPhoto {
         delay(300)
         // 부모 화면(캡처 내역)에서도 보이도록 같은 저장소에 넣는다.
-        val saved = FakeCapturedMedia.add(
-            Screenshot(
-                id = "photo-" + System.currentTimeMillis(),
-                capturedAt = SimpleDateFormat("MM.dd HH:mm", Locale.getDefault()).format(Date()),
-                description = "카메라 촬영",
-                trigger = "CAMERA",
-                imageUrl = file.toURI().toString(),
-            ),
-        )
+        val saved = store.add(source = file, description = "카메라 촬영", trigger = "CAMERA")
         return ChildPhoto(id = saved.id, capturedAt = saved.capturedAt, imageUrl = saved.imageUrl)
     }
 }

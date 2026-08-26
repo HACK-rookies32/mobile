@@ -143,6 +143,7 @@ class ChildAlertStore(context: Context) {
         const val TYPE_SCREEN_TIME = "SCREEN_TIME_LIMIT"
         const val TYPE_CAPTURE_REQUEST = "CAPTURE_REQUEST"
         const val TYPE_CAMERA_REQUEST = "CAMERA_REQUEST"
+        const val TYPE_SCHEDULED_CAPTURE = "SCHEDULED_CAPTURE"
 
         private const val MAX_ENTRIES = 50
         private const val DEFAULT_DEDUPE_MS = 60_000L

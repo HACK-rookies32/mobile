@@ -35,15 +35,26 @@ class ChildCommandNotifier(private val context: Context) {
             command.requestedBy?.takeIf { it.isNotBlank() }
                 ?: context.getString(R.string.child_request_default_sender),
         )
-        val title = when (command.type) {
-            RemoteCommandType.SCREEN_CAPTURE -> context.getString(R.string.child_request_capture_title)
-            RemoteCommandType.CAMERA_SHOT -> context.getString(R.string.child_request_camera_title)
-            RemoteCommandType.UNKNOWN -> return
+        // 1시간 주기 정기 캡처는 부모가 보낸 요청이 아니다. 같은 문구를 쓰면
+        // 자녀가 「부모님이 지금 보고 싶어 해요」로 오해한다.
+        val scheduled = command.requestId.startsWith(ScreenCaptureWorker.SCHEDULED_PREFIX)
+        val title = when {
+            command.type == RemoteCommandType.SCREEN_CAPTURE && scheduled ->
+                context.getString(R.string.child_alert_scheduled_capture)
+            command.type == RemoteCommandType.SCREEN_CAPTURE ->
+                context.getString(R.string.child_request_capture_title)
+            command.type == RemoteCommandType.CAMERA_SHOT ->
+                context.getString(R.string.child_request_camera_title)
+            else -> return
         }
-        val body = when (command.type) {
-            RemoteCommandType.SCREEN_CAPTURE -> context.getString(R.string.child_request_capture_body, who)
-            RemoteCommandType.CAMERA_SHOT -> context.getString(R.string.child_request_camera_body, who)
-            RemoteCommandType.UNKNOWN -> return
+        val body = when {
+            command.type == RemoteCommandType.SCREEN_CAPTURE && scheduled ->
+                context.getString(R.string.child_alert_scheduled_capture_body)
+            command.type == RemoteCommandType.SCREEN_CAPTURE ->
+                context.getString(R.string.child_request_capture_body, who)
+            command.type == RemoteCommandType.CAMERA_SHOT ->
+                context.getString(R.string.child_request_camera_body, who)
+            else -> return
         }
 
         val notification = NotificationCompat.Builder(context, ChildNotifications.REQUEST_CHANNEL_ID)

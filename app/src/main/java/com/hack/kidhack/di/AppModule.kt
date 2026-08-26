@@ -4,9 +4,11 @@ package com.hack.kidhack.di
 
 import com.hack.kidhack.BuildConfig
 import com.hack.kidhack.core.common.KidhackJson
+import com.hack.kidhack.data.local.CapturedShotStore
 import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.data.local.ChildPhotoStore
+import com.hack.kidhack.data.local.ProfileScopeStore
 import com.hack.kidhack.data.local.ChildOnboardingStoreImpl
 import com.hack.kidhack.data.local.SelectedChildRepositoryImpl
 import com.hack.kidhack.data.local.SessionEventsImpl
@@ -144,6 +146,8 @@ val appModule = module {
     single { ChatMessageStore(androidContext()) }
     single { ChildAlertStore(androidContext()) }
     single { ChildPhotoStore(androidContext()) }
+    single { CapturedShotStore(androidContext()) }
+    single { ProfileScopeStore(androidContext()) }
 
     single {
         val logging = HttpLoggingInterceptor().apply {
@@ -212,7 +216,7 @@ val appModule = module {
     }
     single<BlocklistRepository> { if (useMock) FakeBlocklistRepository() else RealBlocklistRepository(get()) }
     single<ScreenshotRepository> {
-        if (useMock) FakeScreenshotRepository() else RealScreenshotRepository(get())
+        if (useMock) FakeScreenshotRepository(get()) else RealScreenshotRepository(get())
     }
     single<CommunityRepository> {
         if (useMock) FakeCommunityRepository() else RealCommunityRepository(get())
@@ -242,7 +246,7 @@ val appModule = module {
     single<CommandRepository> {
         if (useMock) FakeCommandRepository() else RealCommandRepository(get(), get())
     }
-    single<PhotoRepository> { if (useMock) FakePhotoRepository() else RealPhotoRepository(get()) }
+    single<PhotoRepository> { if (useMock) FakePhotoRepository(get()) else RealPhotoRepository(get()) }
 
     // 루키즈페이 용돈 지갑 (부모 송금/회수 ↔ 자녀 QR 결제)
     single<AllowanceRepository> {

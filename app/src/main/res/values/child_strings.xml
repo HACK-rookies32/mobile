@@ -210,6 +210,8 @@
     <string name="child_request_default_sender">부모님</string>
     <string name="child_alert_capture_request">부모님이 화면 캡처를 요청했어요</string>
     <string name="child_alert_camera_request">부모님이 사진 촬영을 요청했어요</string>
+    <string name="child_alert_scheduled_capture">정기 화면 기록 시간이에요 ⏱️</string>
+    <string name="child_alert_scheduled_capture_body">눌러서 허용하면 화면이 한 번 기록돼요</string>
     <string name="child_alert_request_from">%1$s 보냈어요</string>
     <string name="child_request_capture_title">화면 캡처 요청 📸</string>
     <string name="child_request_capture_body">%1$s 지금 화면을 보고 싶어 해요. 눌러서 허용해 주세요.</string>

@@ -179,6 +179,7 @@ class ChildHomeViewModel(
         val isCameraRequest = upper.contains("CAMERA")
         val isCapture = !isCameraRequest &&
             (upper.contains("CAPTURE") || upper.contains("SCREENSHOT"))
+        val isScheduled = upper.contains("SCHEDULED")
         val isChat = upper.contains("CHAT") || upper.contains("MESSAGE")
         val isHarmful = upper.contains("HARMFUL") || upper.contains("BLOCK")
         val isScreenTime = upper.contains("SCREEN_TIME") || upper.contains("LIMIT")
@@ -197,6 +198,7 @@ class ChildHomeViewModel(
                 isHarmful -> AlertTint.Danger
                 isScreenTime -> AlertTint.Warn
                 isChat -> AlertTint.Info
+                isScheduled -> AlertTint.Info
                 else -> AlertTint.Brand
             },
             opensScreenshot = isCapture,
