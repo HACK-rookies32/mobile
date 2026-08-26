@@ -220,3 +220,70 @@ data class TransferResult(
     val childBalance: Int,
     val txId: String
 )
+
+/** 부모가 보낸 원격 요청 종류. Firebase 대신 WebSocket/폴링으로 전달된다. */
+enum class RemoteCommandType { SCREEN_CAPTURE, CAMERA_SHOT, UNKNOWN }
+
+data class RemoteCommand(
+    val requestId: String,
+    val type: RemoteCommandType,
+    val childId: String,
+    val requestedBy: String? = null,
+    val requestedAt: String? = null,
+)
+
+/** 요청 처리 결과를 서버에 되돌려 줄 때 쓰는 상태값. */
+object CommandAckStatus {
+    const val RECEIVED = "RECEIVED"
+    const val DONE = "DONE"
+    const val DENIED = "DENIED"
+    const val FAILED = "FAILED"
+}
+
+data class ChildPhoto(
+    val id: String,
+    val capturedAt: String,
+    /** 서버 URL 또는 기기에 저장된 파일 경로. 갤러리는 이 값으로 이미지를 그린다. */
+    val imageUrl: String? = null,
+    /** 부모 요청으로 찍은 사진이면 그 요청 id. 자녀가 스스로 찍었으면 null. */
+    val requestId: String? = null,
+    val requestedBy: String? = null,
+)
+
+/** 자녀 모드 루키즈페이 QR 결제 토큰. */
+data class PayQrToken(
+    val token: String,
+    val payload: String,
+    val amount: Int,
+    val expiresAtMillis: Long,
+)
+
+/**
+ * 루키즈페이 용돈 지갑.
+ *
+ * 부모가 [AllowanceType.SEND] 로 채우고 [AllowanceType.WITHDRAW] 로 회수한다.
+ * 자녀는 이 잔액 한도 안에서만 [AllowanceType.PAYMENT] 를 만들 수 있다.
+ */
+data class Allowance(
+    val balance: Int,
+    val updatedAt: String? = null,
+)
+
+enum class AllowanceType { SEND, WITHDRAW, PAYMENT }
+
+data class AllowanceEntry(
+    val id: String,
+    val type: AllowanceType,
+    /** 부호 있는 금액. 받으면 +, 회수/결제면 -. */
+    val amount: Int,
+    val description: String,
+    val dateLabel: String,
+)
+
+data class AllowancePayment(
+    val id: String,
+    val amount: Int,
+    val balanceAfter: Int,
+    val approvedAt: String,
+    val merchant: String? = null,
+)

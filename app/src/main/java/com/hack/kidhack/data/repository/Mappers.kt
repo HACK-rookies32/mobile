@@ -1,5 +1,8 @@
 package com.hack.kidhack.data.repository
 
+import com.hack.kidhack.data.remote.dto.AllowanceDto
+import com.hack.kidhack.data.remote.dto.AllowanceEntryDto
+import com.hack.kidhack.data.remote.dto.AllowancePaymentDto
 import com.hack.kidhack.data.remote.dto.AppControlDto
 import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.CardDto
@@ -7,6 +10,7 @@ import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.ChildDto
+import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.CommentDto
 import com.hack.kidhack.data.remote.dto.GeofenceDto
 import com.hack.kidhack.data.remote.dto.InquiryAnswerDto
@@ -20,12 +24,17 @@ import com.hack.kidhack.data.remote.dto.PaymentDto
 import com.hack.kidhack.data.remote.dto.PointBalanceDto
 import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
+import com.hack.kidhack.data.remote.dto.RemoteCommandDto
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SubscriptionDto
 import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.TokenResponse
 import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UserDto
+import com.hack.kidhack.domain.model.Allowance
+import com.hack.kidhack.domain.model.AllowanceEntry
+import com.hack.kidhack.domain.model.AllowancePayment
+import com.hack.kidhack.domain.model.AllowanceType
 import com.hack.kidhack.data.remote.dto.WalletDto
 import com.hack.kidhack.data.remote.dto.WalletTransactionDto
 import com.hack.kidhack.domain.model.AppNotification
@@ -34,6 +43,7 @@ import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
+import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
@@ -46,6 +56,8 @@ import com.hack.kidhack.domain.model.Payment
 import com.hack.kidhack.domain.model.PointBalance
 import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
+import com.hack.kidhack.domain.model.RemoteCommand
+import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
@@ -192,6 +204,46 @@ fun SubscriptionDto.toDomain(): Subscription = Subscription(planId, status, meth
 fun AppUsageDto.toDomain(): AppUsage = AppUsage(appName, durationSec, category)
 
 fun PairingCodeDto.toDomain(): PairingCode = PairingCode(pairingCode, expiresIn)
+
+fun RemoteCommandDto.toDomain(): RemoteCommand = RemoteCommand(
+    requestId = requestId,
+    type = type.toRemoteCommandType(),
+    childId = childId,
+    requestedBy = requestedBy,
+    requestedAt = requestedAt,
+)
+
+/** 서버/소켓이 쓸 법한 이름들을 넉넉하게 받아 준다. 모르는 값은 UNKNOWN 으로 떨어뜨린다. */
+fun String?.toRemoteCommandType(): RemoteCommandType = when (this?.uppercase()) {
+    "SCREEN_CAPTURE", "CAPTURE", "CAPTURE_REQUEST", "SCREENSHOT" -> RemoteCommandType.SCREEN_CAPTURE
+    "CAMERA_SHOT", "CAMERA", "CAMERA_REQUEST", "PHOTO" -> RemoteCommandType.CAMERA_SHOT
+    else -> RemoteCommandType.UNKNOWN
+}
+
+fun ChildPhotoDto.toDomain(): ChildPhoto = ChildPhoto(
+    id = id,
+    capturedAt = capturedAt,
+    imageUrl = imageUrl,
+)
+
+fun AllowanceDto.toDomain(): Allowance = Allowance(balance = balance, updatedAt = updatedAt)
+
+fun AllowanceEntryDto.toDomain(): AllowanceEntry = AllowanceEntry(
+    id = id,
+    type = runCatching { AllowanceType.valueOf(type.uppercase()) }
+        .getOrDefault(AllowanceType.PAYMENT),
+    amount = amount,
+    description = description,
+    dateLabel = dateLabel,
+)
+
+fun AllowancePaymentDto.toDomain(): AllowancePayment = AllowancePayment(
+    id = id,
+    amount = amount,
+    balanceAfter = balanceAfter,
+    approvedAt = approvedAt,
+    merchant = merchant,
+ )
 
 fun AppControlDto.toDomain(): com.hack.kidhack.domain.model.AppControlItem = com.hack.kidhack.domain.model.AppControlItem(
     packageName = packageName,

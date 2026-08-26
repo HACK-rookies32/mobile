@@ -2,6 +2,8 @@ package com.hack.kidhack.background
 
 import android.content.Context
 import com.hack.kidhack.background.capture.ScreenCaptureWorker
+import com.hack.kidhack.background.command.ChildCommandPollWorker
+import com.hack.kidhack.background.command.ChildCommandService
 import com.hack.kidhack.background.geofence.GeofenceRegistrar
 import com.hack.kidhack.background.location.GpsStatusMonitor
 import com.hack.kidhack.background.location.LocationBatchWorker
@@ -65,12 +67,16 @@ class ChildPlatformController(
         gpsStatusMonitor.start()
         AppUsageWorker.enqueuePeriodic(context)
         ScreenCaptureWorker.enqueuePeriodic(context)
+        // FCM 대체 경로: 상주 WebSocket(실시간) + 15분 폴링(백업)
+        ChildCommandService.start(context)
+        ChildCommandPollWorker.enqueuePeriodic(context)
         scope.launch { runCatching { geofenceRegistrar.sync() } }
     }
 
     private fun stop() {
         if (!running) {
             LocationTrackingService.stop(context)
+            ChildCommandService.stop(context)
             return
         }
         running = false
@@ -79,6 +85,8 @@ class ChildPlatformController(
         gpsStatusMonitor.stop()
         AppUsageWorker.cancel(context)
         ScreenCaptureWorker.cancel(context)
+        ChildCommandService.stop(context)
+        ChildCommandPollWorker.cancel(context)
         geofenceRegistrar.clear()
     }
 }

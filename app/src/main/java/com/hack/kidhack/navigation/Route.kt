@@ -36,8 +36,19 @@ sealed class Route(val path: String) {
     data object ChildChat : Route("child/chat")
     data object ChildServices : Route("child/services")
     data object ChildCamera : Route("child/camera")
+    data object ChildCameraRequest : Route("child/camera?requestId={requestId}&gallery={gallery}") {
+        fun create(requestId: String) = "child/camera?requestId=$requestId&gallery=false"
+
+        /** 마이페이지 「카메라 갤러리」처럼 갤러리 탭을 바로 열 때. */
+        fun gallery() = "child/camera?gallery=true"
+
+        /** 하단 카메라 탭. 갤러리로 열린 적이 있어도 항상 카메라로 시작한다. */
+        fun camera() = "child/camera?gallery=false"
+    }
     data object ChildMypage : Route("child/mypage")
     data object ChildScreenshot : Route("child/screenshot")
+    data object ChildPay : Route("child/pay")
+    data object ChildProfileEdit : Route("child/profile/edit")
 }
 
 data class TabItem(

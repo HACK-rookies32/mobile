@@ -11,8 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.hack.kidhack.background.command.ChildCommandBus
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.Role
+import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
@@ -23,6 +25,7 @@ fun KidhackNavHost() {
     val koin = GlobalContext.get()
     val sessionRepository = koin.get<SessionRepository>()
     val sessionEvents = koin.get<SessionEvents>()
+    val commandBus = koin.get<ChildCommandBus>()
     val navController = rememberNavController()
     val colors = LocalKidhackColors.current
 
@@ -30,6 +33,22 @@ fun KidhackNavHost() {
         val dest = if (session.user.role == Role.PARENT) Route.ParentGraph.path else Route.ChildGraph.path
         navController.navigate(dest) {
             popUpTo(navController.graph.id) { inclusive = true }
+        }
+    }
+
+    // 부모 요청 알림 탭 → 해당 화면으로 이동. 화면 캡처는 알림이 동의 액티비티로 바로 보내므로
+    // 여기서는 카메라 촬영 요청만 처리한다.
+    LaunchedEffect(Unit) {
+        commandBus.pending.collect { command ->
+            when (command.type) {
+                RemoteCommandType.CAMERA_SHOT -> {
+                    navController.navigate(Route.ChildCameraRequest.create(command.requestId)) {
+                        launchSingleTop = true
+                    }
+                    commandBus.consume()
+                }
+                else -> commandBus.consume()
+            }
         }
     }
 
