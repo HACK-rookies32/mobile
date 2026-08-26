@@ -17,7 +17,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -122,33 +129,36 @@ fun ParentLocationScreen(
                 .background(colors.surface)
                 .verticalScroll(rememberScrollState()),
         ) {
+            // 자녀 현재 위치(좌표 문자열 -> LatLng). 없으면 서울 시청 기본값.
+            val defaultPos = LatLng(37.5665, 126.9780)
+            val childPos = state.current?.let { c ->
+                val lat = c.lat.toDoubleOrNull()
+                val lng = c.lng.toDoubleOrNull()
+                if (lat != null && lng != null) LatLng(lat, lng) else null
+            }
+            val cameraPositionState = rememberCameraPositionState {
+                position = CameraPosition.fromLatLngZoom(childPos ?: defaultPos, 15f)
+            }
+            LaunchedEffect(childPos) {
+                if (childPos != null) {
+                    cameraPositionState.position = CameraPosition.fromLatLngZoom(childPos, 16f)
+                }
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(224.dp)
-                    .background(Brush.linearGradient(listOf(Color(0xFFDBEAFE), Color(0xFFDCFCE7), Color(0xFFBFDBFE)))),
-                contentAlignment = Alignment.Center,
+                    .height(224.dp),
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🗺️", fontSize = 56.sp)
-                    Text(
-                        stringResource(R.string.parent_map_placeholder),
-                        color = colors.muted,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBold,
-                        fontSize = 14.sp,
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .offset(y = (-28).dp)
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(colors.brand),
-                    contentAlignment = Alignment.Center,
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraPositionState,
                 ) {
-                    Text("👦", fontSize = 20.sp)
+                    if (childPos != null) {
+                        Marker(
+                            state = MarkerState(position = childPos),
+                            title = state.current?.label ?: stringResource(R.string.parent_location_current),
+                        )
+                    }
                 }
             }
             Column(Modifier.padding(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {

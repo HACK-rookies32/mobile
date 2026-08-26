@@ -201,6 +201,11 @@ fun ParentCardsScreen(
                         }
                     }
                 }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { deleteCardId = card.cardId }) {
+                        Text("삭제", color = colors.danger, fontWeight = FontBold)
+                    }
+                }
             }
         }
 
