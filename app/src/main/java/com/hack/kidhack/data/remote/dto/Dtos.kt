@@ -27,13 +27,14 @@ internal object FlexibleStringSerializer : KSerializer<String> {
 }
 
 @Serializable
-data class LoginRequest(val username: String, val password: String)
+data class LoginRequest(val loginId: String, val password: String)
 
 @Serializable
 data class LoginResponse(
     val token: String? = null,
     val accessToken: String? = null,
     val refreshToken: String? = null,
+    val loginId: String? = null,
     val username: String? = null,
     val role: String? = null,
     val user: UserDto? = null,
@@ -44,6 +45,7 @@ data class LoginResponse(
 
 @Serializable
 data class SignupRequest(
+    val loginId: String,
     val username: String,
     val password: String,
     val nickname: String? = null,

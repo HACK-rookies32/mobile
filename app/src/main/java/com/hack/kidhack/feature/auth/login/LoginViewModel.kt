@@ -42,7 +42,7 @@ class LoginViewModel(
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
                 authRepository.login(
-                    username = current.loginId.trim(),
+                    loginId = current.loginId.trim(),
                     password = current.password,
                     preferredRole = current.role,
                 )

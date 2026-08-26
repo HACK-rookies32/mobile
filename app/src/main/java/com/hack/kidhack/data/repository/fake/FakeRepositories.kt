@@ -56,6 +56,7 @@ class FakeAuthRepository(
     private val sessionEvents: SessionEvents,
 ) : AuthRepository {
     override suspend fun signup(
+        loginId: String,
         username: String,
         password: String,
         nickname: String?,
@@ -68,7 +69,8 @@ class FakeAuthRepository(
         parentId: Long?,
     ): Session {
         delay(300)
-        require(username.isNotBlank() && password.isNotBlank()) { "아이디와 비밀번호를 입력해 주세요" }
+        require(loginId.isNotBlank() && password.isNotBlank()) { "아이디와 비밀번호를 입력해 주세요" }
+        require(username.isNotBlank()) { "실명을 입력해 주세요" }
         require(phoneNumber.isNotBlank()) { "휴대폰 번호를 입력해 주세요" }
         require(birthDate.matches(Regex("""\d{4}-\d{2}-\d{2}"""))) { "생년월일은 yyyy-MM-dd 형식이어야 해요" }
         if (role != Role.CHILD) {
@@ -78,9 +80,9 @@ class FakeAuthRepository(
             require(parentId != null && parentId > 0) { "연결할 부모님 회원 번호를 입력해 주세요" }
         }
         val user = User(
-            id = "user-$username",
-            loginId = username,
-            name = nickname?.ifBlank { null } ?: username,
+            id = "user-$loginId",
+            loginId = loginId,
+            name = username,
             role = role,
             phone = phoneNumber,
             email = email,
@@ -91,13 +93,13 @@ class FakeAuthRepository(
         return session
     }
 
-    override suspend fun login(username: String, password: String, preferredRole: Role?): Session {
+    override suspend fun login(loginId: String, password: String, preferredRole: Role?): Session {
         delay(250)
-        require(username.isNotBlank() && password.isNotBlank()) { "아이디와 비밀번호를 입력해 주세요" }
+        require(loginId.isNotBlank() && password.isNotBlank()) { "아이디와 비밀번호를 입력해 주세요" }
         val user = when {
-            preferredRole == Role.CHILD || username.contains("minjun") || username.startsWith("child") ->
-                FakeData.childUser.copy(loginId = username.ifBlank { FakeData.childUser.loginId })
-            else -> FakeData.parent.copy(loginId = username.ifBlank { FakeData.parent.loginId })
+            preferredRole == Role.CHILD || loginId.contains("minjun") || loginId.startsWith("child") ->
+                FakeData.childUser.copy(loginId = loginId.ifBlank { FakeData.childUser.loginId })
+            else -> FakeData.parent.copy(loginId = loginId.ifBlank { FakeData.parent.loginId })
         }
         val session = FakeData.sessionFor(user)
         sessionRepository.save(session)

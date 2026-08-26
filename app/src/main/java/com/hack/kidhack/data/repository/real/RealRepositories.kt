@@ -99,6 +99,7 @@ class RealAuthRepository(
     private val sessionEvents: SessionEvents,
 ) : AuthRepository {
     override suspend fun signup(
+        loginId: String,
         username: String,
         password: String,
         nickname: String?,
@@ -110,10 +111,10 @@ class RealAuthRepository(
         role: Role,
         parentId: Long?,
     ): Session {
-        // Signup response has User only (no tokens). /users/me is not available yet, so
-        // do not auto-login here — show success with the created profile.
+        // Signup response has User only (no tokens). Do not auto-login.
         val user = api.signup(
             SignupRequest(
+                loginId = loginId,
                 username = username,
                 password = password,
                 nickname = nickname,
@@ -129,14 +130,18 @@ class RealAuthRepository(
         val session = Session(
             accessToken = "",
             refreshToken = "",
-            user = user,
+            user = user.copy(
+                loginId = user.loginId.ifBlank { loginId },
+                name = user.name.ifBlank { username },
+                role = role,
+            ),
         )
         sessionRepository.save(session)
         return session
     }
 
-    override suspend fun login(username: String, password: String, preferredRole: Role?): Session {
-        val login = api.login(LoginRequest(username, password)).unwrap()
+    override suspend fun login(loginId: String, password: String, preferredRole: Role?): Session {
+        val login = api.login(LoginRequest(loginId, password)).unwrap()
         return establishSession(login)
     }
 
@@ -157,16 +162,28 @@ class RealAuthRepository(
         val access = login.resolvedAccessToken()?.takeIf { it.isNotBlank() }
             ?: error("로그인 토큰이 없습니다")
         val refresh = login.refreshToken.orEmpty()
-        val placeholder = login.user?.toDomain() ?: User(
-            id = "",
-            loginId = login.username.orEmpty(),
-            name = login.username.orEmpty(),
-            role = runCatching { Role.valueOf(login.role.orEmpty()) }.getOrDefault(Role.PARENT),
+        val loginRole = runCatching { Role.valueOf(login.role.orEmpty()) }.getOrNull()
+        val fromUser = login.user?.toDomain()
+        val placeholder = User(
+            id = fromUser?.id.orEmpty(),
+            loginId = login.loginId?.takeIf { it.isNotBlank() }
+                ?: fromUser?.loginId.orEmpty(),
+            name = login.username?.takeIf { it.isNotBlank() }
+                ?: fromUser?.name.orEmpty(),
+            role = loginRole ?: fromUser?.role ?: Role.PARENT,
+            phone = fromUser?.phone.orEmpty(),
+            email = fromUser?.email,
+            profileImageUrl = fromUser?.profileImageUrl,
         )
         sessionRepository.save(Session(access, refresh, placeholder))
         return try {
             val me = userApi.me().unwrap().toDomain()
-            Session(access, refresh, me).also { sessionRepository.save(it) }
+            val merged = me.copy(
+                loginId = me.loginId.ifBlank { placeholder.loginId },
+                name = me.name.ifBlank { placeholder.name },
+                role = loginRole ?: me.role,
+            )
+            Session(access, refresh, merged).also { sessionRepository.save(it) }
         } catch (t: Throwable) {
             sessionRepository.clear()
             throw t

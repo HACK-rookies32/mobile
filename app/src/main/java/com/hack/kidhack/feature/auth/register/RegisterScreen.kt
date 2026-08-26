@@ -209,7 +209,8 @@ private fun InfoStep(
 ) {
     val colors = LocalKidhackColors.current
     Text(badge, color = colors.brandDark, fontWeight = FontBold, fontSize = 14.sp)
-    KidTextField(state.username, viewModel::onUsername, "아이디", placeholder = "로그인에 사용할 아이디")
+    KidTextField(state.loginId, viewModel::onLoginId, "아이디", placeholder = "로그인에 사용할 아이디")
+    KidTextField(state.realName, viewModel::onRealName, "실명", placeholder = "이름(실명)을 입력하세요")
     KidTextField(
         state.password,
         viewModel::onPassword,
@@ -385,6 +386,9 @@ private fun DoneStep(session: Session, onStart: () -> Unit) {
     KidCard {
         Text(if (parent) "부모님 계정" else "자녀 계정", fontWeight = FontBold)
         Text(session.user.loginId, color = colors.muted, fontSize = 12.sp)
+        if (session.user.name.isNotBlank()) {
+            Text(session.user.name, color = colors.muted, fontSize = 12.sp)
+        }
     }
     KidButton(
         text = if (parent) "부모님 앱 시작하기 →" else "자녀 앱 시작하기 →",

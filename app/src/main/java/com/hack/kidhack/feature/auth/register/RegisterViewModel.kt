@@ -21,7 +21,8 @@ data class RegisterUiState(
     val step: Int = 0,
     val role: Role? = null,
     val nickname: String = "",
-    val username: String = "",
+    val loginId: String = "",
+    val realName: String = "",
     val phoneNumber: String = "",
     val email: String = "",
     val birthDate: String = "",
@@ -62,7 +63,8 @@ class RegisterViewModel(
     fun selectRole(role: Role) = _state.update { it.copy(role = role, step = 1, error = null) }
     fun back() = _state.update { it.copy(step = (it.step - 1).coerceAtLeast(0), error = null) }
     fun onNickname(v: String) = _state.update { it.copy(nickname = v) }
-    fun onUsername(v: String) = _state.update { it.copy(username = v) }
+    fun onLoginId(v: String) = _state.update { it.copy(loginId = v) }
+    fun onRealName(v: String) = _state.update { it.copy(realName = v) }
     fun onPhoneNumber(v: String) = _state.update {
         it.copy(phoneNumber = formatPhoneNumber(v))
     }
@@ -95,7 +97,8 @@ class RegisterViewModel(
         val birthOk = s.birthDate.matches(Regex("""\d{4}-\d{2}-\d{2}"""))
         val parentIdValue = s.parentId.toLongOrNull()
         when {
-            s.username.isBlank() -> _state.update { it.copy(error = "아이디를 입력해 주세요") }
+            s.loginId.isBlank() -> _state.update { it.copy(error = "아이디를 입력해 주세요") }
+            s.realName.isBlank() -> _state.update { it.copy(error = "실명을 입력해 주세요") }
             s.phoneNumber.isBlank() -> _state.update { it.copy(error = "휴대폰 번호를 입력해 주세요") }
             role != Role.CHILD && s.email.isBlank() ->
                 _state.update { it.copy(error = "이메일을 입력해 주세요") }
@@ -132,7 +135,8 @@ class RegisterViewModel(
                 _state.update { it.copy(loading = true, error = null) }
                 runCatching {
                     authRepository.signup(
-                        username = s.username.trim(),
+                        loginId = s.loginId.trim(),
+                        username = s.realName.trim(),
                         password = s.password,
                         nickname = s.nickname.trim().ifBlank { null },
                         email = s.email.trim().ifBlank { null },

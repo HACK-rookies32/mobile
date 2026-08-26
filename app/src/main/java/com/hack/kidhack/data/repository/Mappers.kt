@@ -37,9 +37,10 @@ import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
 
 fun UserDto.toDomain(): User {
-    val resolvedLogin = username?.takeIf { it.isNotBlank() } ?: loginId.orEmpty()
-    val resolvedName = nickname?.takeIf { it.isNotBlank() }
+    val resolvedLogin = loginId?.takeIf { it.isNotBlank() }.orEmpty()
+    val resolvedName = username?.takeIf { it.isNotBlank() }
         ?: name?.takeIf { it.isNotBlank() }
+        ?: nickname?.takeIf { it.isNotBlank() }
         ?: resolvedLogin
     return User(
         id = id,
