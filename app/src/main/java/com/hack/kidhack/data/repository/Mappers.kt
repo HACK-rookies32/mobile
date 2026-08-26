@@ -28,7 +28,6 @@ import com.hack.kidhack.data.remote.dto.RemoteCommandDto
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SubscriptionDto
 import com.hack.kidhack.data.remote.dto.LoginResponse
-import com.hack.kidhack.data.remote.dto.TokenResponse
 import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UserDto
 import com.hack.kidhack.domain.model.Allowance

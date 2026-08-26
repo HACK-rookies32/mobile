@@ -31,11 +31,14 @@ val apiBaseUrl: String =
         ?: "http://10.0.2.2:8080/api"
 logger.lifecycle("kidhack BASE_URL = $apiBaseUrl")
 
-// local.properties에서 Google Maps API 키를 읽어옴 (git에 커밋되지 않음)
-val mapsApiKey: String = Properties().apply {
-    val f = rootProject.file("local.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
-}.getProperty("MAPS_API_KEY", "")
+// Google Maps API 키. 우선순위: .env → local.properties (둘 다 git 에 커밋되지 않음)
+val mapsApiKey: String = run {
+    val fromEnv = Properties().apply {
+        val f = rootProject.file(".env")
+        if (f.exists()) f.inputStream().use { load(it) }
+    }.getProperty("MAPS_API_KEY")
+    (fromEnv ?: localProperties.getProperty("MAPS_API_KEY") ?: "").trim()
+}
 
 
 android {

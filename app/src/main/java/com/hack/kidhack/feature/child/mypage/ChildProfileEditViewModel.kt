@@ -88,9 +88,11 @@ class ChildProfileEditViewModel(
             _state.update { it.copy(saving = true, message = null) }
             runCatching {
                 userRepository.updateMe(
+                    nickname = null,
                     name = current.name.trim(),
                     phone = current.phone.trim(),
                     email = current.email.takeIf { it.isNotBlank() },
+                    profileImageUrl = null,
                 )
             }.onSuccess { updated ->
                 // 저장된 값을 세션에 밀어 넣어야 다른 화면들이 바로 새 이름을 쓴다.

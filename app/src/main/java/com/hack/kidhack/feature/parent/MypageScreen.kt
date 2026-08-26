@@ -122,9 +122,6 @@ class MypageViewModel(
         }
     }
 
-    fun toggleEdit() = _state.update { it.copy(editing = !it.editing, message = null) }
-    fun onName(v: String) = _state.update { it.copy(name = v) }
-    fun onPhone(v: String) = _state.update { it.copy(phone = formatPhoneNumber(v)) }
     fun selectChild(id: String) {
         viewModelScope.launch { selectedChildRepository.select(id) }
     }
