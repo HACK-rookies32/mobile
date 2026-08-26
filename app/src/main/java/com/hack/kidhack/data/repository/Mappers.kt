@@ -22,6 +22,7 @@ import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SubscriptionDto
+import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.TokenResponse
 import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UserDto
@@ -54,21 +55,27 @@ import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
 
-fun UserDto.toDomain(): User = User(
-    id = id,
-    loginId = loginId,
-    name = name,
-    role = runCatching { Role.valueOf(role) }.getOrDefault(Role.PARENT),
-    nickname = nickname,
-    phone = phone,
-    email = email,
-    profileImageUrl = profileImageUrl,
-)
+fun UserDto.toDomain(): User {
+    val resolvedLogin = loginId?.takeIf { it.isNotBlank() }.orEmpty()
+    val resolvedName = username?.takeIf { it.isNotBlank() }
+        ?: name?.takeIf { it.isNotBlank() }
+        ?: nickname?.takeIf { it.isNotBlank() }
+        ?: resolvedLogin
+    return User(
+        id = id,
+        loginId = resolvedLogin,
+        name = resolvedName,
+        role = runCatching { Role.valueOf(role.orEmpty()) }.getOrDefault(Role.PARENT),
+        phone = phoneNumber?.takeIf { it.isNotBlank() } ?: phone.orEmpty(),
+        email = email,
+        profileImageUrl = profileImageUrl,
+    )
+}
 
-fun TokenResponse.toSession(): Session = Session(
-    accessToken = accessToken,
-    refreshToken = refreshToken,
-    user = user.toDomain(),
+fun LoginResponse.toSession(user: User): Session = Session(
+    accessToken = resolvedAccessToken().orEmpty(),
+    refreshToken = refreshToken.orEmpty(),
+    user = user,
 )
 
 fun ChildDto.toDomain(): ChildProfile = ChildProfile(

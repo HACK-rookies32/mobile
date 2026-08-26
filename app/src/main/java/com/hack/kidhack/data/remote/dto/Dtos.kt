@@ -1,18 +1,61 @@
 package com.hack.kidhack.data.remote.dto
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonPrimitive
+
+/** Accepts JSON string or number as a string (signup `id` is numeric in v0.2). */
+internal object FlexibleStringSerializer : KSerializer<String> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("FlexibleString", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): String {
+        val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeString()
+        val primitive = jsonDecoder.decodeJsonElement() as? JsonPrimitive ?: return ""
+        return primitive.content
+    }
+
+    override fun serialize(encoder: Encoder, value: String) {
+        encoder.encodeString(value)
+    }
+}
 
 @Serializable
 data class LoginRequest(val loginId: String, val password: String)
 
 @Serializable
+data class LoginResponse(
+    val token: String? = null,
+    val accessToken: String? = null,
+    val refreshToken: String? = null,
+    val loginId: String? = null,
+    val username: String? = null,
+    val role: String? = null,
+    val user: UserDto? = null,
+) {
+    fun resolvedAccessToken(): String? =
+        accessToken?.takeIf { it.isNotBlank() } ?: token?.takeIf { it.isNotBlank() }
+}
+
+@Serializable
 data class SignupRequest(
     val loginId: String,
+    val username: String,
     val password: String,
-    val name: String,
-    val role: String,
-    val phone: String,
+    val nickname: String? = null,
     val email: String? = null,
+    val phoneNumber: String,
+    val birthDate: String,
+    val address: String? = null,
+    val profileImageUrl: String? = null,
+    val role: String,
+    val parentId: Long? = null,
 )
 
 @Serializable
@@ -29,23 +72,19 @@ data class ResetPasswordRequest(
 )
 
 @Serializable
-data class TokenResponse(
-    val accessToken: String,
-    val refreshToken: String,
-    val user: UserDto,
-)
-
-@Serializable
 data class FindIdResponse(val loginId: String)
 
 @Serializable
 data class UserDto(
-    val id: String,
-    val loginId: String,
-    val name: String,
-    val role: String,
+    @Serializable(with = FlexibleStringSerializer::class)
+    val id: String = "",
+    val username: String? = null,
+    val loginId: String? = null,
     val nickname: String? = null,
-    val phone: String = "",
+    val name: String? = null,
+    val role: String? = null,
+    val phoneNumber: String? = null,
+    val phone: String? = null,
     val email: String? = null,
     val profileImageUrl: String? = null,
 )

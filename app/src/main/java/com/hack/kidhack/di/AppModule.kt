@@ -195,7 +195,7 @@ val appModule = module {
     single { get<Retrofit>().create(CardApi::class.java) }
 
     single<AuthRepository> {
-        if (useMock) FakeAuthRepository(get()) else RealAuthRepository(get(), get(), get())
+        if (useMock) FakeAuthRepository(get(), get()) else RealAuthRepository(get(), get(), get(), get())
     }
     single<UserRepository> { if (useMock) FakeUserRepository() else RealUserRepository(get()) }
     single<PairingRepository> { if (useMock) FakePairingRepository() else RealPairingRepository(get()) }
@@ -236,7 +236,7 @@ val appModule = module {
     }
 
     viewModel { LoginViewModel(get()) }
-    viewModel { RegisterViewModel(get(), get()) }
+    viewModel { RegisterViewModel(get(), get(), get(), androidContext()) }
     viewModel { ForgotViewModel(get()) }
 
     viewModel { DashboardViewModel(get(), get(), get(), get(), get()) }
@@ -264,5 +264,7 @@ val appModule = module {
     viewModel { ChildServicesViewModel(get(), get()) }
     viewModel { ChildMypageViewModel(get(), get(), get()) }
     viewModel { ChildScreenshotViewModel(get()) }
-    viewModel { ChildOnboardingViewModel(get()) }
+    viewModel { (persistDone: Boolean) ->
+        ChildOnboardingViewModel(get(), get(), persistDone)
+    }
 }

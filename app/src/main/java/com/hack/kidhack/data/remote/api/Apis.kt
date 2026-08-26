@@ -34,6 +34,7 @@ import com.hack.kidhack.data.remote.dto.InstalledAppDto
 import com.hack.kidhack.data.remote.dto.InstalledAppsResponse
 import com.hack.kidhack.data.remote.dto.LocationDto
 import com.hack.kidhack.data.remote.dto.LoginRequest
+import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.NotificationDto
 import com.hack.kidhack.data.remote.dto.NotificationSettingsDto
 import com.hack.kidhack.data.remote.dto.PairingCodeDto
@@ -49,6 +50,7 @@ import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SignupRequest
 import com.hack.kidhack.data.remote.dto.SubscribeRequest
 import com.hack.kidhack.data.remote.dto.SubscriptionDto
+import com.hack.kidhack.data.remote.dto.UsePointRequest
 import com.hack.kidhack.data.remote.dto.TokenResponse
 import com.hack.kidhack.data.remote.dto.TransferRequest
 import com.hack.kidhack.data.remote.dto.TransferResponse
@@ -71,16 +73,16 @@ import retrofit2.http.Query
 
 interface AuthApi {
     @POST("auth/signup")
-    suspend fun signup(@Body body: SignupRequest): ApiEnvelope<TokenResponse>
+    suspend fun signup(@Body body: SignupRequest): ApiEnvelope<UserDto>
 
     @POST("auth/login")
-    suspend fun login(@Body body: LoginRequest): ApiEnvelope<TokenResponse>
+    suspend fun login(@Body body: LoginRequest): ApiEnvelope<LoginResponse>
 
     @POST("auth/logout")
     suspend fun logout(): ApiEnvelope<Unit>
 
     @POST("auth/token/refresh")
-    suspend fun refresh(@Body body: RefreshRequest): ApiEnvelope<TokenResponse>
+    suspend fun refresh(@Body body: RefreshRequest): ApiEnvelope<LoginResponse>
 
     @POST("auth/find-id")
     suspend fun findId(@Body body: FindIdRequest): ApiEnvelope<FindIdResponse>
