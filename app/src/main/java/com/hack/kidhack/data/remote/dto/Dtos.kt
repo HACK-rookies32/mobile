@@ -252,3 +252,46 @@ data class ChildPhotoDto(
     val capturedAt: String,
     val imageUrl: String? = null,
 )
+
+/**
+ * 루키즈페이 용돈 지갑 (신규 제안 계약, GAP-05).
+ *
+ * 명세의 `points` 경로는 구독 적립 포인트라 「부모 → 자녀 송금」 필드가 없다.
+ * 자녀 QR 결제는 송금자·수신자가 분명해야 하므로 별도 지갑 경로를 제안한다.
+ */
+@Serializable
+data class AllowanceDto(
+    val balance: Int,
+    val updatedAt: String? = null,
+)
+
+@Serializable
+data class AllowanceEntryDto(
+    val id: String,
+    val type: String,
+    val amount: Int,
+    val description: String = "",
+    val dateLabel: String = "",
+)
+
+@Serializable
+data class AllowanceTransferRequest(
+    val amount: Int,
+    val memo: String? = null,
+)
+
+@Serializable
+data class AllowancePaymentRequest(
+    val token: String,
+    val amount: Int,
+    val merchant: String? = null,
+)
+
+@Serializable
+data class AllowancePaymentDto(
+    val id: String,
+    val amount: Int,
+    val balanceAfter: Int,
+    val approvedAt: String,
+    val merchant: String? = null,
+)

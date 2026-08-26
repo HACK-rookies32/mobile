@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import android.widget.Toast
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -56,9 +59,19 @@ fun ChildChatScreen(
     val colors = LocalKidhackColors.current
     val listState = rememberLazyListState()
 
+    val context = LocalContext.current
+
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
             listState.animateScrollToItem(state.messages.lastIndex)
+        }
+    }
+
+    LaunchedEffect(state.error) {
+        val message = state.error
+        if (message != null) {
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.clearError()
         }
     }
 
@@ -82,14 +95,16 @@ fun ChildChatScreen(
                 Spacer(Modifier.size(12.dp))
                 Column {
                     Text(
-                        text = stringResource(R.string.child_chat_mom),
+                        text = state.title.ifBlank { stringResource(R.string.child_chat_mom) },
                         color = Color.White,
                         fontFamily = KidhackFontFamily,
                         fontWeight = FontBold,
                         fontSize = 16.sp,
                     )
                     Text(
-                        text = stringResource(R.string.child_chat_online),
+                        text = stringResource(
+                            if (state.online) R.string.child_chat_online else R.string.child_chat_offline,
+                        ),
                         color = Color.White.copy(alpha = 0.7f),
                         fontSize = 12.sp,
                     )
@@ -104,15 +119,24 @@ fun ChildChatScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
-                Text(
-                    text = stringResource(R.string.child_chat_today),
-                    modifier = Modifier.fillMaxWidth(),
-                    color = colors.muted,
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBold,
-                    fontSize = 12.sp,
-                )
+            if (state.loading) {
+                item {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = colors.brand)
+                    }
+                }
+            }
+            if (!state.loading && state.messages.isEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(R.string.child_chat_empty),
+                        modifier = Modifier.fillMaxWidth(),
+                        color = colors.muted,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontSemibold,
+                        fontSize = 12.sp,
+                    )
+                }
             }
             items(state.messages, key = { it.id }) { message ->
                 ChatBubble(message)
@@ -160,8 +184,8 @@ fun ChildChatScreen(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(colors.brand)
-                    .clickable(onClick = viewModel::send),
+                    .background(if (state.canSend) colors.brand else colors.border)
+                    .clickable(enabled = state.canSend, onClick = viewModel::send),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

@@ -2,6 +2,8 @@ package com.hack.kidhack.feature.child.camera
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hack.kidhack.data.local.ChildPhotoStore
+import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.CommandAckStatus
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.PhotoRepository
@@ -21,6 +23,9 @@ data class ChildCameraUiState(
     val requestId: String? = null,
     val requestedBy: String? = null,
     val phase: UploadPhase = UploadPhase.Idle,
+    /** 기기에 남아 있는 촬영본. 업로드 성공 여부와 무관하게 자녀가 볼 수 있다. */
+    val gallery: List<ChildPhoto> = emptyList(),
+    val galleryLoading: Boolean = true,
 )
 
 /**
@@ -33,10 +38,22 @@ class ChildCameraViewModel(
     private val photoRepository: PhotoRepository,
     private val commandRepository: CommandRepository,
     private val sessionRepository: SessionRepository,
+    private val photoStore: ChildPhotoStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChildCameraUiState())
     val state: StateFlow<ChildCameraUiState> = _state.asStateFlow()
+
+    init {
+        loadGallery()
+    }
+
+    fun loadGallery() {
+        viewModelScope.launch {
+            val photos = photoStore.list()
+            _state.update { it.copy(gallery = photos, galleryLoading = false) }
+        }
+    }
 
     fun onRequest(requestId: String?) {
         if (requestId.isNullOrBlank() || requestId == _state.value.requestId) return
@@ -49,6 +66,15 @@ class ChildCameraViewModel(
         viewModelScope.launch {
             val childId = sessionRepository.current()?.user?.id.orEmpty()
             val requestId = _state.value.requestId
+
+            // 업로드보다 먼저 기기에 저장한다. 서버가 죽어 있어도 찍은 사진은 남아야 한다.
+            photoStore.save(
+                source = file,
+                requestId = requestId,
+                requestedBy = _state.value.requestedBy,
+            )
+            loadGallery()
+
             val result = runCatching {
                 photoRepository.upload(
                     childId = childId,

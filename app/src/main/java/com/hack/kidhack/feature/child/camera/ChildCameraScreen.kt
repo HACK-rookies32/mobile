@@ -42,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -52,7 +51,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import com.hack.kidhack.R
+import com.hack.kidhack.domain.model.ChildPhoto
+import com.hack.kidhack.core.common.KoreanParticles
 import com.hack.kidhack.core.designsystem.component.BrandGradientHeader
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.theme.FontBlack
@@ -65,23 +68,30 @@ import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 import java.io.File
 
-private data class GalleryTile(val emoji: String, val labelRes: Int)
+
+
+private const val TAB_CAMERA = "camera"
+private const val TAB_GALLERY = "gallery"
 
 /**
  * 자녀 카메라 화면.
  *
  * [requestId] 가 있으면 부모의 촬영 요청으로 열린 것이다. 이때는 갤러리 탭을 잠그고
  * 요청 배너를 띄우며, 셔터를 누르는 즉시 촬영본이 부모 계정으로 전송된다.
+ *
+ * [openGallery] 는 마이페이지 「카메라 갤러리」처럼 처음부터 갤러리를 보여 줄 때 쓴다.
+ * 부모 요청이 살아 있으면 요청이 우선이라 카메라로 되돌아간다.
  */
 @Composable
 fun ChildCameraScreen(
     requestId: String? = null,
+    openGallery: Boolean = false,
     viewModel: ChildCameraViewModel = koinViewModel(),
 ) {
     val colors = LocalKidhackColors.current
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var tab by remember { mutableStateOf("camera") }
+    var tab by remember { mutableStateOf(if (openGallery) TAB_GALLERY else TAB_CAMERA) }
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var hasPermission by remember {
         mutableStateOf(
@@ -102,9 +112,13 @@ fun ChildCameraScreen(
     // 부모 요청으로 열렸으면 갤러리를 보고 있어도 카메라로 되돌린다.
     LaunchedEffect(requestActive) {
         if (requestActive) {
-            tab = "camera"
+            tab = TAB_CAMERA
             if (!hasPermission) launcher.launch(KidhackPermissions.camera)
         }
+    }
+
+    LaunchedEffect(tab) {
+        if (tab == TAB_GALLERY) viewModel.loadGallery()
     }
 
     LaunchedEffect(state.phase) {
@@ -152,15 +166,15 @@ fun ChildCameraScreen(
                     fontSize = 20.sp,
                 )
                 CameraTabChip(
-                    selected = tab == "camera",
+                    selected = tab == TAB_CAMERA,
                     label = stringResource(R.string.child_camera_tab_camera),
-                    onClick = { tab = "camera" },
+                    onClick = { tab = TAB_CAMERA },
                 )
                 Spacer(Modifier.size(8.dp))
                 CameraTabChip(
-                    selected = tab == "gallery",
+                    selected = tab == TAB_GALLERY,
                     label = stringResource(R.string.child_camera_tab_gallery),
-                    onClick = { if (!requestActive) tab = "gallery" },
+                    onClick = { if (!requestActive) tab = TAB_GALLERY },
                 )
             }
         }
@@ -169,7 +183,7 @@ fun ChildCameraScreen(
             RequestBanner(requestedBy = state.requestedBy)
         }
 
-        if (tab == "camera") {
+        if (tab == TAB_CAMERA) {
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -216,7 +230,7 @@ fun ChildCameraScreen(
                     .padding(horizontal = 24.dp, vertical = 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CircleControl("🖼️") { if (!requestActive) tab = "gallery" }
+                CircleControl("🖼️") { if (!requestActive) tab = TAB_GALLERY }
                 Spacer(Modifier.weight(1f))
                 Box(
                     modifier = Modifier
@@ -262,69 +276,133 @@ fun ChildCameraScreen(
                 }
             }
         } else {
-            val tiles = listOf(
-                GalleryTile("🏫", R.string.child_camera_school),
-                GalleryTile("😄", R.string.child_camera_selfie),
-                GalleryTile("🍕", R.string.child_camera_lunch),
-                GalleryTile("📚", R.string.child_camera_study),
-                GalleryTile("🐶", R.string.child_camera_dog),
-                GalleryTile("🌅", R.string.child_camera_sunset),
+            GalleryGrid(
+                photos = state.gallery,
+                loading = state.galleryLoading,
+                modifier = Modifier.weight(1f),
             )
+        }
+    }
+}
+
+/**
+ * 실제로 찍어서 기기에 남아 있는 사진들.
+ *
+ * 예전에는 이모지 타일 6개가 하드코딩돼 있어서, 부모 요청으로 찍어 보낸 사진을
+ * 자녀가 다시 볼 방법이 없었다.
+ */
+@Composable
+private fun GalleryGrid(
+    photos: List<ChildPhoto>,
+    loading: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalKidhackColors.current
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.child_camera_recent),
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 14.sp,
+            color = colors.text,
+        )
+        Spacer(Modifier.height(12.dp))
+
+        if (photos.isEmpty()) {
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                Spacer(Modifier.height(40.dp))
+                Text(if (loading) "⏳" else "📷", fontSize = 40.sp)
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    text = stringResource(R.string.child_camera_recent),
+                    text = stringResource(
+                        if (loading) R.string.child_camera_gallery_loading
+                        else R.string.child_camera_gallery_empty,
+                    ),
                     fontFamily = KidhackFontFamily,
                     fontWeight = FontBold,
                     fontSize = 14.sp,
                     color = colors.text,
                 )
-                Spacer(Modifier.height(12.dp))
-                tiles.chunked(3).forEach { row ->
-                    Row {
-                        row.forEach { tile ->
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(4.dp)
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
-                                        ),
-                                    ),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Spacer(Modifier.weight(1f))
-                                Text(tile.emoji, fontSize = 28.sp)
-                                Text(
-                                    text = stringResource(tile.labelRes),
-                                    color = colors.muted,
-                                    fontFamily = KidhackFontFamily,
-                                    fontWeight = FontSemibold,
-                                    fontSize = 12.sp,
-                                )
-                                Spacer(Modifier.weight(1f))
-                            }
-                        }
-                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-                    }
+                if (!loading) {
+                    Text(
+                        text = stringResource(R.string.child_camera_gallery_empty_hint),
+                        color = colors.muted,
+                        fontSize = 12.sp,
+                    )
                 }
             }
+            return@Column
         }
+
+        photos.chunked(GALLERY_COLUMNS).forEach { row ->
+            Row {
+                row.forEach { photo ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(4.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(colors.border),
+                        ) {
+                            AsyncImage(
+                                model = photo.imageUrl?.let(::File),
+                                contentDescription = photo.capturedAt,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                            if (photo.requestId != null) {
+                                Text(
+                                    text = stringResource(R.string.child_camera_gallery_requested),
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(4.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(colors.brand)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                                    color = Color.White,
+                                    fontFamily = KidhackFontFamily,
+                                    fontWeight = FontBold,
+                                    fontSize = 10.sp,
+                                )
+                            }
+                        }
+                        Text(
+                            text = photo.capturedAt,
+                            color = colors.muted,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontSemibold,
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
+                repeat(GALLERY_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
     }
 }
+
+private const val GALLERY_COLUMNS = 3
 
 @Composable
 private fun RequestBanner(requestedBy: String?) {
     val colors = LocalKidhackColors.current
-    val who = requestedBy?.takeIf { it.isNotBlank() }
-        ?: stringResource(R.string.child_request_default_sender)
+    val who = KoreanParticles.subject(
+        requestedBy?.takeIf { it.isNotBlank() }
+            ?: stringResource(R.string.child_request_default_sender),
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()

@@ -29,6 +29,7 @@ import com.hack.kidhack.feature.child.camera.ChildCameraScreen
 import com.hack.kidhack.feature.child.chat.ChildChatScreen
 import com.hack.kidhack.feature.child.home.ChildHomeScreen
 import com.hack.kidhack.feature.child.mypage.ChildMypageScreen
+import com.hack.kidhack.feature.child.mypage.ChildProfileEditScreen
 import com.hack.kidhack.feature.child.onboarding.ChildOnboardingScreen
 import com.hack.kidhack.feature.child.pay.ChildPayScreen
 import com.hack.kidhack.feature.child.onboarding.ChildStartRoute
@@ -167,6 +168,7 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
                 onServices = { navController.navigateChildTab(Route.ChildServices.path) },
                 onMypage = { navController.navigateChildTab(Route.ChildMypage.path) },
                 onScreenshot = { navController.navigate(Route.ChildScreenshot.path) },
+                onCamera = { navController.navigateChildTab(Route.ChildCamera.path) },
             )
         }
         childTab(Route.ChildChat.path, navController) { ChildChatScreen() }
@@ -179,18 +181,26 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
                     nullable = true
                     defaultValue = null
                 },
+                navArgument(ARG_OPEN_GALLERY) {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
             ),
         ) { entry ->
             ChildShell(navController) {
-                ChildCameraScreen(requestId = entry.arguments?.getString(ARG_REQUEST_ID))
+                ChildCameraScreen(
+                    requestId = entry.arguments?.getString(ARG_REQUEST_ID),
+                    openGallery = entry.arguments?.getBoolean(ARG_OPEN_GALLERY) == true,
+                )
             }
         }
         childTab(Route.ChildMypage.path, navController) {
             ChildMypageScreen(
                 onServices = { navController.navigateChildTab(Route.ChildServices.path) },
                 onScreenshot = { navController.navigate(Route.ChildScreenshot.path) },
-                onCamera = { navController.navigateChildTab(Route.ChildCamera.path) },
+                onCamera = { navController.navigateChildGallery() },
                 onPay = { navController.navigate(Route.ChildPay.path) },
+                onEditProfile = { navController.navigate(Route.ChildProfileEdit.path) },
             )
         }
         composable(Route.ChildScreenshot.path) {
@@ -203,10 +213,32 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
                 ChildPayScreen(onBack = { navController.popBackStack() })
             }
         }
+        composable(Route.ChildProfileEdit.path) {
+            ChildShell(navController) {
+                ChildProfileEditScreen(onBack = { navController.popBackStack() })
+            }
+        }
     }
 }
 
 internal const val ARG_REQUEST_ID = "requestId"
+internal const val ARG_OPEN_GALLERY = "gallery"
+
+/**
+ * 마이페이지 「카메라 갤러리」 → 카메라 탭의 갤러리 화면.
+ *
+ * 일반 navigate 로 쌓으면 마이페이지 탭 스택이 `[마이페이지, 갤러리]` 가 되고,
+ * 하단 「마이」를 눌렀을 때 그 스택이 통째로 복원돼 갤러리로 되돌아간다.
+ * 그래서 탭 전환과 같은 방식으로 이동한다. 다만 `gallery=true` 인자를 살려야 하므로
+ * 이전 카메라 상태는 복원하지 않는다.
+ */
+private fun NavHostController.navigateChildGallery() {
+    navigate(Route.ChildCameraRequest.gallery()) {
+        popUpTo(Route.ChildGraph.path) { saveState = true }
+        launchSingleTop = true
+        restoreState = false
+    }
+}
 
 private fun NavHostController.navigateChildTab(route: String) {
     navigate(route) {
@@ -270,13 +302,22 @@ private fun TabShell(
                 NavigationBar(containerColor = colors.card, contentColor = colors.muted) {
                     tabs.forEach { tab ->
                         val selected = currentRoute == tab.route.path
+                        // 카메라 탭만 예외: 마이페이지 「카메라 갤러리」로 들어간 적이 있으면
+                        // 저장된 상태(gallery=true)가 복원돼 탭을 눌러도 갤러리가 뜬다.
+                        // 탭은 언제나 카메라로 시작해야 하므로 인자를 명시하고 복원을 끈다.
+                        val isCameraTab = tab.route.path == Route.ChildCamera.path
                         NavigationBarItem(
                             selected = selected,
                             onClick = {
-                                navController.navigate(tab.route.path) {
+                                val target = if (isCameraTab) {
+                                    Route.ChildCameraRequest.camera()
+                                } else {
+                                    tab.route.path
+                                }
+                                navController.navigate(target) {
                                     popUpTo(graphRoute) { saveState = true }
                                     launchSingleTop = true
-                                    restoreState = true
+                                    restoreState = !isCameraTab
                                 }
                             },
                             icon = { Text(tab.emoji, fontSize = 18.sp) },

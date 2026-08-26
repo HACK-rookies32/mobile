@@ -20,6 +20,18 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
+    <!--
+        안드로이드 11+ 패키지 가시성. 이게 없으면 PackageManager 가 다른 앱을 숨겨서
+        (logcat 의 AppsFilter BLOCKED) 앱 사용 모니터링이 앱 이름을 못 찾고 목록에서 빠진다.
+        QUERY_ALL_PACKAGES 대신 「런처에서 열 수 있는 앱」만 요청한다.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />

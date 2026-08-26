@@ -10,6 +10,8 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.hack.kidhack.R
 import com.hack.kidhack.background.ChildNotifications
+import com.hack.kidhack.core.common.KoreanParticles
+import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.domain.model.CommandAckStatus
 import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.repository.CommandRepository
@@ -39,6 +41,7 @@ class ChildCommandService : Service() {
     private val commandRepository: CommandRepository by inject()
     private val sessionRepository: SessionRepository by inject()
     private val notifier: ChildCommandNotifier by inject()
+    private val alertStore: ChildAlertStore by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -71,6 +74,8 @@ class ChildCommandService : Service() {
             commandRepository.observe().collect { command ->
                 if (command.type == RemoteCommandType.UNKNOWN) return@collect
                 notifier.notify(command)
+                // 알림은 지나가면 사라진다. 홈 탭 「최근 알림」에서 다시 볼 수 있게 기록해 둔다.
+                recordAlert(command)
                 val childId = command.childId.ifBlank {
                     sessionRepository.current()?.user?.id.orEmpty()
                 }
@@ -78,6 +83,28 @@ class ChildCommandService : Service() {
                     commandRepository.ack(childId, command.requestId, CommandAckStatus.RECEIVED)
                 }
             }
+        }
+    }
+
+    private suspend fun recordAlert(command: com.hack.kidhack.domain.model.RemoteCommand) {
+        val who = KoreanParticles.subject(
+            command.requestedBy?.takeIf { it.isNotBlank() }
+                ?: getString(R.string.child_request_default_sender),
+        )
+        when (command.type) {
+            RemoteCommandType.SCREEN_CAPTURE -> alertStore.record(
+                type = ChildAlertStore.TYPE_CAPTURE_REQUEST,
+                title = getString(R.string.child_alert_capture_request),
+                body = getString(R.string.child_alert_request_from, who),
+                dedupeKey = ChildAlertStore.TYPE_CAPTURE_REQUEST + "-" + command.requestId,
+            )
+            RemoteCommandType.CAMERA_SHOT -> alertStore.record(
+                type = ChildAlertStore.TYPE_CAMERA_REQUEST,
+                title = getString(R.string.child_alert_camera_request),
+                body = getString(R.string.child_alert_request_from, who),
+                dedupeKey = ChildAlertStore.TYPE_CAMERA_REQUEST + "-" + command.requestId,
+            )
+            RemoteCommandType.UNKNOWN -> Unit
         }
     }
 

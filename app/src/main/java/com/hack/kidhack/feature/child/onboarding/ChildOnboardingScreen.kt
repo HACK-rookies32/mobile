@@ -1,6 +1,8 @@
 package com.hack.kidhack.feature.child.onboarding
 
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -29,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.hack.kidhack.R
@@ -78,6 +81,18 @@ fun ChildOnboardingScreen(
 
     LaunchedEffect(state.finished) {
         if (state.finished) onFinished()
+    }
+
+    // 설정 앱에서 접근성을 켜고 돌아오면 즉시 반영돼야 한다.
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshPermissions()
+        onPauseOrDispose { }
+    }
+
+    val openSettings: (String) -> Unit = { action ->
+        runCatching {
+            context.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
     }
 
     val locationLauncher = rememberLauncherForActivityResult(
@@ -170,11 +185,26 @@ fun ChildOnboardingScreen(
         }
 
         if (state.step == lastStep) {
+            // 접근성·사용정보 접근·오버레이는 런타임 권한이 아니라 설정 앱에서만 켤 수 있다.
+            // 앱이 코드로 켜는 건 OS 가 막아 두었으므로(WRITE_SECURE_SETTINGS 는 시스템 전용),
+            // 여기서 바로 설정으로 보내 주고 결과를 확인해 준다.
             listOf(
-                R.string.child_onboarding_later_usage,
-                R.string.child_onboarding_later_accessibility,
-                R.string.child_onboarding_later_overlay,
-            ).forEach { res ->
+                Triple(
+                    R.string.child_onboarding_later_accessibility,
+                    state.harmfulBlockEnabled,
+                    Settings.ACTION_ACCESSIBILITY_SETTINGS,
+                ),
+                Triple(
+                    R.string.child_onboarding_later_usage,
+                    state.usageAccessGranted,
+                    Settings.ACTION_USAGE_ACCESS_SETTINGS,
+                ),
+                Triple(
+                    R.string.child_onboarding_later_overlay,
+                    state.overlayGranted,
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                ),
+            ).forEach { (labelRes, granted, action) ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -184,26 +214,41 @@ fun ChildOnboardingScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = stringResource(res),
+                        text = stringResource(labelRes),
                         modifier = Modifier.weight(1f),
                         fontFamily = KidhackFontFamily,
                         fontWeight = FontBold,
                         fontSize = 14.sp,
                         color = colors.text,
                     )
-                    Text(
-                        text = stringResource(R.string.child_onboarding_later_badge),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(colors.brandLight)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = colors.brand,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBold,
-                        fontSize = 12.sp,
-                    )
+                    if (granted) {
+                        Text(
+                            text = stringResource(R.string.child_onboarding_granted),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFF0FDF4))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            color = colors.safe,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 12.sp,
+                        )
+                    } else {
+                        KidButton(
+                            text = stringResource(R.string.child_onboarding_open_settings),
+                            onClick = { openSettings(action) },
+                            variant = KidButtonVariant.Secondary,
+                        )
+                    }
                 }
             }
+            Text(
+                text = stringResource(R.string.child_onboarding_special_note),
+                color = colors.muted,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontSemibold,
+                fontSize = 12.sp,
+            )
         }
 
         KidButton(

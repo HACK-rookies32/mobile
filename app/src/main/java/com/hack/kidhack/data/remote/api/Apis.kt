@@ -2,6 +2,11 @@ package com.hack.kidhack.data.remote.api
 
 import com.hack.kidhack.data.remote.ApiEnvelope
 import com.hack.kidhack.data.remote.PageResponse
+import com.hack.kidhack.data.remote.dto.AllowanceDto
+import com.hack.kidhack.data.remote.dto.AllowanceEntryDto
+import com.hack.kidhack.data.remote.dto.AllowancePaymentDto
+import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
+import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
 import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
@@ -331,4 +336,38 @@ interface PhotoApi {
         @Part("capturedAt") capturedAt: RequestBody,
         @Part("requestId") requestId: RequestBody?,
     ): ApiEnvelope<ChildPhotoDto>
+}
+
+/** 루키즈페이 용돈 지갑 (신규 제안 계약, GAP-05). */
+interface AllowanceApi {
+    @GET("children/{childId}/allowance")
+    suspend fun balance(@Path("childId") childId: String): ApiEnvelope<AllowanceDto>
+
+    @GET("children/{childId}/allowance/history")
+    suspend fun history(
+        @Path("childId") childId: String,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 50,
+    ): ApiEnvelope<PageResponse<AllowanceEntryDto>>
+
+    /** 부모 전용: 용돈 보내기 */
+    @POST("children/{childId}/allowance/send")
+    suspend fun send(
+        @Path("childId") childId: String,
+        @Body body: AllowanceTransferRequest,
+    ): ApiEnvelope<AllowanceDto>
+
+    /** 부모 전용: 용돈 회수하기 */
+    @POST("children/{childId}/allowance/withdraw")
+    suspend fun withdraw(
+        @Path("childId") childId: String,
+        @Body body: AllowanceTransferRequest,
+    ): ApiEnvelope<AllowanceDto>
+
+    /** 자녀 전용: QR 결제 승인 */
+    @POST("children/{childId}/allowance/payments")
+    suspend fun pay(
+        @Path("childId") childId: String,
+        @Body body: AllowancePaymentRequest,
+    ): ApiEnvelope<AllowancePaymentDto>
 }

@@ -1,5 +1,8 @@
 package com.hack.kidhack.data.repository
 
+import com.hack.kidhack.data.remote.dto.AllowanceDto
+import com.hack.kidhack.data.remote.dto.AllowanceEntryDto
+import com.hack.kidhack.data.remote.dto.AllowancePaymentDto
 import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
@@ -19,6 +22,10 @@ import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SubscriptionDto
 import com.hack.kidhack.data.remote.dto.TokenResponse
 import com.hack.kidhack.data.remote.dto.UserDto
+import com.hack.kidhack.domain.model.Allowance
+import com.hack.kidhack.domain.model.AllowanceEntry
+import com.hack.kidhack.domain.model.AllowancePayment
+import com.hack.kidhack.domain.model.AllowanceType
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.ChatMessage
@@ -181,4 +188,23 @@ fun ChildPhotoDto.toDomain(): ChildPhoto = ChildPhoto(
     id = id,
     capturedAt = capturedAt,
     imageUrl = imageUrl,
+)
+
+fun AllowanceDto.toDomain(): Allowance = Allowance(balance = balance, updatedAt = updatedAt)
+
+fun AllowanceEntryDto.toDomain(): AllowanceEntry = AllowanceEntry(
+    id = id,
+    type = runCatching { AllowanceType.valueOf(type.uppercase()) }
+        .getOrDefault(AllowanceType.PAYMENT),
+    amount = amount,
+    description = description,
+    dateLabel = dateLabel,
+)
+
+fun AllowancePaymentDto.toDomain(): AllowancePayment = AllowancePayment(
+    id = id,
+    amount = amount,
+    balanceAfter = balanceAfter,
+    approvedAt = approvedAt,
+    merchant = merchant,
 )

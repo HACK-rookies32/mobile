@@ -4,6 +4,7 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import com.hack.kidhack.data.remote.api.AllowanceApi
 import com.hack.kidhack.data.remote.api.AppUsageApi
 import com.hack.kidhack.data.remote.api.AuthApi
 import com.hack.kidhack.data.remote.api.BlocklistApi
@@ -21,6 +22,8 @@ import com.hack.kidhack.data.remote.api.PointApi
 import com.hack.kidhack.data.remote.api.ScreenshotApi
 import com.hack.kidhack.data.remote.api.SubscriptionApi
 import com.hack.kidhack.data.remote.api.UserApi
+import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
+import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
 import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
@@ -50,6 +53,9 @@ import com.hack.kidhack.data.ws.ChatWebSocketClient
 import com.hack.kidhack.data.ws.ChatWsEvent
 import com.hack.kidhack.data.ws.ChildCommandSocket
 import com.hack.kidhack.domain.model.AppControlItem
+import com.hack.kidhack.domain.model.Allowance
+import com.hack.kidhack.domain.model.AllowanceEntry
+import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
@@ -71,6 +77,7 @@ import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
+import com.hack.kidhack.domain.repository.AllowanceRepository
 import com.hack.kidhack.domain.repository.AppControlRepository
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.AuthRepository
@@ -376,6 +383,8 @@ class RealCommandRepository(
     override fun observe(): Flow<RemoteCommand> = socket.commands
         .onStart { socket.start() }
 
+    override val connected: Flow<Boolean> = socket.connected
+
     override fun disconnect() = socket.stop()
 
     override suspend fun pending(childId: String): List<RemoteCommand> =
@@ -392,3 +401,26 @@ private fun File.toImagePart(): MultipartBody.Part =
     MultipartBody.Part.createFormData("file", name, asRequestBody("image/jpeg".toMediaType()))
 
 private fun String.toPlainBody(): RequestBody = toRequestBody("text/plain".toMediaType())
+
+class RealAllowanceRepository(private val api: AllowanceApi) : AllowanceRepository {
+
+    override suspend fun balance(childId: String): Allowance =
+        api.balance(childId).unwrap().toDomain()
+
+    override suspend fun history(childId: String): List<AllowanceEntry> =
+        api.history(childId).unwrap().content.map { it.toDomain() }
+
+    override suspend fun send(childId: String, amount: Int, memo: String?): Allowance =
+        api.send(childId, AllowanceTransferRequest(amount, memo)).unwrap().toDomain()
+
+    override suspend fun withdraw(childId: String, amount: Int, memo: String?): Allowance =
+        api.withdraw(childId, AllowanceTransferRequest(amount, memo)).unwrap().toDomain()
+
+    override suspend fun pay(
+        childId: String,
+        token: String,
+        amount: Int,
+        merchant: String?,
+    ): AllowancePayment =
+        api.pay(childId, AllowancePaymentRequest(token, amount, merchant)).unwrap().toDomain()
+}

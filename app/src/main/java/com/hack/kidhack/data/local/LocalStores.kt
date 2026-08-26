@@ -14,11 +14,15 @@ import com.hack.kidhack.domain.repository.ChildOnboardingStore
 import com.hack.kidhack.domain.repository.SelectedChildRepository
 import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 private val Context.sessionDataStore: DataStore<Preferences> by preferencesDataStore(name = "session")
@@ -43,24 +47,37 @@ class SessionRepositoryImpl(
 ) : SessionRepository {
 
     private val dataStore = context.sessionDataStore
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
     private var cached: Session? = null
 
+    @Volatile
+    private var loaded: Boolean = false
+
     override val session: Flow<Session?> = dataStore.data.map { it.toSession() }
 
     init {
-        cached = runBlocking { dataStore.data.first().toSession() }
+        // 생성 시점에 디스크를 읽지 않는다. 예전에는 여기서 runBlocking 으로 읽는 바람에
+        // Application.onCreate 가 메인 스레드를 붙잡아 첫 프레임이 늦어졌다.
+        scope.launch {
+            dataStore.data.collect { prefs ->
+                cached = prefs.toSession()
+                loaded = true
+            }
+        }
     }
 
     override suspend fun current(): Session? {
         val value = dataStore.data.first().toSession()
         cached = value
+        loaded = true
         return value
     }
 
     override suspend fun save(session: Session) {
         cached = session
+        loaded = true
         dataStore.edit { prefs ->
             prefs[Keys.access] = session.accessToken
             prefs[Keys.refresh] = session.refreshToken
@@ -75,12 +92,28 @@ class SessionRepositoryImpl(
 
     override suspend fun clear() {
         cached = null
+        loaded = true
         dataStore.edit { it.clear() }
     }
 
-    override fun accessToken(): String? = cached?.accessToken
+    override fun accessToken(): String? = snapshot()?.accessToken
 
-    override fun refreshToken(): String? = cached?.refreshToken
+    override fun refreshToken(): String? = snapshot()?.refreshToken
+
+    /**
+     * 동기 토큰 조회.
+     *
+     * 캐시가 아직 안 채워졌으면 한 번만 블로킹해서 읽는다. 호출자는 OkHttp 인터셉터와
+     * 소켓 연결 코루틴뿐이라 항상 백그라운드 스레드다(메인 스레드에서 부르면 안 된다).
+     */
+    private fun snapshot(): Session? {
+        if (loaded) return cached
+        return runBlocking { dataStore.data.first().toSession() }
+            .also {
+                cached = it
+                loaded = true
+            }
+    }
 
     private fun Preferences.toSession(): Session? {
         val access = this[Keys.access] ?: return null

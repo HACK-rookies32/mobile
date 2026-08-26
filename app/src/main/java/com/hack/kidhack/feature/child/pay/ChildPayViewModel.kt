@@ -2,10 +2,12 @@ package com.hack.kidhack.feature.child.pay
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.PayQrToken
-import com.hack.kidhack.domain.model.PointHistory
-import com.hack.kidhack.domain.repository.PointRepository
+import com.hack.kidhack.domain.repository.AllowanceRepository
 import com.hack.kidhack.domain.repository.SessionRepository
+import com.hack.kidhack.domain.repository.childId
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +20,7 @@ import kotlin.random.Random
 data class ChildPayUiState(
     val loading: Boolean = true,
     val balance: Int = 0,
-    val history: List<PointHistory> = emptyList(),
+    val history: List<AllowanceEntry> = emptyList(),
     val amountInput: String = "",
     val token: PayQrToken? = null,
     val secondsLeft: Int = 0,
@@ -28,7 +30,7 @@ data class ChildPayUiState(
 ) {
     val amount: Int get() = amountInput.filter { it.isDigit() }.toIntOrNull() ?: 0
 
-    /** 잔액 한도 안에서만 결제 가능 — 자녀 모드의 핵심 제약. */
+    /** 부모가 채워 준 잔액 한도 안에서만 결제 가능 — 자녀 모드의 핵심 제약. */
     val overLimit: Boolean get() = amount > balance
     val canIssue: Boolean get() = amount > 0 && !overLimit && !paying
 }
@@ -36,19 +38,21 @@ data class ChildPayUiState(
 /**
  * 자녀 모드 루키즈페이.
  *
- * 부모가 보낸 용돈(포인트) **잔액 한도 안에서만** QR 결제 토큰을 발급한다.
- * 발급된 토큰은 [TOKEN_TTL_SECONDS] 초 뒤 자동 만료되고, 가맹점이 스캔해 승인하면
- * `POST /points/use` 로 잔액이 차감된다.
+ * 잔액의 공급원은 오직 부모의 「용돈 보내기」이고, 부모는 언제든 회수할 수 있다.
+ * 그래서 결제 확정 직전에 잔액을 **서버에서 다시 읽어** 확인한다
+ * (QR 을 띄워 둔 사이에 부모가 회수했을 수 있다).
  *
- * 송금·회수(부모 모드)는 여기서 다루지 않는다 — 자녀 앱에는 그 UI 자체가 없다.
+ * 용돈 보내기·회수 UI 는 부모 모드 기능이라 이 화면에 존재하지 않는다.
  */
 class ChildPayViewModel(
-    private val pointRepository: PointRepository,
+    private val allowanceRepository: AllowanceRepository,
     private val sessionRepository: SessionRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChildPayUiState())
     val state: StateFlow<ChildPayUiState> = _state.asStateFlow()
+
+    private var countdownJob: Job? = null
 
     init {
         refresh()
@@ -57,9 +61,17 @@ class ChildPayViewModel(
     fun refresh() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true) }
-            val balance = runCatching { pointRepository.balance().balance }.getOrDefault(0)
-            val history = runCatching { pointRepository.history() }.getOrDefault(emptyList())
-            _state.update { it.copy(loading = false, balance = balance, history = history) }
+            val childId = sessionRepository.childId()
+            val balance = runCatching { allowanceRepository.balance(childId).balance }
+            val history = runCatching { allowanceRepository.history(childId) }
+            _state.update {
+                it.copy(
+                    loading = false,
+                    balance = balance.getOrDefault(it.balance),
+                    history = history.getOrDefault(it.history),
+                    error = if (balance.isFailure) "잔액을 불러오지 못했어요" else it.error,
+                )
+            }
         }
     }
 
@@ -70,7 +82,7 @@ class ChildPayViewModel(
 
     fun quickAmount(amount: Int) = onAmountChange(amount.toString())
 
-    /** 결제용 QR 토큰 발급. 서버 승인 전이라 잔액은 아직 깎지 않는다. */
+    /** 결제용 QR 토큰 발급. 서버 승인 전이므로 잔액은 아직 깎이지 않는다. */
     fun issueToken() {
         val current = _state.value
         if (!current.canIssue) {
@@ -78,20 +90,20 @@ class ChildPayViewModel(
             return
         }
         viewModelScope.launch {
-            val childId = sessionRepository.current()?.user?.id.orEmpty()
-            val nonce = Random.nextLong(NONCE_BOUND).toString(RADIX_36).uppercase()
+            val childId = sessionRepository.childId()
+            val token = Random.nextLong(NONCE_BOUND).toString(RADIX_36).uppercase()
             val expiresAt = System.currentTimeMillis() + TOKEN_TTL_SECONDS * 1000L
             val payload = listOf(
                 PAYLOAD_PREFIX,
                 childId,
                 current.amount.toString(),
-                nonce,
+                token,
                 expiresAt.toString(),
             ).joinToString(PAYLOAD_SEPARATOR)
 
             _state.update {
                 it.copy(
-                    token = PayQrToken(payload, current.amount, expiresAt),
+                    token = PayQrToken(token, payload, current.amount, expiresAt),
                     secondsLeft = TOKEN_TTL_SECONDS,
                     error = null,
                     message = null,
@@ -101,45 +113,85 @@ class ChildPayViewModel(
         }
     }
 
-    fun cancelToken() = _state.update { it.copy(token = null, secondsLeft = 0) }
+    fun cancelToken() {
+        countdownJob?.cancel()
+        _state.update { it.copy(token = null, secondsLeft = 0) }
+    }
 
     /**
-     * 가맹점 승인 시뮬레이션.
+     * 가맹점 승인 확정.
      *
-     * 실제 서비스에서는 가맹점 단말이 QR 을 읽어 서버로 승인 요청을 보내고,
-     * 자녀 앱은 소켓으로 결과만 받는다. 데모에서는 자녀 앱이 직접 확정한다.
+     * 실서비스에서는 가맹점 단말이 QR 을 읽어 서버로 승인 요청을 보내고 자녀 앱은 결과만 받는다.
+     * 가맹점 단말이 없는 지금은 자녀 앱이 같은 토큰으로 승인을 요청한다.
      */
     fun confirmPayment() {
         val token = _state.value.token ?: return
         if (System.currentTimeMillis() > token.expiresAtMillis) {
-            _state.update { it.copy(token = null, secondsLeft = 0, error = "QR 이 만료됐어요. 다시 발급해 주세요") }
-            return
-        }
-        if (token.amount > _state.value.balance) {
-            _state.update { it.copy(error = "잔액이 부족해요") }
+            cancelToken()
+            _state.update { it.copy(error = "QR 이 만료됐어요. 다시 만들어 주세요") }
             return
         }
         viewModelScope.launch {
             _state.update { it.copy(paying = true, error = null) }
-            val result = runCatching { pointRepository.use(QR_PRODUCT_ID, token.amount) }
-            _state.update {
-                it.copy(
-                    paying = false,
-                    token = null,
-                    secondsLeft = 0,
-                    amountInput = if (result.isSuccess) "" else it.amountInput,
-                    message = if (result.isSuccess) "결제가 끝났어요!" else null,
-                    error = if (result.isSuccess) null else "결제에 실패했어요. 잠시 후 다시 시도해 주세요",
+            val childId = sessionRepository.childId()
+
+            // QR 을 띄워 둔 사이 부모가 회수했을 수 있으므로 최신 잔액을 다시 확인한다.
+            val latest = runCatching { allowanceRepository.balance(childId).balance }.getOrNull()
+            if (latest != null && token.amount > latest) {
+                countdownJob?.cancel()
+                _state.update {
+                    it.copy(
+                        paying = false,
+                        token = null,
+                        secondsLeft = 0,
+                        balance = latest,
+                        error = "잔액이 부족해요. 부모님이 용돈을 회수했을 수 있어요",
+                    )
+                }
+                return@launch
+            }
+
+            val result = runCatching {
+                allowanceRepository.pay(
+                    childId = childId,
+                    token = token.token,
+                    amount = token.amount,
+                    merchant = null,
                 )
             }
-            if (result.isSuccess) refresh()
+            countdownJob?.cancel()
+            result
+                .onSuccess { payment ->
+                    _state.update {
+                        it.copy(
+                            paying = false,
+                            token = null,
+                            secondsLeft = 0,
+                            amountInput = "",
+                            balance = payment.balanceAfter,
+                            message = "결제가 끝났어요!",
+                        )
+                    }
+                    refresh()
+                }
+                .onFailure { t ->
+                    _state.update {
+                        it.copy(
+                            paying = false,
+                            token = null,
+                            secondsLeft = 0,
+                            error = t.message ?: "결제에 실패했어요. 잠시 후 다시 시도해 주세요",
+                        )
+                    }
+                }
         }
     }
 
     fun clearMessage() = _state.update { it.copy(message = null, error = null) }
 
     private fun startCountdown() {
-        viewModelScope.launch {
+        countdownJob?.cancel()
+        countdownJob = viewModelScope.launch {
             while (isActive) {
                 delay(1000)
                 val token = _state.value.token ?: return@launch
@@ -160,8 +212,5 @@ class ChildPayViewModel(
         const val PAYLOAD_SEPARATOR = "|"
         const val NONCE_BOUND = 1_000_000_000L
         const val RADIX_36 = 36
-
-        /** 명세의 `POST /points/use` 는 productId 를 요구한다. QR 결제용 고정 값. */
-        const val QR_PRODUCT_ID = 9001
     }
 }

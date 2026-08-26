@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidCard
@@ -42,11 +43,18 @@ fun ChildMypageScreen(
     onScreenshot: () -> Unit = {},
     onCamera: () -> Unit = {},
     onPay: () -> Unit = {},
+    onEditProfile: () -> Unit = {},
     viewModel: ChildMypageViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
     val context = LocalContext.current
+    // 부모가 용돈을 보내거나 회수했을 수 있으니 탭 복귀 때마다 잔액을 다시 읽는다.
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
+
     val comingSoon = {
         Toast.makeText(context, context.getString(R.string.child_mypage_coming_soon), Toast.LENGTH_SHORT).show()
     }
@@ -141,6 +149,15 @@ fun ChildMypageScreen(
                 color = colors.text,
             )
             Spacer(Modifier.height(8.dp))
+            if (state.guardians.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.child_mypage_guardians_empty),
+                    color = colors.muted,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontSemibold,
+                    fontSize = 12.sp,
+                )
+            }
             state.guardians.forEachIndexed { index, guardian ->
                 ListRow(
                     title = guardian.name,
@@ -160,7 +177,7 @@ fun ChildMypageScreen(
                 fontWeight = FontBold,
                 fontSize = 12.sp,
             )
-            ListRow(title = stringResource(R.string.child_mypage_edit_profile), onClick = comingSoon)
+            ListRow(title = stringResource(R.string.child_mypage_edit_profile), onClick = onEditProfile)
             ListRow(
                 title = stringResource(R.string.child_mypage_change_password),
                 onClick = comingSoon,

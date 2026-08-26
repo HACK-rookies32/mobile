@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class ChildScreenshotUiState(
+    val loading: Boolean = true,
+    val error: String? = null,
     val items: List<Screenshot> = emptyList(),
     val bannerVisible: Boolean = false,
     /** 아직 처리하지 않은 캡처 요청. null 이면 대기 중인 요청이 없다. */
@@ -51,9 +53,16 @@ class ChildScreenshotViewModel(
 
     fun refresh() {
         viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null) }
             val childId = sessionRepository.current()?.user?.id.orEmpty()
-            val items = runCatching { screenshotRepository.list(childId) }.getOrDefault(emptyList())
-            _state.update { it.copy(items = items) }
+            runCatching { screenshotRepository.list(childId) }
+                .onSuccess { items ->
+                    _state.update { it.copy(loading = false, items = items, error = null) }
+                }
+                .onFailure {
+                    // 서버가 죽어 있어도 화면이 그냥 비어 보이면 안 된다. 원인을 알리고 재시도를 준다.
+                    _state.update { it.copy(loading = false, error = "캡처 내역을 불러오지 못했어요") }
+                }
         }
     }
 

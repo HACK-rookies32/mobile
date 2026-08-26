@@ -57,7 +57,36 @@ POST /children/{childId}/commands/{requestId}/ack
      body: { "status": "DONE", "message": null }
 ```
 
-## 3. 업로드
+## 3. 루키즈페이 용돈 지갑 (신규 · GAP-05)
+
+명세의 `points` 경로는 **구독 적립 포인트**라 「부모 → 자녀 송금」 필드가 없다.
+자녀 QR 결제는 송금자·수신자가 분명해야 하므로 별도 지갑 경로를 제안한다.
+
+```
+GET  /children/{childId}/allowance             -> { "balance": 12000, "updatedAt": "..." }
+GET  /children/{childId}/allowance/history     -> [ { "id", "type", "amount", "description", "dateLabel" } ]
+POST /children/{childId}/allowance/send        { "amount": 10000, "memo": "이번 주 용돈" }   # 부모
+POST /children/{childId}/allowance/withdraw    { "amount": 3000,  "memo": null }             # 부모
+POST /children/{childId}/allowance/payments    { "token", "amount", "merchant" }             # 자녀 QR
+```
+
+`type`: `SEND` | `WITHDRAW` | `PAYMENT` (부호 있는 `amount` — 받으면 +, 회수·결제면 −)
+
+**잔액 검증의 최종 권한은 서버**다. 자녀가 QR 을 띄워 둔 사이 부모가 회수할 수 있으므로,
+`payments` 는 잔액을 다시 확인하고 부족하면 거절해야 한다. 클라이언트도 결제 확정 직전에
+`GET .../allowance` 를 한 번 더 호출하지만 그건 UX 용 방어일 뿐이다.
+
+QR 페이로드 형식(가맹점 단말이 파싱):
+
+```
+KIDHACKPAY1|{childId}|{amount}|{token}|{expiresAtMillis}
+```
+
+`token` 은 1회용 난수이고 발급 후 180초 뒤 만료된다.
+
+---
+
+## 4. 업로드
 
 - 화면 캡처: **기존 명세 그대로** `POST /children/{childId}/screenshots`
   (multipart: `file`, `capturedAt`, `trigger=SCHEDULED|MANUAL`)
@@ -69,7 +98,7 @@ POST /children/{childId}/commands/{requestId}/ack
 
 ---
 
-## 4. 안드로이드 제약 (기획·백엔드 공유 필요)
+## 5. 안드로이드 제약 (기획·백엔드 공유 필요)
 
 1. **MediaProjection 토큰은 저장할 수 없다.** 안드로이드는 화면 녹화를 매번 사용자 동의로만 허용한다.
    따라서 「부모 요청 → 자동 캡처」는 불가능하고, 반드시 **자녀가 알림을 눌러 동의**해야 한다.
@@ -83,7 +112,7 @@ POST /children/{childId}/commands/{requestId}/ack
 
 ---
 
-## 5. 서버 없이 테스트하기
+## 6. 서버 없이 테스트하기
 
 디버그 빌드(`USE_MOCK=true`)에서 자녀 계정으로 로그인 후
 **서비스 현황 탭 → 「요청 테스트 (개발용)」** 카드의 버튼을 누르면

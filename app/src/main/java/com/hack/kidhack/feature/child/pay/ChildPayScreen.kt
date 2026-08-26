@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
@@ -41,6 +42,7 @@ import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.domain.model.AllowanceType
 import com.hack.kidhack.feature.child.components.ChildScreenScaffold
 import org.koin.androidx.compose.koinViewModel
 
@@ -49,8 +51,8 @@ private val QUICK_AMOUNTS = listOf(1_000, 3_000, 5_000, 10_000)
 /**
  * 마이페이지 › 루키즈 페이 (자녀 모드).
  *
- * 자녀는 **잔액 한도 안에서 QR 결제만** 할 수 있다.
- * 용돈 보내기·회수는 부모 모드 기능이라 이 화면에 존재하지 않는다.
+ * 잔액은 부모가 「용돈 보내기」로 채워 준 금액에서 「회수하기」를 뺀 값이다.
+ * 자녀는 그 한도 안에서 **QR 결제만** 할 수 있고, 보내기·회수 UI 는 여기 없다.
  */
 @Composable
 fun ChildPayScreen(
@@ -60,6 +62,11 @@ fun ChildPayScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
     val context = LocalContext.current
+
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
 
     LaunchedEffect(state.message, state.error) {
         val text = state.message ?: state.error
@@ -267,6 +274,15 @@ fun ChildPayScreen(
                         .padding(vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Text(
+                        text = when (item.type) {
+                            AllowanceType.SEND -> "💰"
+                            AllowanceType.WITHDRAW -> "↩️"
+                            AllowanceType.PAYMENT -> "🧾"
+                        },
+                        fontSize = 18.sp,
+                    )
+                    Spacer(Modifier.size(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = item.description,
@@ -278,8 +294,8 @@ fun ChildPayScreen(
                         Text(text = item.dateLabel, color = colors.muted, fontSize = 12.sp)
                     }
                     Text(
-                        text = signedPoint(item.point),
-                        color = if (item.point >= 0) colors.safe else colors.danger,
+                        text = signedPoint(item.amount),
+                        color = if (item.amount >= 0) colors.safe else colors.danger,
                         fontFamily = KidhackFontFamily,
                         fontWeight = FontBlack,
                         fontSize = 14.sp,

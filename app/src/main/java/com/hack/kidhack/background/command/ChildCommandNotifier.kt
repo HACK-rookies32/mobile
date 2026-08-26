@@ -14,6 +14,7 @@ import com.hack.kidhack.background.ChildNotifications
 import com.hack.kidhack.background.capture.MediaProjectionRequestActivity
 import com.hack.kidhack.background.capture.ScreenCaptureService
 import com.hack.kidhack.background.capture.ScreenCaptureWorker
+import com.hack.kidhack.core.common.KoreanParticles
 import com.hack.kidhack.core.permission.KidhackPermissions
 import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.RemoteCommandType
@@ -30,8 +31,10 @@ class ChildCommandNotifier(private val context: Context) {
         if (!canPostNotifications()) return
         ChildNotifications.ensureChannel(context)
 
-        val who = command.requestedBy?.takeIf { it.isNotBlank() }
-            ?: context.getString(R.string.child_request_default_sender)
+        val who = KoreanParticles.subject(
+            command.requestedBy?.takeIf { it.isNotBlank() }
+                ?: context.getString(R.string.child_request_default_sender),
+        )
         val title = when (command.type) {
             RemoteCommandType.SCREEN_CAPTURE -> context.getString(R.string.child_request_capture_title)
             RemoteCommandType.CAMERA_SHOT -> context.getString(R.string.child_request_camera_title)

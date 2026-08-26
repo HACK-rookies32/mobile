@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -20,9 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
@@ -36,6 +40,7 @@ import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.feature.child.components.ChildScreenScaffold
+import com.hack.kidhack.feature.child.components.RetryCard
 import com.hack.kidhack.feature.child.formatDurationSec
 import org.koin.androidx.compose.koinViewModel
 
@@ -45,6 +50,20 @@ fun ChildServicesScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
+    val context = LocalContext.current
+
+    // 접근성·사용정보 접근은 일반 권한 다이얼로그로 못 받고 설정 화면으로 보내야 한다.
+    val openSettings: (String) -> Unit = { action ->
+        runCatching {
+            context.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
+    // 권한·GPS 는 설정에서 바뀔 수 있으므로 탭 복귀 때마다 실제 상태를 다시 읽는다.
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
 
     ChildScreenScaffold(
         header = {
@@ -62,8 +81,62 @@ fun ChildServicesScreen(
             )
         },
     ) {
+        val loadError = state.error
+        if (loadError != null) {
+            RetryCard(message = loadError, onRetry = viewModel::refresh)
+        }
+
         KidCard {
-            ServiceHeader("📍", stringResource(R.string.child_services_location), stringResource(R.string.child_services_location_desc))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🔔", fontSize = 20.sp)
+                Spacer(Modifier.size(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.child_services_push_title),
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 14.sp,
+                        color = colors.text,
+                    )
+                    Text(
+                        text = stringResource(
+                            if (state.pushConnected) {
+                                R.string.child_services_push_on_desc
+                            } else {
+                                R.string.child_services_push_off_desc
+                            },
+                        ),
+                        color = colors.muted,
+                        fontSize = 12.sp,
+                    )
+                }
+                Text(
+                    text = stringResource(
+                        if (state.pushConnected) {
+                            R.string.child_services_push_on
+                        } else {
+                            R.string.child_services_push_off
+                        },
+                    ),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (state.pushConnected) Color(0xFFF0FDF4) else colors.surface)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    color = if (state.pushConnected) colors.safe else colors.warn,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 12.sp,
+                )
+            }
+        }
+
+        KidCard {
+            ServiceHeader(
+                emoji = "📍",
+                title = stringResource(R.string.child_services_location),
+                subtitle = stringResource(R.string.child_services_location_desc),
+                active = state.locationGranted && state.gpsEnabled,
+            )
             Spacer(Modifier.height(12.dp))
             Box(
                 modifier = Modifier
@@ -106,18 +179,27 @@ fun ChildServicesScreen(
             Spacer(Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = stringResource(R.string.child_services_updated),
+                    text = if (state.locationUpdatedAt.isBlank()) {
+                        stringResource(R.string.child_services_updated_unknown)
+                    } else {
+                        stringResource(R.string.child_services_updated_at, state.locationUpdatedAt)
+                    },
                     modifier = Modifier.weight(1f),
                     color = colors.muted,
                     fontFamily = KidhackFontFamily,
                     fontWeight = FontSemibold,
                     fontSize = 12.sp,
                 )
+                val gpsOn = state.locationGranted && state.gpsEnabled
                 Text(
                     text = stringResource(
-                        if (state.gpsEnabled) R.string.child_services_gps_on else R.string.child_services_gps_off,
+                        when {
+                            gpsOn -> R.string.child_services_gps_on
+                            !state.locationGranted -> R.string.child_services_location_denied
+                            else -> R.string.child_services_gps_off
+                        },
                     ),
-                    color = colors.brand,
+                    color = if (gpsOn) colors.safe else colors.warn,
                     fontFamily = KidhackFontFamily,
                     fontWeight = FontBold,
                     fontSize = 12.sp,
@@ -126,7 +208,13 @@ fun ChildServicesScreen(
         }
 
         KidCard {
-            ServiceHeader("⏰", stringResource(R.string.child_services_limits), stringResource(R.string.child_services_limits_desc))
+            // 취침 모드·스크린타임 제한은 기기에서 강제되지 않는다(GAP-12).
+            // 「실행 중」이라고 표시하면 거짓말이 되므로 배지를 달지 않는다.
+            ServiceHeader(
+                emoji = "⏰",
+                title = stringResource(R.string.child_services_limits),
+                subtitle = stringResource(R.string.child_services_limits_desc),
+            )
             LimitRow("⏱️", stringResource(R.string.child_services_screentime_limit), stringResource(R.string.child_services_screentime_value))
             LimitRow("🌙", stringResource(R.string.child_services_bedtime), stringResource(R.string.child_services_bedtime_value))
             LimitRow("✅", stringResource(R.string.child_services_status), stringResource(R.string.child_services_available), showDivider = false)
@@ -139,7 +227,12 @@ fun ChildServicesScreen(
         }
 
         KidCard {
-            ServiceHeader("🚫", stringResource(R.string.child_services_harmful), stringResource(R.string.child_services_harmful_desc))
+            ServiceHeader(
+                emoji = "🚫",
+                title = stringResource(R.string.child_services_harmful),
+                subtitle = stringResource(R.string.child_services_harmful_desc),
+                active = state.harmfulBlockEnabled,
+            )
             Spacer(Modifier.height(8.dp))
             val cats = listOf(
                 R.string.child_services_cat_adult,
@@ -157,11 +250,13 @@ fun ChildServicesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFF0FDF4))
+                                .background(
+                                    if (state.harmfulBlockEnabled) Color(0xFFF0FDF4) else colors.surface,
+                                )
                                 .padding(10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("✅", fontSize = 14.sp)
+                            Text(if (state.harmfulBlockEnabled) "✅" else "⚪", fontSize = 14.sp)
                             Spacer(Modifier.size(8.dp))
                             Text(
                                 text = stringResource(res),
@@ -178,17 +273,65 @@ fun ChildServicesScreen(
             HorizontalDivider(color = colors.border)
             Spacer(Modifier.height(12.dp))
             Text(
-                text = stringResource(R.string.child_services_blocked_today, state.blockedToday),
+                text = if (state.harmfulBlockEnabled) {
+                    stringResource(R.string.child_services_blocked_today, state.blockedToday)
+                } else {
+                    stringResource(R.string.child_services_harmful_off)
+                },
                 color = colors.muted,
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontSemibold,
                 fontSize = 12.sp,
             )
+            if (!state.harmfulBlockEnabled) {
+                Spacer(Modifier.height(12.dp))
+                KidButton(
+                    text = stringResource(R.string.child_services_harmful_enable),
+                    onClick = { openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS) },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = KidButtonVariant.Secondary,
+                )
+            }
         }
 
         KidCard {
-            ServiceHeader("📊", stringResource(R.string.child_services_usage), stringResource(R.string.child_services_usage_desc))
+            ServiceHeader(
+                emoji = "📊",
+                title = stringResource(R.string.child_services_usage),
+                subtitle = stringResource(R.string.child_services_usage_desc),
+                active = state.usageAccessGranted,
+            )
             Spacer(Modifier.height(8.dp))
+            if (!state.usageAccessGranted) {
+                Text(
+                    text = stringResource(R.string.child_services_usage_no_access),
+                    color = colors.warn,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontSemibold,
+                    fontSize = 12.sp,
+                )
+                Spacer(Modifier.height(8.dp))
+                KidButton(
+                    text = stringResource(R.string.child_services_usage_enable),
+                    onClick = { openSettings(Settings.ACTION_USAGE_ACCESS_SETTINGS) },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = KidButtonVariant.Secondary,
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+            if (state.usages.isEmpty()) {
+                Text(
+                    text = stringResource(
+                        if (state.loading) R.string.child_services_loading
+                        else R.string.child_services_usage_empty,
+                    ),
+                    color = colors.muted,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontSemibold,
+                    fontSize = 12.sp,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
             val max = state.usages.maxOfOrNull { it.durationSec }?.coerceAtLeast(1) ?: 1
             state.usages.forEach { usage ->
                 UsageBar(
@@ -208,6 +351,15 @@ fun ChildServicesScreen(
                 fontWeight = FontSemibold,
                 fontSize = 12.sp,
             )
+            if (state.usages.isNotEmpty() && !state.usageFromDevice) {
+                Text(
+                    text = stringResource(R.string.child_services_usage_sample),
+                    color = colors.warn,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontSemibold,
+                    fontSize = 12.sp,
+                )
+            }
         }
 
         if (state.simulationAvailable) {
@@ -238,7 +390,18 @@ fun ChildServicesScreen(
 }
 
 @Composable
-private fun ServiceHeader(emoji: String, title: String, subtitle: String) {
+private fun ServiceHeader(
+    emoji: String,
+    title: String,
+    subtitle: String,
+    /**
+     * 실제 동작 여부. null 이면 배지를 그리지 않는다.
+     *
+     * 예전에는 이 배지가 하드코딩이라 접근성이 꺼져 있어도 「실행 중」으로 보였고,
+     * 같은 카드 안에서 「차단 기능 켜기」 버튼과 모순됐다.
+     */
+    active: Boolean? = null,
+) {
     val colors = LocalKidhackColors.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
@@ -261,17 +424,21 @@ private fun ServiceHeader(emoji: String, title: String, subtitle: String) {
             )
             Text(text = subtitle, color = colors.muted, fontSize = 12.sp)
         }
-        Text(
-            text = stringResource(R.string.child_services_running),
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFFF0FDF4))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            color = colors.safe,
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 12.sp,
-        )
+        if (active != null) {
+            Text(
+                text = stringResource(
+                    if (active) R.string.child_services_running else R.string.child_services_stopped,
+                ),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (active) Color(0xFFF0FDF4) else colors.surface)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                color = if (active) colors.safe else colors.muted,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 12.sp,
+            )
+        }
     }
 }
 

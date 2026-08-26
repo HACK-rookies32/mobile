@@ -30,6 +30,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.R
 import com.hack.kidhack.background.capture.MediaProjectionRequestActivity
+import com.hack.kidhack.core.common.KoreanParticles
 import com.hack.kidhack.background.capture.ScreenCaptureService
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidCard
@@ -38,6 +39,7 @@ import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.feature.child.components.ChildScreenScaffold
+import com.hack.kidhack.feature.child.components.RetryCard
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -103,8 +105,10 @@ fun ChildScreenshotScreen(
                     Text(
                         text = stringResource(
                             R.string.child_screenshot_banner_body_from,
-                            state.requestedBy?.takeIf { it.isNotBlank() }
-                                ?: stringResource(R.string.child_request_default_sender),
+                            KoreanParticles.subject(
+                                state.requestedBy?.takeIf { it.isNotBlank() }
+                                    ?: stringResource(R.string.child_request_default_sender),
+                            ),
                         ),
                         color = colors.muted,
                         fontSize = 12.sp,
@@ -164,6 +168,33 @@ fun ChildScreenshotScreen(
             fontSize = 14.sp,
             color = colors.text,
         )
+        val loadError = state.error
+        if (loadError != null) {
+            RetryCard(message = loadError, onRetry = viewModel::refresh)
+        }
+        if (loadError == null && state.items.isEmpty() && !state.loading) {
+            KidCard {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("📭", fontSize = 32.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.child_screenshot_empty),
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 14.sp,
+                        color = colors.text,
+                    )
+                    Text(
+                        text = stringResource(R.string.child_screenshot_empty_hint),
+                        color = colors.muted,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+        }
         state.items.forEach { item ->
             KidCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
