@@ -32,6 +32,8 @@ fun KidTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     enabled: Boolean = true,
     isError: Boolean = false,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
     supportingText: String? = null,
 ) {
     val colors = LocalKidhackColors.current
@@ -65,7 +67,8 @@ fun KidTextField(
             },
             visualTransformation = visualTransformation,
             keyboardOptions = keyboardOptions,
-            singleLine = true,
+            singleLine = singleLine,
+            minLines = minLines,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = colors.surface,

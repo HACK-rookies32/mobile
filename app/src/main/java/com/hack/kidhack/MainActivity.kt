@@ -11,20 +11,33 @@ import com.hack.kidhack.core.designsystem.theme.KidhackTheme
 import com.hack.kidhack.data.repository.toRemoteCommandType
 import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.RemoteCommandType
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.hack.kidhack.core.designsystem.theme.KidhackTheme
+import com.hack.kidhack.core.permission.PermissionRequester
 import com.hack.kidhack.navigation.KidhackNavHost
 import org.koin.android.ext.android.inject
+
+val LocalPermissionRequester = staticCompositionLocalOf<PermissionRequester> {
+    error("PermissionRequester not provided")
+}
 
 class MainActivity : ComponentActivity() {
 
     private val commandBus: ChildCommandBus by inject()
+    /** Registered before STARTED so system permission dialogs can be shown reliably. */
+    val permissionRequester = PermissionRequester(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         routeRemoteCommand(intent)
         setContent {
-            KidhackTheme {
-                KidhackNavHost()
+            CompositionLocalProvider(LocalPermissionRequester provides permissionRequester) {
+                KidhackTheme {
+                    KidhackNavHost()
+                }
             }
         }
     }
@@ -57,3 +70,6 @@ class MainActivity : ComponentActivity() {
         intent.action = null
     }
 }
+
+@Composable
+fun permissionRequester(): PermissionRequester = LocalPermissionRequester.current

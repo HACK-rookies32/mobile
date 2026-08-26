@@ -5,22 +5,39 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -33,9 +50,11 @@ import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.KidSwitch
 import com.hack.kidhack.core.designsystem.component.KidTextField
 import com.hack.kidhack.core.designsystem.theme.FontBold
+import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.AppControlItem
+import com.hack.kidhack.domain.model.InstalledApp
 import com.hack.kidhack.domain.repository.AppControlRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
@@ -50,9 +69,11 @@ enum class AppControlFilter { ALL, BLOCKED, ALLOWED, LIMITED }
 
 data class AppControlUiState(
     val items: List<AppControlItem> = emptyList(),
+    val installedApps: List<InstalledApp> = emptyList(),
+    val selectedApp: InstalledApp? = null,
     val filter: AppControlFilter = AppControlFilter.ALL,
-    val adding: Boolean = false,
-    val newName: String = "",
+    val showAppSelection: Boolean = false,
+    val showControlSettings: Boolean = false,
     val loading: Boolean = true,
     val error: String? = null,
 )
@@ -69,8 +90,19 @@ class AppControlViewModel(
     init { load() }
 
     fun onFilter(f: AppControlFilter) = _state.update { it.copy(filter = f) }
-    fun onNewName(v: String) = _state.update { it.copy(newName = v) }
-    fun toggleAdding() = _state.update { it.copy(adding = !it.adding) }
+    
+    fun toggleAppSelection(show: Boolean) {
+        _state.update { it.copy(showAppSelection = show) }
+        if (show) loadInstalledApps()
+    }
+
+    fun selectAppForControl(app: InstalledApp) {
+        _state.update { it.copy(selectedApp = app, showAppSelection = false, showControlSettings = true) }
+    }
+
+    fun closeControlSettings() {
+        _state.update { it.copy(showControlSettings = false, selectedApp = null) }
+    }
 
     fun load() {
         viewModelScope.launch {
@@ -86,25 +118,61 @@ class AppControlViewModel(
         }
     }
 
-    fun toggle(name: String, blocked: Boolean) {
-        _state.update { s ->
-            s.copy(items = s.items.map { if (it.name == name) it.copy(blocked = blocked, limit = if (blocked) "차단" else it.limit) else it })
+    private fun loadInstalledApps() {
+        viewModelScope.launch {
+            runCatching {
+                val id = selectedChildRepository.current() ?: return@runCatching emptyList()
+                appControlRepository.getInstalledApps(id)
+            }.onSuccess { apps ->
+                _state.update { it.copy(installedApps = apps) }
+            }
         }
     }
 
-    fun addApp() {
-        val name = _state.value.newName.trim()
-        if (name.isBlank()) return
-        _state.update {
-            it.copy(
-                items = it.items + AppControlItem(name, "📱", "기타", false, "무제한"),
-                newName = "",
-                adding = false,
-            )
+    fun toggle(item: AppControlItem, blocked: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                val id = selectedChildRepository.current() ?: return@launch
+                appControlRepository.updateAppControl(id, item.packageName, blocked, item.limitMinutes)
+            }.onSuccess { updated ->
+                _state.update { s ->
+                    s.copy(items = s.items.map { if (it.packageName == updated.packageName) updated else it })
+                }
+            }
+        }
+    }
+
+    fun saveControl(blocked: Boolean, limitMinutes: Int?) {
+        val app = _state.value.selectedApp ?: return
+        viewModelScope.launch {
+            runCatching {
+                val id = selectedChildRepository.current() ?: return@launch
+                appControlRepository.updateAppControl(id, app.packageName, blocked, limitMinutes)
+            }.onSuccess { newItem ->
+                _state.update { s ->
+                    s.copy(
+                        items = (s.items.filterNot { it.packageName == newItem.packageName } + newItem),
+                        showControlSettings = false,
+                        selectedApp = null
+                    )
+                }
+            }
+        }
+    }
+
+    fun removeControl(packageName: String) {
+        viewModelScope.launch {
+            runCatching {
+                val id = selectedChildRepository.current() ?: return@launch
+                appControlRepository.deleteAppControl(id, packageName)
+            }.onSuccess {
+                _state.update { s -> s.copy(items = s.items.filterNot { it.packageName == packageName }) }
+            }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParentAppControlScreen(
     onBack: () -> Unit = {},
@@ -116,8 +184,8 @@ fun ParentAppControlScreen(
         when (state.filter) {
             AppControlFilter.ALL -> true
             AppControlFilter.BLOCKED -> item.blocked
-            AppControlFilter.ALLOWED -> !item.blocked && (item.limit.isBlank() || item.limit == "무제한")
-            AppControlFilter.LIMITED -> !item.blocked && item.limit.isNotBlank() && item.limit != "무제한" && item.limit != "차단"
+            AppControlFilter.ALLOWED -> !item.blocked && (item.limit == "무제한")
+            AppControlFilter.LIMITED -> !item.blocked && item.limit != "무제한" && item.limit != "차단"
         }
     }
 
@@ -134,6 +202,7 @@ fun ParentAppControlScreen(
         },
     ) {
         ParentLoadingOrError(state.loading && state.items.isEmpty(), state.error, viewModel::load)
+        
         filtered.forEach { app ->
             KidCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -141,12 +210,12 @@ fun ParentAppControlScreen(
                         Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(colors.surface),
                         contentAlignment = Alignment.Center,
                     ) { Text(app.icon, fontSize = 20.sp) }
-                    Spacer(Modifier.size(12.dp))
-                    androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
                         Text(app.name, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
                         Text(app.category, color = colors.muted, fontSize = 12.sp)
                     }
-                    if (!app.blocked && app.limit.isNotBlank()) {
+                    if (!app.blocked && app.limit != "무제한") {
                         Text(
                             app.limit,
                             modifier = Modifier
@@ -158,29 +227,113 @@ fun ParentAppControlScreen(
                             fontWeight = FontBold,
                             fontSize = 12.sp,
                         )
-                        Spacer(Modifier.size(8.dp))
+                        Spacer(Modifier.width(8.dp))
                     }
                     KidSwitch(
                         checked = !app.blocked,
-                        onCheckedChange = { viewModel.toggle(app.name, !it) },
+                        onCheckedChange = { viewModel.toggle(app, !it) },
                         trackColor = if (app.blocked) colors.danger else colors.safe,
                     )
                 }
             }
         }
-        if (state.adding) {
-            KidCard {
-                KidTextField(state.newName, viewModel::onNewName, stringResource(R.string.parent_appcontrol_add_hint))
-                KidButton(stringResource(R.string.parent_appcontrol_add_confirm), viewModel::addApp, Modifier.fillMaxWidth())
+
+        Spacer(Modifier.height(16.dp))
+        KidButton(
+            text = stringResource(R.string.parent_appcontrol_add),
+            onClick = { viewModel.toggleAppSelection(true) },
+            modifier = Modifier.fillMaxWidth(),
+            variant = KidButtonVariant.Secondary,
+        )
+    }
+
+    if (state.showAppSelection) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.toggleAppSelection(false) },
+            sheetState = rememberModalBottomSheetState()
+        ) {
+            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                Text(
+                    text = "통제할 앱 선택",
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 18.sp,
+                    color = colors.text
+                )
+                Spacer(Modifier.height(16.dp))
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(state.installedApps) { app ->
+                        val alreadyAdded = state.items.any { it.packageName == app.packageName }
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (alreadyAdded) colors.surface else Color.Transparent)
+                                .clickable(enabled = !alreadyAdded) { viewModel.selectAppForControl(app) }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("📱", fontSize = 20.sp)
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(app.appName, fontWeight = FontBold, fontSize = 14.sp)
+                                if (alreadyAdded) {
+                                    Text("이미 추가됨", color = colors.brand, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(32.dp))
             }
         }
-        KidButton(
-            stringResource(R.string.parent_appcontrol_add),
-            viewModel::toggleAdding,
-            Modifier.fillMaxWidth(),
-            KidButtonVariant.Secondary,
-        )
-        Spacer(Modifier.height(8.dp))
+    }
+
+    if (state.showControlSettings && state.selectedApp != null) {
+        val app = state.selectedApp!!
+        var isBlocked by remember { mutableStateOf(false) }
+        var limitMinutes by remember { mutableStateOf("") }
+
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.closeControlSettings() },
+            sheetState = rememberModalBottomSheetState()
+        ) {
+            Column(Modifier.fillMaxWidth().padding(24.dp)) {
+                Text(
+                    text = "${app.appName} 설정",
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 20.sp
+                )
+                Spacer(Modifier.height(24.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("앱 차단", Modifier.weight(1f), fontWeight = FontSemibold)
+                    KidSwitch(checked = isBlocked, onCheckedChange = { isBlocked = it })
+                }
+                
+                if (!isBlocked) {
+                    Spacer(Modifier.height(16.dp))
+                    Text("일일 시간 제한 (분)", fontWeight = FontSemibold, fontSize = 14.sp)
+                    Spacer(Modifier.height(8.dp))
+                    KidTextField(
+                        value = limitMinutes,
+                        onValueChange = { if (it.all { c -> c.isDigit() }) limitMinutes = it },
+                        label = "제한 시간(분)",
+                        placeholder = "예: 60",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+
+                Spacer(Modifier.height(32.dp))
+                KidButton(
+                    text = "저장하기",
+                    onClick = { viewModel.saveControl(isBlocked, limitMinutes.toIntOrNull()) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(16.dp))
+            }
+        }
     }
 }
 
@@ -192,7 +345,7 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .clip(RoundedCornerShape(99.dp))
             .background(if (selected) Color.White else Color.White.copy(alpha = 0.2f))
-            .clickableChip(onClick)
+            .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 4.dp),
         color = if (selected) colors.brand else Color.White,
         fontFamily = KidhackFontFamily,
@@ -200,5 +353,3 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
         fontSize = 12.sp,
     )
 }
-
-private fun Modifier.clickableChip(onClick: () -> Unit) = clickable(onClick = onClick)

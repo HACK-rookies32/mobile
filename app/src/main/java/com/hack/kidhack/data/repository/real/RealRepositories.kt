@@ -5,42 +5,57 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
 import com.hack.kidhack.data.remote.api.AllowanceApi
+import com.hack.kidhack.data.remote.api.AppControlApi
 import com.hack.kidhack.data.remote.api.AppUsageApi
 import com.hack.kidhack.data.remote.api.AuthApi
 import com.hack.kidhack.data.remote.api.BlocklistApi
+import com.hack.kidhack.data.remote.api.CardApi
 import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.GeofenceApi
+import com.hack.kidhack.data.remote.api.InquiryApi
 import com.hack.kidhack.data.remote.api.LocationApi
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
 import com.hack.kidhack.data.remote.api.PhotoApi
 import com.hack.kidhack.data.remote.api.PaymentApi
+import com.hack.kidhack.data.remote.api.PaymentChargeApi
 import com.hack.kidhack.data.remote.api.PointApi
 import com.hack.kidhack.data.remote.api.ScreenshotApi
 import com.hack.kidhack.data.remote.api.SubscriptionApi
 import com.hack.kidhack.data.remote.api.UserApi
 import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
+import com.hack.kidhack.data.remote.api.WalletApi
+import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
 import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
+import com.hack.kidhack.data.remote.dto.CardRegisterRequest
+import com.hack.kidhack.data.remote.dto.ChangePasswordRequest
+import com.hack.kidhack.data.remote.dto.ChargeConfirmRequest
+import com.hack.kidhack.data.remote.dto.ChargePrepareRequest
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
+import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
 import com.hack.kidhack.data.remote.dto.GeofenceDto
 import com.hack.kidhack.data.remote.dto.GpsStatusRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
 import com.hack.kidhack.data.remote.dto.LoginRequest
+import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.PairingConnectRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
+import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.SignupRequest
 import com.hack.kidhack.data.remote.dto.SubscribeRequest
+import com.hack.kidhack.data.remote.dto.TransferRequest
+import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UsePointRequest
 import com.hack.kidhack.data.remote.dto.UserUpdateRequest
 import com.hack.kidhack.data.remote.paging.PageResponsePagingSource
@@ -48,7 +63,6 @@ import com.hack.kidhack.data.remote.unwrap
 import com.hack.kidhack.data.remote.unwrapOrNull
 import com.hack.kidhack.data.repository.toDomain
 import com.hack.kidhack.data.repository.toDto
-import com.hack.kidhack.data.repository.toSession
 import com.hack.kidhack.data.ws.ChatWebSocketClient
 import com.hack.kidhack.data.ws.ChatWsEvent
 import com.hack.kidhack.data.ws.ChildCommandSocket
@@ -59,11 +73,13 @@ import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
+import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -76,17 +92,22 @@ import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
+import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AllowanceRepository
+import com.hack.kidhack.domain.model.Wallet
+import com.hack.kidhack.domain.model.WalletTransaction
 import com.hack.kidhack.domain.repository.AppControlRepository
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.AuthRepository
 import com.hack.kidhack.domain.repository.BlocklistRepository
+import com.hack.kidhack.domain.repository.CardRepository
 import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.GeofenceRepository
+import com.hack.kidhack.domain.repository.InquiryRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
@@ -98,6 +119,7 @@ import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
 import com.hack.kidhack.domain.repository.SubscriptionRepository
 import com.hack.kidhack.domain.repository.UserRepository
+import com.hack.kidhack.domain.repository.WalletRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
@@ -115,32 +137,55 @@ import java.time.format.DateTimeFormatter
 
 class RealAuthRepository(
     private val api: AuthApi,
+    private val userApi: UserApi,
     private val sessionRepository: SessionRepository,
     private val sessionEvents: SessionEvents,
 ) : AuthRepository {
     override suspend fun signup(
         loginId: String,
+        username: String,
         password: String,
-        name: String,
-        role: Role,
-        phone: String,
+        nickname: String?,
         email: String?,
-        pairingCode: String?,
+        phoneNumber: String,
+        birthDate: String,
+        address: String?,
+        profileImageUrl: String?,
+        role: Role,
+        parentId: Long?,
     ): Session {
-        val session = api.signup(
-            SignupRequest(loginId, password, name, role.name, phone, email),
-        ).unwrap().toSession()
+        // Signup response has User only (no tokens). Do not auto-login.
+        val user = api.signup(
+            SignupRequest(
+                loginId = loginId,
+                username = username,
+                password = password,
+                nickname = nickname,
+                email = email,
+                phoneNumber = phoneNumber,
+                birthDate = birthDate,
+                address = address,
+                profileImageUrl = profileImageUrl,
+                role = role.name,
+                parentId = parentId,
+            ),
+        ).unwrap().toDomain()
+        val session = Session(
+            accessToken = "",
+            refreshToken = "",
+            user = user.copy(
+                loginId = user.loginId.ifBlank { loginId },
+                name = user.name.ifBlank { username },
+                role = role,
+            ),
+        )
         sessionRepository.save(session)
-        if (role == Role.CHILD && !pairingCode.isNullOrBlank()) {
-            // Pairing requires CHILD JWT; connect is invoked by PairingRepository after signup.
-        }
         return session
     }
 
     override suspend fun login(loginId: String, password: String, preferredRole: Role?): Session {
-        val session = api.login(LoginRequest(loginId, password)).unwrap().toSession()
-        sessionRepository.save(session)
-        return session
+        val login = api.login(LoginRequest(loginId, password)).unwrap()
+        return establishSession(login)
     }
 
     override suspend fun logout() {
@@ -155,12 +200,53 @@ class RealAuthRepository(
     override suspend fun resetPassword(loginId: String, verifyCode: String, newPassword: String) {
         api.resetPassword(ResetPasswordRequest(loginId, verifyCode, newPassword)).unwrapOrNull()
     }
+
+    private suspend fun establishSession(login: LoginResponse): Session {
+        val access = login.resolvedAccessToken()?.takeIf { it.isNotBlank() }
+            ?: error("로그인 토큰이 없습니다")
+        val refresh = login.refreshToken.orEmpty()
+        val loginRole = runCatching { Role.valueOf(login.role.orEmpty()) }.getOrNull()
+        val fromUser = login.user?.toDomain()
+        val placeholder = User(
+            id = fromUser?.id.orEmpty(),
+            loginId = login.loginId?.takeIf { it.isNotBlank() }
+                ?: fromUser?.loginId.orEmpty(),
+            name = login.username?.takeIf { it.isNotBlank() }
+                ?: fromUser?.name.orEmpty(),
+            role = loginRole ?: fromUser?.role ?: Role.PARENT,
+            phone = fromUser?.phone.orEmpty(),
+            email = fromUser?.email,
+            profileImageUrl = fromUser?.profileImageUrl,
+        )
+        sessionRepository.save(Session(access, refresh, placeholder))
+        return try {
+            val me = userApi.me().unwrap().toDomain()
+            val merged = me.copy(
+                loginId = me.loginId.ifBlank { placeholder.loginId },
+                name = me.name.ifBlank { placeholder.name },
+                role = loginRole ?: me.role,
+            )
+            Session(access, refresh, merged).also { sessionRepository.save(it) }
+        } catch (t: Throwable) {
+            sessionRepository.clear()
+            throw t
+        }
+    }
 }
 
 class RealUserRepository(private val api: UserApi) : UserRepository {
     override suspend fun me(): User = api.me().unwrap().toDomain()
-    override suspend fun updateMe(name: String?, phone: String?, email: String?): User =
-        api.updateMe(UserUpdateRequest(name, phone, email)).unwrap().toDomain()
+    override suspend fun updateMe(
+        nickname: String?,
+        name: String?,
+        phone: String?,
+        email: String?,
+        profileImageUrl: String?,
+    ): User =
+        api.updateMe(UserUpdateRequest(nickname, name, phone, email, profileImageUrl)).unwrap().toDomain()
+    override suspend fun changePassword(newPassword: String) {
+        api.changePassword(ChangePasswordRequest(newPassword)).unwrap()
+    }
     override suspend fun deleteMe() { api.deleteMe().unwrapOrNull() }
     override suspend fun notificationSettings(): NotificationSettings =
         api.notificationSettings().unwrap().toDomain()
@@ -183,7 +269,12 @@ class RealChildRepository(private val api: ChildApi) : ChildRepository {
         name: String?,
         alias: String?,
         profileImageUrl: String?,
-    ): ChildProfile = api.update(childId, ChildUpdateRequest(name, alias, profileImageUrl)).unwrap().toDomain()
+        birthDate: String?,
+        school: String?,
+    ): ChildProfile = api.update(
+        childId,
+        ChildUpdateRequest(name, alias, profileImageUrl, birthDate, school)
+    ).unwrap().toDomain()
 }
 
 class RealLocationRepository(private val api: LocationApi) : LocationRepository {
@@ -268,12 +359,79 @@ class RealCommunityRepository(private val api: CommunityApi) : CommunityReposito
         }.flow.map { paging -> paging.map { it.toDomain() } }
     override suspend fun posts(): List<Post> = api.posts(0, 50).unwrap().content.map { it.toDomain() }
     override suspend fun post(postId: String): Post = api.post(postId).unwrap().toDomain()
-    override suspend fun create(title: String, body: String): Post =
-        api.create(CreatePostRequest(title, body)).unwrap().toDomain()
+    override suspend fun create(
+        title: String,
+        body: String,
+        imageUrls: List<String>?,
+        links: List<String>?
+    ): Post =
+        api.create(CreatePostRequest(title, body, imageUrls, links)).unwrap().toDomain()
     override suspend fun like(postId: String) { api.like(postId).unwrapOrNull() }
     override suspend fun comment(postId: String, body: String) {
         api.comment(postId, CommentRequest(body)).unwrapOrNull()
     }
+    override suspend fun reportPost(postId: String, reason: String, detail: String?) {
+        api.reportPost(postId, ReportRequest(reason, detail)).unwrapOrNull()
+    }
+    override suspend fun reportComment(postId: String, commentId: String, reason: String, detail: String?) {
+        api.reportComment(postId, commentId, ReportRequest(reason, detail)).unwrapOrNull()
+    }
+}
+
+class RealInquiryRepository(private val api: InquiryApi) : InquiryRepository {
+    override suspend fun list(): List<Inquiry> =
+        api.getInquiries().unwrap().map { it.toDomain() }
+
+    override suspend fun create(
+        title: String,
+        body: String,
+        imageUrls: List<String>?,
+        links: List<String>?
+    ): Inquiry = api.createInquiry(CreateInquiryRequest(title, body, imageUrls, links)).unwrap().toDomain()
+
+    override suspend fun get(id: String): Inquiry =
+        api.getInquiry(id).unwrap().toDomain()
+}
+
+class RealWalletRepository(
+    private val walletApi: WalletApi,
+    private val chargeApi: PaymentChargeApi
+) : WalletRepository {
+    override suspend fun getMyWallet(): Wallet = walletApi.me().unwrap().toDomain()
+    
+    override suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction> =
+        walletApi.transactions(type = type, page = page).unwrap().content.map { it.toDomain() }
+
+    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult =
+        walletApi.transfer(TransferRequest(childId, amount, memo)).unwrap().toDomain()
+
+    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult =
+        walletApi.reclaim(TransferRequest(childId, amount)).unwrap().toDomain()
+
+    override suspend fun getChildWallet(childId: String): Wallet =
+        walletApi.childWallet(childId).unwrap().toDomain()
+
+    override suspend fun prepareCharge(amount: Int, method: String, cardId: String): com.hack.kidhack.domain.model.Charge =
+        chargeApi.prepare(ChargePrepareRequest(amount, method, cardId)).unwrap().toDomain()
+
+    override suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet =
+        chargeApi.confirm(ChargeConfirmRequest(chargeId, paymentKey, amount)).unwrap().let { resp ->
+            Wallet(walletId = resp.chargeId, balance = resp.walletBalance, updatedAt = "")
+        }
+}
+
+class RealCardRepository(private val api: CardApi) : CardRepository {
+    override suspend fun register(
+        cardNumber: String,
+        expiry: String,
+        cvc: String,
+        cardPassword2: String,
+        birthDate: String,
+        ownerName: String
+    ): Card = api.register(CardRegisterRequest(cardNumber, expiry, cvc, cardPassword2, birthDate, ownerName)).unwrap().toDomain()
+
+    override suspend fun list(): List<Card> = api.list().unwrap().map { it.toDomain() }
+    override suspend fun delete(cardId: String) { api.delete(cardId).unwrapOrNull() }
 }
 
 class RealChatRepository(
@@ -346,13 +504,26 @@ class RealAppUsageRepository(private val api: AppUsageApi) : AppUsageRepository 
     }
 }
 
-class RealAppControlRepository : AppControlRepository {
+class RealAppControlRepository(private val api: AppControlApi) : AppControlRepository {
     override suspend fun items(childId: String): List<AppControlItem> =
-        FakeLocalAppControl.items
-}
+        api.getAppControlList(childId).unwrap().map { it.toDomain() }
 
-private object FakeLocalAppControl {
-    val items = emptyList<AppControlItem>()
+    override suspend fun getInstalledApps(childId: String): List<com.hack.kidhack.domain.model.InstalledApp> =
+        api.getInstalledApps(childId).unwrap().apps.map { it.toDomain() }
+
+    override suspend fun updateAppControl(
+        childId: String,
+        packageName: String,
+        blocked: Boolean,
+        limitMinutes: Int?
+    ): AppControlItem = api.updateAppControl(
+        childId,
+        AppControlUpdateRequest(packageName, blocked, limitMinutes)
+    ).unwrap().toDomain()
+
+    override suspend fun deleteAppControl(childId: String, packageName: String) {
+        api.deleteAppControl(childId, packageName).unwrapOrNull()
+    }
 }
 
 class RealPhotoRepository(private val api: PhotoApi) : PhotoRepository {

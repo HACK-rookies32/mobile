@@ -1,7 +1,11 @@
 package com.hack.kidhack.navigation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -36,6 +40,7 @@ import com.hack.kidhack.feature.child.onboarding.ChildStartRoute
 import com.hack.kidhack.feature.child.screenshot.ChildScreenshotScreen
 import com.hack.kidhack.feature.child.services.ChildServicesScreen
 import com.hack.kidhack.feature.parent.ParentAppControlScreen
+import com.hack.kidhack.feature.parent.ParentCardsScreen
 import com.hack.kidhack.feature.parent.ParentChatScreen
 import com.hack.kidhack.feature.parent.ParentChildProfileScreen
 import com.hack.kidhack.feature.parent.ParentCommunityDetailScreen
@@ -43,6 +48,7 @@ import com.hack.kidhack.feature.parent.ParentCommunityScreen
 import com.hack.kidhack.feature.parent.ParentCommunityWriteScreen
 import com.hack.kidhack.feature.parent.ParentContactScreen
 import com.hack.kidhack.feature.parent.ParentDashboardScreen
+import com.hack.kidhack.feature.parent.ParentEditProfileScreen
 import com.hack.kidhack.feature.parent.ParentGeofenceScreen
 import com.hack.kidhack.feature.parent.ParentHarmfulScreen
 import com.hack.kidhack.feature.parent.ParentLocationScreen
@@ -89,9 +95,12 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
             ParentLocationScreen(onOpenGeofence = { navController.navigate(Route.ParentGeofence.path) })
         }
         parentTab(Route.ParentChat.path, navController) { ParentChatScreen() }
-        parentTab(Route.ParentNotifications.path, navController) { ParentNotificationsScreen() }
+        parentTab(Route.ParentNotifications.path, navController) { 
+            ParentNotificationsScreen(onBack = { navController.popBackStack() }) 
+        }
         parentTab(Route.ParentMypage.path, navController) {
             ParentMypageScreen(
+                onOpenEditProfile = { navController.navigate(Route.ParentEditProfile.path) },
                 onOpenNotifications = { navController.navigate(Route.ParentNotifications.path) },
                 onOpenAppControl = { navController.navigate(Route.ParentAppControl.path) },
                 onOpenScreenshot = { navController.navigate(Route.ParentScreenshot.path) },
@@ -102,8 +111,10 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 onOpenNotice = { navController.navigate(Route.ParentNotice.path) },
                 onOpenContact = { navController.navigate(Route.ParentContact.path) },
                 onOpenPay = { navController.navigate(Route.ParentPay.path) },
+                onOpenCards = { navController.navigate(Route.ParentCards.path) },
             )
         }
+        composable(Route.ParentEditProfile.path) { ParentShell(navController) { ParentEditProfileScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentAppControl.path) { ParentShell(navController) { ParentAppControlScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentScreenshot.path) { ParentShell(navController) { ParentScreenshotScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentChildProfile.path) { ParentShell(navController) { ParentChildProfileScreen(onBack = { navController.popBackStack() }) } }
@@ -144,7 +155,15 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
         }
         composable(Route.ParentNotice.path) { ParentShell(navController) { ParentNoticeScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentContact.path) { ParentShell(navController) { ParentContactScreen(onBack = { navController.popBackStack() }) } }
-        composable(Route.ParentPay.path) { ParentShell(navController) { ParentPayScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentPay.path) {
+            ParentShell(navController) {
+                ParentPayScreen(
+                    onBack = { navController.popBackStack() },
+                    onRegisterCard = { navController.navigate(Route.ParentCards.path) },
+                )
+            }
+        }
+        composable(Route.ParentCards.path) { ParentShell(navController) { ParentCardsScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentGeofence.path) { ParentShell(navController) { ParentGeofenceScreen(onBack = { navController.popBackStack() }) } }
     }
 }
@@ -297,6 +316,10 @@ private fun TabShell(
     val currentRoute = navBackStackEntry?.destination?.route?.substringBefore('?')
     val showBar = tabs.any { it.route.path == currentRoute }
     Scaffold(
+        // 상단 인셋은 BrandGradientHeader가 statusBarsPadding()으로 직접 처리한다.
+        // 여기서 함께 넘기면 상태바 높이가 두 번 쌓여 헤더 제목이 아래로 밀린다.
+        contentWindowInsets = WindowInsets.systemBars
+            .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
         bottomBar = {
             if (showBar) {
                 NavigationBar(containerColor = colors.card, contentColor = colors.muted) {

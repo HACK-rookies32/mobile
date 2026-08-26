@@ -7,10 +7,20 @@ import com.hack.kidhack.data.remote.dto.AllowanceEntryDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
+import com.hack.kidhack.data.remote.dto.AppControlDto
+import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
 import com.hack.kidhack.data.remote.dto.AppUsageDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.BlocklistResponse
+import com.hack.kidhack.data.remote.dto.CardDto
+import com.hack.kidhack.data.remote.dto.CardRegisterRequest
+import com.hack.kidhack.data.remote.dto.ChangePasswordRequest
+import com.hack.kidhack.data.remote.dto.ChargeCancelRequest
+import com.hack.kidhack.data.remote.dto.ChargeConfirmRequest
+import com.hack.kidhack.data.remote.dto.ChargeConfirmResponse
+import com.hack.kidhack.data.remote.dto.ChargePrepareRequest
+import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
@@ -18,14 +28,19 @@ import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
+import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
 import com.hack.kidhack.data.remote.dto.FindIdResponse
 import com.hack.kidhack.data.remote.dto.GeofenceDto
 import com.hack.kidhack.data.remote.dto.GpsStatusRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
+import com.hack.kidhack.data.remote.dto.InquiryDto
+import com.hack.kidhack.data.remote.dto.InstalledAppDto
+import com.hack.kidhack.data.remote.dto.InstalledAppsResponse
 import com.hack.kidhack.data.remote.dto.LocationDto
 import com.hack.kidhack.data.remote.dto.LoginRequest
+import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.NotificationDto
 import com.hack.kidhack.data.remote.dto.NotificationSettingsDto
 import com.hack.kidhack.data.remote.dto.PairingCodeDto
@@ -37,15 +52,21 @@ import com.hack.kidhack.data.remote.dto.PostDto
 import com.hack.kidhack.data.remote.dto.RefreshRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandDto
+import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SignupRequest
 import com.hack.kidhack.data.remote.dto.SubscribeRequest
 import com.hack.kidhack.data.remote.dto.SubscriptionDto
+import com.hack.kidhack.data.remote.dto.UsePointRequest
 import com.hack.kidhack.data.remote.dto.TokenResponse
+import com.hack.kidhack.data.remote.dto.TransferRequest
+import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UsePointRequest
 import com.hack.kidhack.data.remote.dto.UserDto
 import com.hack.kidhack.data.remote.dto.UserUpdateRequest
+import com.hack.kidhack.data.remote.dto.WalletDto
+import com.hack.kidhack.data.remote.dto.WalletTransactionDto
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
@@ -60,16 +81,16 @@ import retrofit2.http.Query
 
 interface AuthApi {
     @POST("auth/signup")
-    suspend fun signup(@Body body: SignupRequest): ApiEnvelope<TokenResponse>
+    suspend fun signup(@Body body: SignupRequest): ApiEnvelope<UserDto>
 
     @POST("auth/login")
-    suspend fun login(@Body body: LoginRequest): ApiEnvelope<TokenResponse>
+    suspend fun login(@Body body: LoginRequest): ApiEnvelope<LoginResponse>
 
     @POST("auth/logout")
     suspend fun logout(): ApiEnvelope<Unit>
 
     @POST("auth/token/refresh")
-    suspend fun refresh(@Body body: RefreshRequest): ApiEnvelope<TokenResponse>
+    suspend fun refresh(@Body body: RefreshRequest): ApiEnvelope<LoginResponse>
 
     @POST("auth/find-id")
     suspend fun findId(@Body body: FindIdRequest): ApiEnvelope<FindIdResponse>
@@ -84,6 +105,9 @@ interface UserApi {
 
     @PATCH("users/me")
     suspend fun updateMe(@Body body: UserUpdateRequest): ApiEnvelope<UserDto>
+
+    @PATCH("users/me/password")
+    suspend fun changePassword(@Body body: ChangePasswordRequest): ApiEnvelope<Unit>
 
     @DELETE("users/me")
     suspend fun deleteMe(): ApiEnvelope<Unit>
@@ -241,6 +265,19 @@ interface CommunityApi {
     @POST("community/posts/{postId}/like")
     suspend fun like(@Path("postId") postId: String): ApiEnvelope<Unit>
 
+    @POST("community/posts/{postId}/report")
+    suspend fun reportPost(
+        @Path("postId") postId: String,
+        @Body body: ReportRequest,
+    ): ApiEnvelope<Unit>
+
+    @POST("community/posts/{postId}/comments/{commentId}/report")
+    suspend fun reportComment(
+        @Path("postId") postId: String,
+        @Path("commentId") commentId: String,
+        @Body body: ReportRequest,
+    ): ApiEnvelope<Unit>
+
     @Multipart
     @POST("community/attachments")
     suspend fun uploadAttachment(@Part file: MultipartBody.Part): ApiEnvelope<Unit>
@@ -370,4 +407,87 @@ interface AllowanceApi {
         @Path("childId") childId: String,
         @Body body: AllowancePaymentRequest,
     ): ApiEnvelope<AllowancePaymentDto>
+interface AppControlApi {
+    @GET("children/{childId}/installed-apps")
+    suspend fun getInstalledApps(@Path("childId") childId: String): ApiEnvelope<InstalledAppsResponse>
+
+    @GET("children/{childId}/app-control")
+    suspend fun getAppControlList(@Path("childId") childId: String): ApiEnvelope<List<AppControlDto>>
+
+    @POST("children/{childId}/app-control")
+    suspend fun updateAppControl(
+        @Path("childId") childId: String,
+        @Body body: AppControlUpdateRequest,
+    ): ApiEnvelope<AppControlDto>
+
+    @DELETE("children/{childId}/app-control/{packageName}")
+    suspend fun deleteAppControl(
+        @Path("childId") childId: String,
+        @Path("packageName") packageName: String,
+    ): ApiEnvelope<Unit>
+}
+
+interface InquiryApi {
+    @GET("inquiries")
+    suspend fun getInquiries(): ApiEnvelope<List<InquiryDto>>
+
+    @POST("inquiries")
+    suspend fun createInquiry(@Body body: CreateInquiryRequest): ApiEnvelope<InquiryDto>
+
+    @GET("inquiries/{id}")
+    suspend fun getInquiry(@Path("id") id: String): ApiEnvelope<InquiryDto>
+}
+
+interface PaymentChargeApi {
+    @POST("payments/charge/prepare")
+    suspend fun prepare(@Body body: ChargePrepareRequest): ApiEnvelope<ChargePrepareResponse>
+
+    @POST("payments/charge/confirm")
+    suspend fun confirm(@Body body: ChargeConfirmRequest): ApiEnvelope<ChargeConfirmResponse>
+
+    @GET("payments/charges")
+    suspend fun list(
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20
+    ): ApiEnvelope<PageResponse<ChargePrepareResponse>>
+
+    @GET("payments/charges/{chargeId}")
+    suspend fun get(@Path("chargeId") chargeId: String): ApiEnvelope<ChargePrepareResponse>
+
+    @POST("payments/charges/{chargeId}/cancel")
+    suspend fun cancel(@Path("chargeId") chargeId: String, @Body body: ChargeCancelRequest): ApiEnvelope<Unit>
+}
+
+interface WalletApi {
+    @GET("wallets/me")
+    suspend fun me(): ApiEnvelope<WalletDto>
+
+    @GET("wallets/me/transactions")
+    suspend fun transactions(
+        @Query("type") type: String? = null,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20
+    ): ApiEnvelope<PageResponse<WalletTransactionDto>>
+
+    @POST("wallets/transfer")
+    suspend fun transfer(@Body body: TransferRequest): ApiEnvelope<TransferResponse>
+
+    @POST("wallets/reclaim")
+    suspend fun reclaim(@Body body: TransferRequest): ApiEnvelope<TransferResponse>
+
+    @GET("children/{childId}/wallet")
+    suspend fun childWallet(@Path("childId") childId: String): ApiEnvelope<WalletDto>
+}
+
+interface CardApi {
+    @POST("payments/cards")
+    suspend fun register(@Body body: CardRegisterRequest): ApiEnvelope<CardDto>
+
+    @GET("payments/cards")
+    suspend fun list(): ApiEnvelope<List<CardDto>>
+
+    @DELETE("payments/cards/{cardId}")
+    suspend fun delete(@Path("cardId") cardId: String): ApiEnvelope<Unit>
 }
