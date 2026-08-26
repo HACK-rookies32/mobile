@@ -1,3 +1,6 @@
+import java.net.DatagramSocket
+import java.net.Inet4Address
+import java.net.InetAddress
 import java.util.Properties
 
 plugins {
@@ -12,9 +15,21 @@ val localProperties = Properties().apply {
         file.inputStream().use { load(it) }
     }
 }
+
+fun detectLanIpv4(): String? = runCatching {
+    DatagramSocket().use { socket ->
+        socket.connect(InetAddress.getByName("8.8.8.8"), 53)
+        val addr = socket.localAddress
+        if (addr is Inet4Address && !addr.isLoopbackAddress) addr.hostAddress else null
+    }
+}.getOrNull()
+
 // Prefer host LAN IP on Windows emulators; 10.0.2.2 often times out for OkHttp only.
 val apiBaseUrl: String =
-    localProperties.getProperty("api.base.url", "http://10.0.2.2:8080/api")
+    localProperties.getProperty("api.base.url")
+        ?: detectLanIpv4()?.let { "http://$it:8080/api" }
+        ?: "http://10.0.2.2:8080/api"
+logger.lifecycle("kidhack BASE_URL = $apiBaseUrl")
 
 android {
     namespace = "com.hack.kidhack"
