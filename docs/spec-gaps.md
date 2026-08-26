@@ -595,3 +595,12 @@ GAP-01(방향)과 별개로 **언제** 코드를 보내는지가 갈린다.
 14. **GAP-14 프로필 필드 · GAP-15 채팅 부가** — Fake/숨김으로 1차를 막지 않음.
 
 합의 기록은 이 파일을 수정해 ID별로 「결정: … / 일자」한 줄을 남긴다. 엔드포인트가 새로 생기면 명세 버전을 인용하고, 여기 적히지 않은 경로를 클라이언트에 넣지 않는다.
+
+## 결정 기록
+
+- GPS 상태 보고(reportGpsStatus, POST /devices/gps-status) (2026-08-26): 위치기반 서비스 v0.2 도메인 분리와 무관하게 LocationRepository에 임시 유지. 추후 백엔드에 /device/event 등 기기 상태 전용 엔드포인트가 생기면 DeviceRepository로 이관 검토.
+- 장소(지오펜스/목적지) 삭제 API (2026-08-26): v0.2 명세에는 없으나 팀 자체 프로젝트 특성상 백엔드팀에 DELETE /location/places/{placeId} 신설을 요청함. 클라이언트는 이 계약을 선반영해두었고, 백엔드 구현 전까지는 Fake로만 정상 동작. Real 연동 시 실제 경로/응답 형식을 백엔드와 재확인 필요.
+- 실시간 추적 상태 조회 API 부재 (2026-08-26): PATCH /location/tracking/{childId}/realtime로 켜고 끌 수는 있으나 현재 상태를 조회하는 GET이 명세에 없음. 부모 화면은 진입 시 항상 OFF로 시작(서버 실제 상태와 불일치 가능). 백엔드에 GET /location/tracking/{childId} 신설 또는 GET /children/{childId}/dashboard(4.18)에 realtimeEnabled 필드 추가를 요청 예정. 삭제하지 않고 요청으로 해결하는 정책 유지.
+- 위치기반 서비스 v0.2 반영 완료 (2026-08-26): 공유 레이어(Dtos/Models/Apis/Repositories) + 부모 화면(Location/Geofence) + 자녀 백그라운드(Tracking 단건화, 온디바이스 지오펜싱/배치큐 제거) 전 단계 완료. 신규 요청한 백엔드 API 2건 — DELETE /location/places/{placeId}(이미 반영), GET 실시간 상태 조회(요청 예정).
+- 도착 알림 토글(notifyOnArrival) 필드 부재 (2026-08-26): POST /location/places 명세에 대응 필드 없음. UI 숨김 처리, 서버 전송값은 true 고정. 백엔드에 필드 추가 요청 예정, 추가되면 스위치 UI 복구.
+- 장소 타입(GEOFENCE/DESTINATION) UI 단순화 (2026-08-26): 제품 요구사항상 모든 등록 장소가 진입+이탈 알림(도착/이동) 모두 필요하여, DESTINATION(도착만 감지) 개념은 사용하지 않기로 함. 클라이언트는 항상 type=GEOFENCE로 전송, 부모에게 타입 선택 UI 노출하지 않음. 명세 자체는 변경 없음(GEOFENCE는 기존 유효 값).

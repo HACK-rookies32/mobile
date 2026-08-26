@@ -25,6 +25,7 @@ import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryAnswer
+import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -51,13 +52,14 @@ import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
-import com.hack.kidhack.domain.repository.GeofenceRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
+import com.hack.kidhack.domain.repository.LocationEventRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
 import com.hack.kidhack.domain.repository.PhotoRepository
+import com.hack.kidhack.domain.repository.PlaceRepository
 import com.hack.kidhack.domain.repository.PointRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
 import com.hack.kidhack.domain.repository.SessionEvents
@@ -205,31 +207,49 @@ class FakeChildRepository : ChildRepository {
 
 class FakeLocationRepository : LocationRepository {
     private val historyMap = mutableMapOf<String, MutableList<LocationPoint>>()
-    override suspend fun current(childId: String): LocationPoint =
-        LocationPoint("37.5665", "126.9780", "2024.08.20 14:30", "📍 서울시청")
-    override suspend fun history(childId: String): List<LocationPoint> = historyMap[childId] ?: listOf(
-        LocationPoint("37.5665", "126.9780", "14:00", "📍 학교"),
-        LocationPoint("37.5655", "126.9770", "15:30", "📍 학원"),
-        LocationPoint("37.5645", "126.9760", "17:00", "📍 집"),
-    )
-    override suspend fun uploadBatch(points: List<LocationPoint>) {}
+    private val realtimeMap = mutableMapOf<String, Boolean>()
+
+    override suspend fun track(childId: String, latitude: String, longitude: String): LocationPoint {
+        val stamp = "2026-08-25T17:10:00"
+        val point = LocationPoint(
+            lat = latitude,
+            lng = longitude,
+            recordedAt = stamp,
+            segmentStart = "2026-08-25T17:05:00",
+            segmentEnd = stamp,
+            updatedAt = stamp,
+        )
+        // 최신순이라 맨 앞에 넣는다.
+        historyMap.getOrPut(childId) { FakeData.locationSegments.toMutableList() }.add(0, point)
+        return point
+    }
+
+    override suspend fun history(childId: String): List<LocationPoint> =
+        historyMap[childId] ?: FakeData.locationSegments
+
+    override suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean {
+        realtimeMap[childId] = enabled
+        return enabled
+    }
+
     override suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String) {}
 }
 
-class FakeGeofenceRepository : GeofenceRepository {
-    private val items = mutableListOf(
-        Geofence("g1", "학교", "37.5665", "126.9780", 200, true),
-        Geofence("g2", "집", "37.5410", "127.0270", 100, true),
-    )
+class FakePlaceRepository : PlaceRepository {
+    private val items = FakeData.places.toMutableList()
     override suspend fun list(childId: String): List<Geofence> = items.toList()
-    override suspend fun create(childId: String, geofence: Geofence): Geofence {
-        val created = geofence.copy(id = "g-${items.size + 1}")
+    override suspend fun create(childId: String, place: Geofence): Geofence {
+        val created = place.copy(id = "${items.size + 1}")
         items.add(created)
         return created
     }
-    override suspend fun delete(childId: String, geofenceId: String) {
-        items.removeAll { it.id == geofenceId }
+    override suspend fun delete(childId: String, placeId: String) {
+        items.removeAll { it.id == placeId }
     }
+}
+
+class FakeLocationEventRepository : LocationEventRepository {
+    override suspend fun events(childId: String): List<LocationEvent> = FakeData.locationEvents
 }
 
 class FakeNotificationRepository : NotificationRepository {

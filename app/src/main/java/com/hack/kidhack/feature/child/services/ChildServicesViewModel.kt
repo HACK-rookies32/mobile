@@ -77,7 +77,8 @@ class ChildServicesViewModel(
             val childId = sessionRepository.childId()
 
             val device = deviceStatus.snapshot()
-            val location = runCatching { locationRepository.current(childId) }
+            // 동선은 최신순이라 첫 항목이 마지막으로 확인된 위치다.
+            val location = runCatching { locationRepository.history(childId).firstOrNull() }
             val usage = usageCollector.todayUsage()
             val notifications = runCatching { notificationRepository.list(null) }
 

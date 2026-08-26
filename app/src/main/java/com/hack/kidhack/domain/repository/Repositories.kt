@@ -16,6 +16,7 @@ import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
+import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -90,16 +91,29 @@ interface ChildRepository {
 }
 
 interface LocationRepository {
-    suspend fun current(childId: String): LocationPoint
+    /** 자녀 앱에서 좌표 업로드. 저장된 세그먼트/포인트를 돌려준다. */
+    suspend fun track(childId: String, latitude: String, longitude: String): LocationPoint
+
+    /** 동선 세그먼트 최신순. 실시간 ON이면 첫 항목이 현재 위치. */
     suspend fun history(childId: String): List<LocationPoint>
-    suspend fun uploadBatch(points: List<LocationPoint>)
+
+    /** 실시간 추적 토글. 서버가 확정한 상태를 돌려준다. */
+    suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean
+
+    /** 위치 트래킹 6종과 별개인 기기 GPS 상태 보고(POST /devices/gps-status). */
     suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String)
 }
 
-interface GeofenceRepository {
+interface PlaceRepository {
     suspend fun list(childId: String): List<Geofence>
-    suspend fun create(childId: String, geofence: Geofence): Geofence
-    suspend fun delete(childId: String, geofenceId: String)
+    suspend fun create(childId: String, place: Geofence): Geofence
+
+    /** 백엔드에 신설 요청한 DELETE /location/places/{placeId} 선반영. */
+    suspend fun delete(childId: String, placeId: String)
+}
+
+interface LocationEventRepository {
+    suspend fun events(childId: String): List<LocationEvent>
 }
 
 interface NotificationRepository {

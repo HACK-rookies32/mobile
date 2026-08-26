@@ -36,9 +36,13 @@ data class LocationPoint(
     val lng: String,
     val recordedAt: String,
     val label: String? = null,
+    val segmentStart: String? = null,
+    val segmentEnd: String? = null,
+    val updatedAt: String? = null,
 )
 
-fun LocationPoint.toDto(): com.hack.kidhack.data.remote.dto.LocationDto = com.hack.kidhack.data.remote.dto.LocationDto(lat, lng, recordedAt, label)
+/** 지오펜스(진입/이탈) / 목적지(도착) 구분. */
+enum class PlaceType { GEOFENCE, DESTINATION }
 
 data class Geofence(
     val id: String,
@@ -47,6 +51,16 @@ data class Geofence(
     val lng: String,
     val radius: Int,
     val notifyOnArrival: Boolean,
+    val type: PlaceType = PlaceType.GEOFENCE,
+)
+
+enum class LocationEventType { ENTER, EXIT, ARRIVED }
+
+data class LocationEvent(
+    val id: String,
+    val placeId: String,
+    val eventType: LocationEventType,
+    val occurredAt: String,
 )
 
 data class AppNotification(

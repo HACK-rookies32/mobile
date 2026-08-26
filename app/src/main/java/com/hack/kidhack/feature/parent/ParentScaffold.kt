@@ -153,3 +153,26 @@ internal suspend fun SelectedChildRepository.resolveId(children: List<ChildProfi
 }
 
 internal fun ChildProfile.avatarEmoji(): String = "👦"
+
+/** 지도 위에 겹쳐 놓는 작은 버튼(전체화면 열기/닫기). */
+@Composable
+fun MapChipButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val colors = LocalKidhackColors.current
+    Text(
+        label,
+        modifier = modifier
+            .padding(8.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(colors.card)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        color = colors.text,
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBold,
+        fontSize = 12.sp,
+    )
+}

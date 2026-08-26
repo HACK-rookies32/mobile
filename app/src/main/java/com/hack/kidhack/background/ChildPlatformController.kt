@@ -4,9 +4,7 @@ import android.content.Context
 import com.hack.kidhack.background.capture.ScreenCaptureWorker
 import com.hack.kidhack.background.command.ChildCommandPollWorker
 import com.hack.kidhack.background.command.ChildCommandService
-import com.hack.kidhack.background.geofence.GeofenceRegistrar
 import com.hack.kidhack.background.location.GpsStatusMonitor
-import com.hack.kidhack.background.location.LocationBatchWorker
 import com.hack.kidhack.background.location.LocationTrackingService
 import com.hack.kidhack.background.usage.AppUsageWorker
 import com.hack.kidhack.core.permission.KidhackPermissions
@@ -31,7 +29,6 @@ class ChildPlatformController(
     private val sessionRepository: SessionRepository,
     private val onboardingStore: ChildOnboardingStore,
     private val gpsStatusMonitor: GpsStatusMonitor,
-    private val geofenceRegistrar: GeofenceRegistrar,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val reevaluateTick = MutableStateFlow(0)
@@ -62,15 +59,12 @@ class ChildPlatformController(
         if (running) return
         running = true
         LocationTrackingService.start(context)
-        LocationBatchWorker.enqueuePeriodic(context)
-        LocationBatchWorker.enqueueNow(context)
         gpsStatusMonitor.start()
         AppUsageWorker.enqueuePeriodic(context)
         ScreenCaptureWorker.enqueuePeriodic(context)
         // FCM 대체 경로: 상주 WebSocket(실시간) + 15분 폴링(백업)
         ChildCommandService.start(context)
         ChildCommandPollWorker.enqueuePeriodic(context)
-        scope.launch { runCatching { geofenceRegistrar.sync() } }
     }
 
     private fun stop() {
@@ -81,12 +75,10 @@ class ChildPlatformController(
         }
         running = false
         LocationTrackingService.stop(context)
-        LocationBatchWorker.cancel(context)
         gpsStatusMonitor.stop()
         AppUsageWorker.cancel(context)
         ScreenCaptureWorker.cancel(context)
         ChildCommandService.stop(context)
         ChildCommandPollWorker.cancel(context)
-        geofenceRegistrar.clear()
     }
 }

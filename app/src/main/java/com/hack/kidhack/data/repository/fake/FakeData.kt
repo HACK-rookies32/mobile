@@ -9,7 +9,10 @@ import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.LocationEvent
+import com.hack.kidhack.domain.model.LocationEventType
 import com.hack.kidhack.domain.model.LocationPoint
+import com.hack.kidhack.domain.model.PlaceType
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
 import com.hack.kidhack.domain.model.Payment
@@ -69,6 +72,44 @@ object FakeData {
     val children = listOf(minjun, jia)
     // 자녀 없을 때 테스트 (empty)
     //val children = emptyList<ChildProfile>()
+
+    /** 서울시청 주변 5분 세그먼트. 최신순(첫 항목 = 실시간 ON일 때의 현재 위치). */
+    val locationSegments = listOf(
+        LocationPoint(
+            lat = "37.5665", lng = "126.9780", recordedAt = "2026-08-25T17:05:00", label = "📍 서울시청",
+            segmentStart = "2026-08-25T17:00:00", segmentEnd = "2026-08-25T17:05:00",
+            updatedAt = "2026-08-25T17:05:00",
+        ),
+        LocationPoint(
+            lat = "37.5642", lng = "126.9770", recordedAt = "2026-08-25T16:40:00", label = "📍 학원",
+            segmentStart = "2026-08-25T16:35:00", segmentEnd = "2026-08-25T16:40:00",
+            updatedAt = "2026-08-25T16:40:00",
+        ),
+        LocationPoint(
+            lat = "37.5700", lng = "126.9762", recordedAt = "2026-08-25T15:20:00", label = "📍 학교 앞",
+            segmentStart = "2026-08-25T15:15:00", segmentEnd = "2026-08-25T15:20:00",
+            updatedAt = "2026-08-25T15:20:00",
+        ),
+        LocationPoint(
+            lat = "37.5729", lng = "126.9794", recordedAt = "2026-08-25T14:10:00", label = "📍 광화문",
+            segmentStart = "2026-08-25T14:05:00", segmentEnd = "2026-08-25T14:10:00",
+            updatedAt = "2026-08-25T14:10:00",
+        ),
+    )
+
+    // 진입(도착)과 이탈(이동) 알림을 모두 받아야 해서 전부 GEOFENCE다.
+    val places = listOf(
+        Geofence("1", "학교", "37.5700", "126.9762", 200, true, PlaceType.GEOFENCE),
+        Geofence("2", "OO학원", "37.5642", "126.9770", 150, true, PlaceType.GEOFENCE),
+    )
+
+    val locationEvents = listOf(
+        LocationEvent("4", "2", LocationEventType.ENTER, "2026-08-25T16:36:12"),
+        LocationEvent("3", "1", LocationEventType.EXIT, "2026-08-25T15:22:04"),
+        LocationEvent("2", "1", LocationEventType.ENTER, "2026-08-25T08:41:37"),
+        // DESTINATION으로 등록하던 시절의 잔여 이벤트. 도착 문구로 함께 표시된다.
+        LocationEvent("1", "2", LocationEventType.ARRIVED, "2026-08-24T16:31:50"),
+    )
 
     val usages = listOf(
         AppUsage("YouTube", 80 * 60, "동영상"),

@@ -139,25 +139,64 @@ data class ChildUpdateRequest(
     val school: String? = null,
 )
 
+/** POST /location/track 요청. 명세상 좌표가 문자열이다(places는 숫자). */
 @Serializable
-data class LocationDto(
-    val lat: String,
-    val lng: String,
-    val recordedAt: String,
-    val label: String? = null,
+data class LocationTrackRequest(
+    val childId: Long,
+    val latitude: String,
+    val longitude: String,
+)
+
+@Serializable
+data class LocationTrackResponse(
+    val id: Long,
+    val childId: Long,
+    val latitude: String,
+    val longitude: String,
+    val segmentStart: String? = null,
+    val segmentEnd: String? = null,
+    val updatedAt: String? = null,
+)
+
+@Serializable
+data class RealtimeToggleResponse(
+    val childId: Long,
+    val realtimeEnabled: Boolean,
 )
 
 @Serializable
 data class GpsStatusRequest(val gpsEnabled: Boolean, val reportedAt: String)
 
+/** POST /location/places 요청. `type` = GEOFENCE | DESTINATION. */
 @Serializable
-data class GeofenceDto(
-    val id: String? = null,
+data class PlaceRequest(
+    val childId: Long,
     val name: String,
-    val lat: String,
-    val lng: String,
-    val radius: Int,
-    val notifyOnArrival: Boolean = true,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Double,
+    val type: String,
+)
+
+@Serializable
+data class PlaceResponse(
+    val id: Long,
+    val childId: Long,
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Double,
+    val type: String,
+)
+
+/** GET /location/events/{childId}. `eventType` = ENTER | EXIT | ARRIVED. */
+@Serializable
+data class LocationEventDto(
+    val id: Long,
+    val childId: Long,
+    val placeId: Long,
+    val eventType: String,
+    val occurredAt: String,
 )
 
 @Serializable

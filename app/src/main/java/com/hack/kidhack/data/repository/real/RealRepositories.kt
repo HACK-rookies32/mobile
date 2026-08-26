@@ -14,12 +14,13 @@ import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
-import com.hack.kidhack.data.remote.api.GeofenceApi
 import com.hack.kidhack.data.remote.api.InquiryApi
 import com.hack.kidhack.data.remote.api.LocationApi
+import com.hack.kidhack.data.remote.api.LocationEventApi
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
 import com.hack.kidhack.data.remote.api.PhotoApi
+import com.hack.kidhack.data.remote.api.PlaceApi
 import com.hack.kidhack.data.remote.api.PaymentApi
 import com.hack.kidhack.data.remote.api.PaymentChargeApi
 import com.hack.kidhack.data.remote.api.PointApi
@@ -43,12 +44,13 @@ import com.hack.kidhack.data.remote.dto.CommentRequest
 import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
-import com.hack.kidhack.data.remote.dto.GeofenceDto
 import com.hack.kidhack.data.remote.dto.GpsStatusRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
+import com.hack.kidhack.data.remote.dto.LocationTrackRequest
 import com.hack.kidhack.data.remote.dto.LoginRequest
 import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.PairingConnectRequest
+import com.hack.kidhack.data.remote.dto.PlaceRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
 import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
@@ -80,6 +82,7 @@ import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
+import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -106,13 +109,14 @@ import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
-import com.hack.kidhack.domain.repository.GeofenceRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
+import com.hack.kidhack.domain.repository.LocationEventRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
 import com.hack.kidhack.domain.repository.PhotoRepository
+import com.hack.kidhack.domain.repository.PlaceRepository
 import com.hack.kidhack.domain.repository.PointRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
 import com.hack.kidhack.domain.repository.SessionEvents
@@ -278,27 +282,38 @@ class RealChildRepository(private val api: ChildApi) : ChildRepository {
 }
 
 class RealLocationRepository(private val api: LocationApi) : LocationRepository {
-    override suspend fun current(childId: String): LocationPoint = api.current(childId).unwrap().toDomain()
+    override suspend fun track(childId: String, latitude: String, longitude: String): LocationPoint =
+        api.track(LocationTrackRequest(childId.toServerId(), latitude, longitude)).unwrap().toDomain()
     override suspend fun history(childId: String): List<LocationPoint> =
         api.history(childId).unwrap().map { it.toDomain() }
-    override suspend fun uploadBatch(points: List<LocationPoint>) {
-        api.batch(points.map { it.toDto() }).unwrapOrNull()
-    }
+    override suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean =
+        api.toggleRealtime(childId, enabled).unwrap().realtimeEnabled
     override suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String) {
         api.gpsStatus(GpsStatusRequest(gpsEnabled, reportedAt)).unwrapOrNull()
     }
 }
 
-class RealGeofenceRepository(private val api: GeofenceApi) : GeofenceRepository {
+class RealPlaceRepository(private val api: PlaceApi) : PlaceRepository {
     override suspend fun list(childId: String): List<Geofence> = api.list(childId).unwrap().map { it.toDomain() }
-    override suspend fun create(childId: String, geofence: Geofence): Geofence =
+    override suspend fun create(childId: String, place: Geofence): Geofence =
         api.create(
-            childId,
-            GeofenceDto(null, geofence.name, geofence.lat, geofence.lng, geofence.radius, geofence.notifyOnArrival),
+            PlaceRequest(
+                childId = childId.toServerId(),
+                name = place.name,
+                latitude = place.lat.toServerCoordinate("위도"),
+                longitude = place.lng.toServerCoordinate("경도"),
+                radiusMeters = place.radius.toDouble(),
+                type = place.type.name,
+            ),
         ).unwrap().toDomain()
-    override suspend fun delete(childId: String, geofenceId: String) {
-        api.delete(childId, geofenceId).unwrapOrNull()
+    override suspend fun delete(childId: String, placeId: String) {
+        api.delete(placeId).unwrapOrNull()
     }
+}
+
+class RealLocationEventRepository(private val api: LocationEventApi) : LocationEventRepository {
+    override suspend fun events(childId: String): List<LocationEvent> =
+        api.events(childId).unwrap().map { it.toDomain() }
 }
 
 class RealNotificationRepository(private val api: NotificationApi) : NotificationRepository {
@@ -567,6 +582,14 @@ class RealCommandRepository(
         runCatching { api.ack(childId, requestId, RemoteCommandAckRequest(status, message)).unwrapOrNull() }
     }
 }
+
+/** 위치 API body의 `childId`는 숫자다. 숫자가 아니면 엉뚱한 대상으로 보내지 말고 실패시킨다. */
+private fun String.toServerId(): Long =
+    toLongOrNull() ?: throw IllegalStateException("childId는 숫자 형식이어야 합니다: $this")
+
+/** 장소 좌표도 서버에서는 숫자다. (0.0, 0.0)으로 조용히 등록되는 것을 막는다. */
+private fun String.toServerCoordinate(label: String): Double =
+    toDoubleOrNull() ?: throw IllegalStateException("$label 값이 숫자 형식이어야 합니다: $this")
 
 private fun File.toImagePart(): MultipartBody.Part =
     MultipartBody.Part.createFormData("file", name, asRequestBody("image/jpeg".toMediaType()))

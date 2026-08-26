@@ -12,15 +12,16 @@ import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.CommentDto
-import com.hack.kidhack.data.remote.dto.GeofenceDto
 import com.hack.kidhack.data.remote.dto.InquiryAnswerDto
 import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
-import com.hack.kidhack.data.remote.dto.LocationDto
+import com.hack.kidhack.data.remote.dto.LocationEventDto
+import com.hack.kidhack.data.remote.dto.LocationTrackResponse
 import com.hack.kidhack.data.remote.dto.NotificationDto
 import com.hack.kidhack.data.remote.dto.NotificationSettingsDto
 import com.hack.kidhack.data.remote.dto.PairingCodeDto
 import com.hack.kidhack.data.remote.dto.PaymentDto
+import com.hack.kidhack.data.remote.dto.PlaceResponse
 import com.hack.kidhack.data.remote.dto.PointBalanceDto
 import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
@@ -48,10 +49,13 @@ import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryAnswer
+import com.hack.kidhack.domain.model.LocationEvent
+import com.hack.kidhack.domain.model.LocationEventType
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
 import com.hack.kidhack.domain.model.Payment
+import com.hack.kidhack.domain.model.PlaceType
 import com.hack.kidhack.domain.model.PointBalance
 import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
@@ -101,22 +105,33 @@ fun ChildDto.toDomain(): ChildProfile = ChildProfile(
     online = online,
 )
 
-fun LocationDto.toDomain(): LocationPoint = LocationPoint(
-    lat = lat,
-    lng = lng,
-    recordedAt = recordedAt,
-    label = label,
+fun LocationTrackResponse.toDomain(): LocationPoint = LocationPoint(
+    lat = latitude,
+    lng = longitude,
+    recordedAt = updatedAt ?: segmentEnd ?: segmentStart.orEmpty(),
+    label = null,
+    segmentStart = segmentStart,
+    segmentEnd = segmentEnd,
+    updatedAt = updatedAt,
 )
 
-fun LocationPoint.toDto(): LocationDto = LocationDto(lat, lng, recordedAt, label)
-
-fun GeofenceDto.toDomain(): Geofence = Geofence(
-    id = id.orEmpty(),
+/** places 응답은 좌표가 숫자라 도메인 문자열로 옮긴다. */
+fun PlaceResponse.toDomain(): Geofence = Geofence(
+    id = id.toString(),
     name = name,
-    lat = lat,
-    lng = lng,
-    radius = radius,
-    notifyOnArrival = notifyOnArrival,
+    lat = latitude.toString(),
+    lng = longitude.toString(),
+    radius = radiusMeters.toInt(),
+    notifyOnArrival = true,
+    type = runCatching { PlaceType.valueOf(type) }.getOrDefault(PlaceType.GEOFENCE),
+)
+
+fun LocationEventDto.toDomain(): LocationEvent = LocationEvent(
+    id = id.toString(),
+    placeId = placeId.toString(),
+    eventType = runCatching { LocationEventType.valueOf(eventType) }
+        .getOrDefault(LocationEventType.ENTER),
+    occurredAt = occurredAt,
 )
 
 fun NotificationDto.toDomain(): AppNotification = AppNotification(

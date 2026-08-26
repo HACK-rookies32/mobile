@@ -122,7 +122,8 @@ class DashboardViewModel(
             // TODO: Backend Integration - API 엔드포인트에 따라 파라미터(날짜, 타입 등) 조정 필요
             val usages = appUsageRepository.list(childId, "APP")
             val notes = notificationRepository.list(null)
-            val loc = runCatching { locationRepository.current(childId) }.getOrNull()
+            // 동선은 최신순이라 첫 항목이 마지막으로 확인된 위치다.
+            val loc = runCatching { locationRepository.history(childId).firstOrNull() }.getOrNull()
             _state.update {
                 it.copy(
                     loading = false,

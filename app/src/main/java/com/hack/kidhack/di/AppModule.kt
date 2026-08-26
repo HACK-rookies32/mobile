@@ -23,11 +23,12 @@ import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
-import com.hack.kidhack.data.remote.api.GeofenceApi
 import com.hack.kidhack.data.remote.api.InquiryApi
 import com.hack.kidhack.data.remote.api.LocationApi
+import com.hack.kidhack.data.remote.api.LocationEventApi
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
+import com.hack.kidhack.data.remote.api.PlaceApi
 import com.hack.kidhack.data.remote.api.PaymentApi
 import com.hack.kidhack.data.remote.api.PhotoApi
 import com.hack.kidhack.data.remote.api.PaymentChargeApi
@@ -49,11 +50,12 @@ import com.hack.kidhack.data.repository.fake.FakeChatRepository
 import com.hack.kidhack.data.repository.fake.FakeChildRepository
 import com.hack.kidhack.data.repository.fake.FakeCommandRepository
 import com.hack.kidhack.data.repository.fake.FakeCommunityRepository
-import com.hack.kidhack.data.repository.fake.FakeGeofenceRepository
 import com.hack.kidhack.data.repository.fake.FakeInquiryRepository
+import com.hack.kidhack.data.repository.fake.FakeLocationEventRepository
 import com.hack.kidhack.data.repository.fake.FakeLocationRepository
 import com.hack.kidhack.data.repository.fake.FakeNotificationRepository
 import com.hack.kidhack.data.repository.fake.FakePairingRepository
+import com.hack.kidhack.data.repository.fake.FakePlaceRepository
 import com.hack.kidhack.data.repository.fake.FakePaymentRepository
 import com.hack.kidhack.data.repository.fake.FakePhotoRepository
 import com.hack.kidhack.data.repository.fake.FakePointRepository
@@ -71,11 +73,12 @@ import com.hack.kidhack.data.repository.real.RealChatRepository
 import com.hack.kidhack.data.repository.real.RealChildRepository
 import com.hack.kidhack.data.repository.real.RealCommandRepository
 import com.hack.kidhack.data.repository.real.RealCommunityRepository
-import com.hack.kidhack.data.repository.real.RealGeofenceRepository
 import com.hack.kidhack.data.repository.real.RealInquiryRepository
+import com.hack.kidhack.data.repository.real.RealLocationEventRepository
 import com.hack.kidhack.data.repository.real.RealLocationRepository
 import com.hack.kidhack.data.repository.real.RealNotificationRepository
 import com.hack.kidhack.data.repository.real.RealPairingRepository
+import com.hack.kidhack.data.repository.real.RealPlaceRepository
 import com.hack.kidhack.data.repository.real.RealPaymentRepository
 import com.hack.kidhack.data.repository.real.RealPhotoRepository
 import com.hack.kidhack.data.repository.real.RealPointRepository
@@ -96,11 +99,12 @@ import com.hack.kidhack.domain.repository.ChildOnboardingStore
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
-import com.hack.kidhack.domain.repository.GeofenceRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
+import com.hack.kidhack.domain.repository.LocationEventRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
+import com.hack.kidhack.domain.repository.PlaceRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
 import com.hack.kidhack.domain.repository.PhotoRepository
 import com.hack.kidhack.domain.repository.PointRepository
@@ -205,7 +209,8 @@ val appModule = module {
     single { get<Retrofit>().create(PairingApi::class.java) }
     single { get<Retrofit>().create(ChildApi::class.java) }
     single { get<Retrofit>().create(LocationApi::class.java) }
-    single { get<Retrofit>().create(GeofenceApi::class.java) }
+    single { get<Retrofit>().create(PlaceApi::class.java) }
+    single { get<Retrofit>().create(LocationEventApi::class.java) }
     single { get<Retrofit>().create(NotificationApi::class.java) }
     single { get<Retrofit>().create(BlocklistApi::class.java) }
     single { get<Retrofit>().create(ScreenshotApi::class.java) }
@@ -231,7 +236,10 @@ val appModule = module {
     single<PairingRepository> { if (useMock) FakePairingRepository() else RealPairingRepository(get()) }
     single<ChildRepository> { if (useMock) FakeChildRepository() else RealChildRepository(get()) }
     single<LocationRepository> { if (useMock) FakeLocationRepository() else RealLocationRepository(get()) }
-    single<GeofenceRepository> { if (useMock) FakeGeofenceRepository() else RealGeofenceRepository(get()) }
+    single<PlaceRepository> { if (useMock) FakePlaceRepository() else RealPlaceRepository(get()) }
+    single<LocationEventRepository> {
+        if (useMock) FakeLocationEventRepository() else RealLocationEventRepository(get())
+    }
     single<NotificationRepository> {
         if (useMock) FakeNotificationRepository() else RealNotificationRepository(get())
     }
@@ -288,7 +296,7 @@ val appModule = module {
     viewModel { ForgotViewModel(get()) }
 
     viewModel { DashboardViewModel(get(), get(), get(), get(), get()) }
-    viewModel { LocationViewModel(get(), get(), get()) }
+    viewModel { LocationViewModel(get(), get(), get(), get(), get()) }
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
     viewModel { ParentChatViewModel(get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get()) }

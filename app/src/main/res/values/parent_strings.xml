@@ -17,13 +17,25 @@
     <string name="parent_add_child">+ 추가</string>
     <string name="parent_location_school">📍 학교</string>
 
+    <string name="parent_map_fullscreen">전체화면</string>
+    <string name="parent_map_close">닫기</string>
     <string name="parent_location_title">자녀 위치 확인</string>
     <string name="parent_map_placeholder">지도 영역</string>
     <string name="parent_location_current">현재 위치</string>
     <string name="parent_location_live">실시간</string>
     <string name="parent_location_recent">최근 위치</string>
+    <string name="parent_location_realtime_toggle">실시간 추적</string>
+    <string name="parent_location_route_show">오늘 이동 경로 확인</string>
+    <string name="parent_location_route_hide">이동 경로 숨기기</string>
     <string name="parent_location_route">오늘 이동 경로</string>
     <string name="parent_location_empty_history">아직 기록된 이동 경로가 없어요</string>
+    <string name="parent_geofence_type_geofence">위험구역</string>
+    <string name="parent_geofence_type_destination">목적지</string>
+    <string name="parent_geofence_pick_hint">지도를 눌러 위치를 선택하세요</string>
+    <string name="parent_geofence_event_entered">%1$s에 도착하였습니다</string>
+    <string name="parent_geofence_event_exit">%1$s에서 이동했습니다</string>
+    <string name="parent_geofence_event_unknown_place">등록된 장소</string>
+    <string name="parent_geofence_events">최근 출입 기록</string>
     <string name="parent_geofence_manage">지정 장소 관리</string>
 
     <string name="parent_geofence_title">지정 장소 관리</string>

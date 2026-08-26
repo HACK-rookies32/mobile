@@ -32,13 +32,14 @@ import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
 import com.hack.kidhack.data.remote.dto.FindIdResponse
-import com.hack.kidhack.data.remote.dto.GeofenceDto
 import com.hack.kidhack.data.remote.dto.GpsStatusRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
 import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
 import com.hack.kidhack.data.remote.dto.InstalledAppsResponse
-import com.hack.kidhack.data.remote.dto.LocationDto
+import com.hack.kidhack.data.remote.dto.LocationEventDto
+import com.hack.kidhack.data.remote.dto.LocationTrackRequest
+import com.hack.kidhack.data.remote.dto.LocationTrackResponse
 import com.hack.kidhack.data.remote.dto.LoginRequest
 import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.NotificationDto
@@ -46,9 +47,12 @@ import com.hack.kidhack.data.remote.dto.NotificationSettingsDto
 import com.hack.kidhack.data.remote.dto.PairingCodeDto
 import com.hack.kidhack.data.remote.dto.PairingConnectRequest
 import com.hack.kidhack.data.remote.dto.PaymentDto
+import com.hack.kidhack.data.remote.dto.PlaceRequest
+import com.hack.kidhack.data.remote.dto.PlaceResponse
 import com.hack.kidhack.data.remote.dto.PointBalanceDto
 import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
+import com.hack.kidhack.data.remote.dto.RealtimeToggleResponse
 import com.hack.kidhack.data.remote.dto.RefreshRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandDto
@@ -149,34 +153,41 @@ interface ChildApi {
 }
 
 interface LocationApi {
-    @GET("children/{childId}/location/current")
-    suspend fun current(@Path("childId") childId: String): ApiEnvelope<LocationDto>
+    /** 자녀 앱 전용(CHILD). 좌표를 올리면 서버가 지오펜스/도착을 판정한다. */
+    @POST("location/track")
+    suspend fun track(@Body body: LocationTrackRequest): ApiEnvelope<LocationTrackResponse>
 
-    @GET("children/{childId}/location/history")
-    suspend fun history(@Path("childId") childId: String): ApiEnvelope<List<LocationDto>>
+    /** 최신순 세그먼트. 실시간 ON이면 첫 항목이 현재 위치. */
+    @GET("location/track/{childId}")
+    suspend fun history(@Path("childId") childId: String): ApiEnvelope<List<LocationTrackResponse>>
 
-    @POST("locations/batch")
-    suspend fun batch(@Body body: List<LocationDto>): ApiEnvelope<Unit>
+    /** body 없이 query `enabled`만 사용한다. */
+    @PATCH("location/tracking/{childId}/realtime")
+    suspend fun toggleRealtime(
+        @Path("childId") childId: String,
+        @Query("enabled") enabled: Boolean,
+    ): ApiEnvelope<RealtimeToggleResponse>
 
+    /** 위치 6종 API와 무관한 기기 상태 보고. 명세에 /device/event가 생기면 이관 예정. */
     @POST("devices/gps-status")
     suspend fun gpsStatus(@Body body: GpsStatusRequest): ApiEnvelope<Unit>
 }
 
-interface GeofenceApi {
-    @GET("children/{childId}/geofences")
-    suspend fun list(@Path("childId") childId: String): ApiEnvelope<List<GeofenceDto>>
+interface PlaceApi {
+    @POST("location/places")
+    suspend fun create(@Body body: PlaceRequest): ApiEnvelope<PlaceResponse>
 
-    @POST("children/{childId}/geofences")
-    suspend fun create(
-        @Path("childId") childId: String,
-        @Body body: GeofenceDto,
-    ): ApiEnvelope<GeofenceDto>
+    @GET("location/places/{childId}")
+    suspend fun list(@Path("childId") childId: String): ApiEnvelope<List<PlaceResponse>>
 
-    @DELETE("children/{childId}/geofences/{geofenceId}")
-    suspend fun delete(
-        @Path("childId") childId: String,
-        @Path("geofenceId") geofenceId: String,
-    ): ApiEnvelope<Unit>
+    /** v0.2 명세에 없는 경로. 백엔드에 신설 요청한 계약을 선반영한 것이다(docs/spec-gaps.md). */
+    @DELETE("location/places/{placeId}")
+    suspend fun delete(@Path("placeId") placeId: String): ApiEnvelope<Unit>
+}
+
+interface LocationEventApi {
+    @GET("location/events/{childId}")
+    suspend fun events(@Path("childId") childId: String): ApiEnvelope<List<LocationEventDto>>
 }
 
 interface NotificationApi {
