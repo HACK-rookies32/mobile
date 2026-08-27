@@ -48,10 +48,8 @@ import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.ChildRepository
-import com.hack.kidhack.domain.repository.LocationRepository
-import com.hack.kidhack.domain.repository.NotificationRepository
+import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
-import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,9 +73,7 @@ class DashboardViewModel(
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
     private val appUsageRepository: AppUsageRepository,
-    private val notificationRepository: NotificationRepository,
-    private val locationRepository: LocationRepository,
-    private val sessionRepository: SessionRepository,
+    private val dashboardRepository: DashboardRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DashboardUiState())
@@ -122,10 +118,10 @@ class DashboardViewModel(
             val child = _state.value.children.find { it.id == childId }
                 ?: childRepository.child(childId)
             // TODO: Backend Integration - API 엔드포인트에 따라 파라미터(날짜, 타입 등) 조정 필요
+            // 앱 사용량은 대시보드 통합 응답에 없어 개별 유지.
             val usages = appUsageRepository.list(childId, "APP")
-            val notes = notificationRepository.list(sessionRepository.current()?.user?.id.orEmpty())
-            // 동선은 최신순이라 첫 항목이 마지막으로 확인된 위치다.
-            val loc = runCatching { locationRepository.history(childId).firstOrNull() }.getOrNull()
+            // 위치·실시간·최근알림3·차단·공간을 통합 API 한 번으로 가져온다.
+            val dashboard = dashboardRepository.get(childId)
             _state.update {
                 it.copy(
                     loading = false,
@@ -133,10 +129,11 @@ class DashboardViewModel(
                     selectedId = childId,
                     selected = child,
                     usages = usages,
-                    notifications = notes,
+                    // recentNotifications는 이미 최근 3건. 화면의 .take(3)은 무해하게 유지.
+                    notifications = dashboard.recentNotifications,
                     // TODO: Backend Integration - 실 API가 위경도만 줄 경우 역지오코딩 로직 추가 필요
-                    lastLocation = loc?.label,
-                    lastLocationAt = loc?.recordedAt?.takeLast(5),
+                    lastLocation = dashboard.currentLocation?.label,
+                    lastLocationAt = dashboard.currentLocation?.updatedAt?.takeLast(5),
                 )
             }
         }.onFailure { t ->

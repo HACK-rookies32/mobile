@@ -20,6 +20,7 @@ import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildPhoto
+import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
@@ -54,6 +55,7 @@ import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
 import com.hack.kidhack.domain.repository.LocationEventRepository
+import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
@@ -237,6 +239,21 @@ class FakeLocationRepository : LocationRepository {
 
 class FakeDeviceRepository : DeviceRepository {
     override suspend fun reportEvent(childId: String, type: String) {}
+}
+
+class FakeDashboardRepository(
+    private val locationRepository: LocationRepository,
+    private val notificationRepository: NotificationRepository,
+    private val placeRepository: PlaceRepository,
+) : DashboardRepository {
+    override suspend fun get(childId: String): ChildDashboard = ChildDashboard(
+        childId = childId,
+        currentLocation = locationRepository.history(childId).firstOrNull(),
+        realtimeEnabled = false,
+        recentNotifications = notificationRepository.list(childId).take(3),
+        blockRulePatterns = emptyList(),
+        places = placeRepository.list(childId),
+    )
 }
 
 class FakePlaceRepository : PlaceRepository {

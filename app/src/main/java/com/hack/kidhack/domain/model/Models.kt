@@ -71,6 +71,16 @@ data class AppNotification(
     val read: Boolean,
 )
 
+/** GET /children/{childId}/dashboard 통합 조회 결과. */
+data class ChildDashboard(
+    val childId: String,
+    val currentLocation: LocationPoint?,
+    val realtimeEnabled: Boolean,
+    val recentNotifications: List<AppNotification>,
+    val blockRulePatterns: List<String>,
+    val places: List<Geofence>,
+)
+
 data class NotificationSettings(
     val location: Boolean,
     val harmfulAccess: Boolean,

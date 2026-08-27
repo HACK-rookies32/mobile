@@ -32,6 +32,7 @@ import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
 import com.hack.kidhack.data.remote.dto.FindIdResponse
+import com.hack.kidhack.data.remote.dto.DashboardResponse
 import com.hack.kidhack.data.remote.dto.DeviceEventRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
 import com.hack.kidhack.data.remote.dto.InquiryDto
@@ -174,6 +175,12 @@ interface DeviceApi {
     /** 기기 전원/GPS 꺼짐 보고. type = "POWER_OFF" | "GPS_OFF" (명세 4.16). */
     @POST("device/event")
     suspend fun reportEvent(@Body body: DeviceEventRequest): ApiEnvelope<Unit>
+}
+
+interface DashboardApi {
+    /** 위치·실시간·최근알림3·차단·공간 통합 조회 (명세 4.3). */
+    @GET("children/{childId}/dashboard")
+    suspend fun get(@Path("childId") childId: String): ApiEnvelope<DashboardResponse>
 }
 
 interface PlaceApi {

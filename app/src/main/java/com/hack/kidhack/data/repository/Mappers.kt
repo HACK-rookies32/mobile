@@ -17,6 +17,7 @@ import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
 import com.hack.kidhack.data.remote.dto.LocationEventDto
 import com.hack.kidhack.data.remote.dto.LocationTrackResponse
+import com.hack.kidhack.data.remote.dto.DashboardResponse
 import com.hack.kidhack.data.remote.dto.NotificationDto
 import com.hack.kidhack.data.remote.dto.NotificationSettingsDto
 import com.hack.kidhack.data.remote.dto.PairingCodeDto
@@ -38,6 +39,7 @@ import com.hack.kidhack.domain.model.AllowanceType
 import com.hack.kidhack.data.remote.dto.WalletDto
 import com.hack.kidhack.data.remote.dto.WalletTransactionDto
 import com.hack.kidhack.domain.model.AppNotification
+import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.Charge
@@ -132,6 +134,15 @@ fun LocationEventDto.toDomain(): LocationEvent = LocationEvent(
     eventType = runCatching { LocationEventType.valueOf(eventType) }
         .getOrDefault(LocationEventType.ENTER),
     occurredAt = occurredAt,
+)
+
+fun DashboardResponse.toDomain(): ChildDashboard = ChildDashboard(
+    childId = childId.toString(),
+    currentLocation = currentLocation?.toDomain(),
+    realtimeEnabled = realtimeEnabled,
+    recentNotifications = recentNotifications.map { it.toDomain() },
+    blockRulePatterns = blockRules.map { it.pattern },
+    places = places.map { it.toDomain() },
 )
 
 fun NotificationDto.toDomain(): AppNotification = AppNotification(

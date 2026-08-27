@@ -15,6 +15,7 @@ import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.InquiryApi
+import com.hack.kidhack.data.remote.api.DashboardApi
 import com.hack.kidhack.data.remote.api.DeviceApi
 import com.hack.kidhack.data.remote.api.LocationApi
 import com.hack.kidhack.data.remote.api.LocationEventApi
@@ -77,6 +78,7 @@ import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildPhoto
@@ -112,6 +114,7 @@ import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
 import com.hack.kidhack.domain.repository.LocationEventRepository
+import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
@@ -296,6 +299,11 @@ class RealDeviceRepository(private val api: DeviceApi) : DeviceRepository {
     override suspend fun reportEvent(childId: String, type: String) {
         api.reportEvent(DeviceEventRequest(childId.toServerId(), type)).unwrapOrNull()
     }
+}
+
+class RealDashboardRepository(private val api: DashboardApi) : DashboardRepository {
+    override suspend fun get(childId: String): ChildDashboard =
+        api.get(childId).unwrap().toDomain()
 }
 
 class RealPlaceRepository(private val api: PlaceApi) : PlaceRepository {

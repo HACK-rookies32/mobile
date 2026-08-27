@@ -23,6 +23,7 @@ import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
+import com.hack.kidhack.data.remote.api.DashboardApi
 import com.hack.kidhack.data.remote.api.DeviceApi
 import com.hack.kidhack.data.remote.api.InquiryApi
 import com.hack.kidhack.data.remote.api.LocationApi
@@ -53,6 +54,7 @@ import com.hack.kidhack.data.repository.fake.FakeCommandRepository
 import com.hack.kidhack.data.repository.fake.FakeCommunityRepository
 import com.hack.kidhack.data.repository.fake.FakeInquiryRepository
 import com.hack.kidhack.data.repository.fake.FakeLocationEventRepository
+import com.hack.kidhack.data.repository.fake.FakeDashboardRepository
 import com.hack.kidhack.data.repository.fake.FakeDeviceRepository
 import com.hack.kidhack.data.repository.fake.FakeLocationRepository
 import com.hack.kidhack.data.repository.fake.FakeNotificationRepository
@@ -77,6 +79,7 @@ import com.hack.kidhack.data.repository.real.RealCommandRepository
 import com.hack.kidhack.data.repository.real.RealCommunityRepository
 import com.hack.kidhack.data.repository.real.RealInquiryRepository
 import com.hack.kidhack.data.repository.real.RealLocationEventRepository
+import com.hack.kidhack.data.repository.real.RealDashboardRepository
 import com.hack.kidhack.data.repository.real.RealDeviceRepository
 import com.hack.kidhack.data.repository.real.RealLocationRepository
 import com.hack.kidhack.data.repository.real.RealNotificationRepository
@@ -104,6 +107,7 @@ import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
 import com.hack.kidhack.domain.repository.LocationEventRepository
+import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
@@ -214,6 +218,7 @@ val appModule = module {
     single { get<Retrofit>().create(ChildApi::class.java) }
     single { get<Retrofit>().create(LocationApi::class.java) }
     single { get<Retrofit>().create(DeviceApi::class.java) }
+    single { get<Retrofit>().create(DashboardApi::class.java) }
     single { get<Retrofit>().create(PlaceApi::class.java) }
     single { get<Retrofit>().create(LocationEventApi::class.java) }
     single { get<Retrofit>().create(NotificationApi::class.java) }
@@ -242,6 +247,7 @@ val appModule = module {
     single<ChildRepository> { if (useMock) FakeChildRepository() else RealChildRepository(get()) }
     single<LocationRepository> { if (useMock) FakeLocationRepository() else RealLocationRepository(get()) }
     single<DeviceRepository> { if (useMock) FakeDeviceRepository() else RealDeviceRepository(get()) }
+    single<DashboardRepository> { if (useMock) FakeDashboardRepository(get(), get(), get()) else RealDashboardRepository(get()) }
     single<PlaceRepository> { if (useMock) FakePlaceRepository() else RealPlaceRepository(get()) }
     single<LocationEventRepository> {
         if (useMock) FakeLocationEventRepository() else RealLocationEventRepository(get())
@@ -301,7 +307,7 @@ val appModule = module {
     viewModel { RegisterViewModel(get(), get(), get(), androidContext()) }
     viewModel { ForgotViewModel(get()) }
 
-    viewModel { DashboardViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { DashboardViewModel(get(), get(), get(), get()) }
     viewModel { LocationViewModel(get(), get(), get(), get(), get()) }
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
     viewModel { ParentChatViewModel(get(), get(), get()) }

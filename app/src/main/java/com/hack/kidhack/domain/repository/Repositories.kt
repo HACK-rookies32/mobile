@@ -13,6 +13,7 @@ import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildPhoto
+import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
@@ -104,6 +105,10 @@ interface LocationRepository {
 interface DeviceRepository {
     /** 기기 전원/GPS 꺼짐 보고. type = "POWER_OFF" | "GPS_OFF" */
     suspend fun reportEvent(childId: String, type: String)
+}
+
+interface DashboardRepository {
+    suspend fun get(childId: String): ChildDashboard
 }
 
 interface PlaceRepository {

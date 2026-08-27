@@ -171,6 +171,24 @@ data class DeviceEventRequest(
     val type: String, // "POWER_OFF" | "GPS_OFF"
 )
 
+/** GET /children/{childId}/dashboard (명세 4.3) 통합 응답. */
+@Serializable
+data class DashboardResponse(
+    val childId: Long,
+    val currentLocation: LocationTrackResponse? = null,
+    val realtimeEnabled: Boolean,
+    val recentNotifications: List<NotificationDto> = emptyList(),
+    val blockRules: List<DashboardBlockRuleDto> = emptyList(),
+    val places: List<PlaceResponse> = emptyList(),
+)
+
+@Serializable
+data class DashboardBlockRuleDto(
+    val id: Long,
+    val childId: Long,
+    val pattern: String,
+)
+
 /** POST /location/places 요청. `type` = GEOFENCE | DESTINATION. */
 @Serializable
 data class PlaceRequest(
