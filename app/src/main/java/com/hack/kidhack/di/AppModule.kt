@@ -317,7 +317,7 @@ val appModule = module {
 
     viewModel { ChildHomeViewModel(get(), get(), get(), get(), get(), get()) }
     viewModel { ChildChatViewModel(get()) }
-    viewModel { ChildServicesViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { ChildServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildMypageViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildScreenshotViewModel(get(), get(), get()) }
     viewModel { ChildCameraViewModel(get(), get(), get(), get()) }
