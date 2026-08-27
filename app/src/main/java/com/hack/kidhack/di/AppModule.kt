@@ -212,6 +212,8 @@ val appModule = module {
                 TokenAuthenticator(
                     sessionRepository = get(),
                     sessionEvents = get(),
+                    chatMessageStore = get(),
+                    chatWebSocketClient = get(),
                     baseUrl = BuildConfig.BASE_URL.trimEnd('/') + "/",
                     refreshClient = OkHttpClient.Builder()
                         .connectTimeout(15, TimeUnit.SECONDS)
@@ -262,7 +264,11 @@ val appModule = module {
     single { get<Retrofit>().create(CardApi::class.java) }
 
     single<AuthRepository> {
-        if (useMock) FakeAuthRepository(get(), get()) else RealAuthRepository(get(), get(), get(), get())
+        if (useMock) {
+            FakeAuthRepository(get(), get(), get(), get())
+        } else {
+            RealAuthRepository(get(), get(), get(), get(), get(), get())
+        }
     }
     single<UserRepository> { if (useMock) FakeUserRepository(get()) else RealUserRepository(get()) }
     single<PairingRepository> { if (useMock) FakePairingRepository() else RealPairingRepository(get()) }
@@ -290,8 +296,8 @@ val appModule = module {
     single<InquiryRepository> {
         if (useMock) FakeInquiryRepository() else RealInquiryRepository(get())
     }
-    single { ChatWebSocketClient(get(), get(), BuildConfig.BASE_URL) }
-    // 어떤 구현을 쓰든 대화 기록은 기기에 남는다(앱을 완전히 종료해도 유지).
+    single { ChatWebSocketClient(get(), BuildConfig.BASE_URL) }
+    // 로그인 중 콜드 스타트용 캐시. 로그아웃 시 AuthRepository가 ChatMessageStore를 비운다.
     single<ChatRepository> {
         val delegate = if (useMock) {
             FakeChatRepository(get())
@@ -336,7 +342,7 @@ val appModule = module {
     viewModel { AppUsageDetailViewModel(get(), get(), get()) }
     viewModel { LocationViewModel(get(), get(), get(), get(), get()) }
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
-    viewModel { ParentChatViewModel(get(), get(), get()) }
+    viewModel { ParentChatViewModel(get(), get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get(), get(), get()) }
     viewModel { MypageViewModel(get(), get(), get(), get(), get()) }
     viewModel { EditProfileViewModel(get()) }
@@ -355,7 +361,7 @@ val appModule = module {
     viewModel { CardViewModel(get()) }
 
     viewModel { ChildHomeViewModel(get(), get(), get(), get(), get(), get()) }
-    viewModel { ChildChatViewModel(get()) }
+    viewModel { ChildChatViewModel(get(), get()) }
     viewModel { ChildServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildMypageViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildPairingViewModel(get()) }

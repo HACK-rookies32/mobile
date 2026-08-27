@@ -13,18 +13,20 @@ import kotlinx.coroutines.flow.onEach
  * 목/실서버 구현을 건드리지 않고 영속성만 얹기 위한 데코레이터다.
  * 부모·자녀 양쪽 채팅이 모두 이걸 거치므로 앱을 완전히 종료해도 대화가 남는다.
  *
- * 서버 조회가 실패하면 캐시를 그대로 돌려주므로 오프라인에서도 지난 대화를 볼 수 있다.
+ * 메시지: 서버 실패 시 디스크 캐시로 보조. 로그아웃 시 [ChatMessageStore.clear].
+ * 방 목록: 서버만 사용(로컬 저장/폴백 없음).
  */
 class CachedChatRepository(
     private val delegate: ChatRepository,
     private val store: ChatMessageStore,
 ) : ChatRepository {
 
+    override suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom =
+        delegate.getOrCreateRoom(parentId, childId)
+
     override suspend fun rooms(): List<ChatRoom> =
-        runCatching { delegate.rooms() }
-            .onSuccess { if (it.isNotEmpty()) store.saveRooms(it) }
-            .getOrElse { store.loadRooms() }
-            .ifEmpty { store.loadRooms() }
+        // 방 목록은 서버만 사용. 로컬 폴백/저장은 계정 교차 노출을 만든다.
+        runCatching { delegate.rooms() }.getOrElse { emptyList() }
 
     override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> {
         val cached = store.loadMessages(roomId)

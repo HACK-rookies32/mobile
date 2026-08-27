@@ -30,7 +30,7 @@ object FakeData {
     const val PAIRING_CODE = "382194"
 
     val parent = User(
-        id = "user-parent",
+        id = "1",
         loginId = "parent01",
         name = "김지영",
         role = Role.PARENT,
@@ -40,16 +40,17 @@ object FakeData {
     )
 
     val childUser = User(
-        id = "user-child",
+        id = "101",
         loginId = "minjun",
         name = "김민준",
         role = Role.CHILD,
         phone = "010-8765-4321",
         email = "minjun@email.com",
+        parentId = 1L,
     )
 
     val minjun = ChildProfile(
-        id = "child-minjun",
+        id = "101",
         name = "김민준",
         alias = "민준",
         ageLabel = "12세 · 초등학교 6학년",
@@ -60,7 +61,7 @@ object FakeData {
     )
 
     val jia = ChildProfile(
-        id = "child-jia",
+        id = "102",
         name = "이지아",
         alias = "지아",
         ageLabel = "9세 · 초등학교 3학년",

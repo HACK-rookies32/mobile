@@ -17,6 +17,8 @@ data class User(
     val phone: String = "",
     val email: String? = null,
     val profileImageUrl: String? = null,
+    /** 자녀 계정만. 연결된 부모 member id. */
+    val parentId: Long? = null,
 )
 
 data class ChildProfile(
@@ -161,6 +163,9 @@ data class ChatRoom(
     val lastMessage: String,
     val lastAt: String,
     val online: Boolean,
+    /** 서버 방 소유자. 계정 전환 시 잘못된 room 재사용 방지용. */
+    val parentId: Long? = null,
+    val childId: Long? = null,
 )
 
 data class ChatMessage(

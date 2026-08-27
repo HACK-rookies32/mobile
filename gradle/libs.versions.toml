@@ -23,6 +23,8 @@ playServicesMaps = "19.2.0"
 mapsCompose = "6.4.1"
 camerax = "1.4.2"
 zxing = "3.5.3"
+stomp = "1.6.6"
+rxjava = "2.2.21"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -68,6 +70,8 @@ androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", 
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+stomp-android = { group = "com.github.NaikSoftware", name = "StompProtocolAndroid", version.ref = "stomp" }
+rxjava = { group = "io.reactivex.rxjava2", name = "rxjava", version.ref = "rxjava" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

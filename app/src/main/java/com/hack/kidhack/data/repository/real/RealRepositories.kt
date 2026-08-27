@@ -4,6 +4,7 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.remote.api.AllowanceApi
 import com.hack.kidhack.data.remote.api.AppControlApi
 import com.hack.kidhack.data.remote.api.AppUsageApi
@@ -45,6 +46,7 @@ import com.hack.kidhack.data.remote.dto.ChargePrepareRequest
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
+import com.hack.kidhack.data.remote.dto.CreateChatRoomRequest
 import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
@@ -155,6 +157,8 @@ class RealAuthRepository(
     private val userApi: UserApi,
     private val sessionRepository: SessionRepository,
     private val sessionEvents: SessionEvents,
+    private val chatMessageStore: ChatMessageStore,
+    private val chatWebSocketClient: ChatWebSocketClient,
 ) : AuthRepository {
     override suspend fun signup(
         loginId: String,
@@ -206,6 +210,8 @@ class RealAuthRepository(
     override suspend fun logout() {
         runCatching { api.logout() }
         sessionRepository.clear()
+        chatMessageStore.clear()
+        chatWebSocketClient.reset()
         sessionEvents.emitLogout()
     }
 
@@ -240,6 +246,7 @@ class RealAuthRepository(
             phone = fromUser?.phone.orEmpty(),
             email = fromUser?.email,
             profileImageUrl = fromUser?.profileImageUrl,
+            parentId = fromUser?.parentId,
         )
         sessionRepository.save(Session(access, refresh, placeholder))
         return try {
@@ -251,6 +258,7 @@ class RealAuthRepository(
                 loginId = me.loginId.ifBlank { placeholder.loginId },
                 name = me.name.ifBlank { placeholder.name },
                 role = loginRole ?: meDto.role.toRoleOrNull() ?: preferredRole ?: Role.PARENT,
+                parentId = me.parentId ?: placeholder.parentId,
             )
             Session(access, refresh, merged).also { sessionRepository.save(it) }
         } catch (t: Throwable) {
@@ -507,22 +515,39 @@ class RealChatRepository(
     private val ws: ChatWebSocketClient,
     private val sessionRepository: SessionRepository,
 ) : ChatRepository {
-    override suspend fun rooms(): List<ChatRoom> = api.rooms().unwrap().map { it.toDomain() }
+    override suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom =
+        api.createOrGetRoom(CreateChatRoomRequest(parentId, childId)).unwrap().toDomain()
 
-    override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> =
-        api.messages(roomId, before, size).unwrap().map { it.toDomain() }
+    override suspend fun rooms(): List<ChatRoom> =
+        // 백엔드에 방 목록 API 없음. ViewModel에서 children + getOrCreate 사용.
+        emptyList()
+
+    override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> {
+        val session = sessionRepository.current()
+        val myId = session?.user?.id?.toLongOrNull()
+        val myRole = session?.user?.role ?: Role.PARENT
+        return api.messages(roomId, before, size).unwrap().content.map {
+            it.toDomain(myUserId = myId, myRole = myRole)
+        }
+    }
 
     override fun observeMessages(roomId: String): Flow<ChatMessage> =
         ws.events
-            .onStart { ws.start() }
+            .onStart {
+                ws.subscribeRoom(roomId)
+                ws.start()
+            }
             .onCompletion { ws.stop() }
             .filterIsInstance<ChatWsEvent.Message>()
             .map { it.message }
             .filter { it.roomId == roomId }
 
     override suspend fun send(roomId: String, content: String): ChatMessage {
-        ws.send(roomId, content)
-        val role = sessionRepository.current()?.user?.role ?: Role.PARENT
+        val session = sessionRepository.current()
+        val role = session?.user?.role ?: Role.PARENT
+        val senderId = session?.user?.id?.toLongOrNull()
+            ?: error("로그인 정보가 없어요")
+        ws.send(roomId, senderId, content)
         val now = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
         return ChatMessage(
             id = "local-${System.currentTimeMillis()}",
@@ -534,7 +559,7 @@ class RealChatRepository(
     }
 
     override suspend fun markRead(roomId: String, lastMessageId: String?) {
-        ws.read(roomId, lastMessageId)
+        // 백엔드 미지원
     }
 }
 
