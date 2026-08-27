@@ -23,9 +23,15 @@ class AppUsageWorker(
 
     private val sessionRepository: SessionRepository by inject()
     private val appUsageRepository: AppUsageRepository by inject()
+    private val usageCollector: AppUsageCollector by inject()
+    private val screenTimeWatcher: ScreenTimeWatcher by inject()
 
     override suspend fun doWork(): Result {
         val childId = sessionRepository.current()?.user?.id ?: return Result.success()
+
+        // 자녀가 앱을 열지 않아도 한도 도달은 기록돼야 한다.
+        screenTimeWatcher.check(usageCollector.todayUsage().totalMinutes)
+
         val manager = applicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
             ?: return Result.success()
         val end = System.currentTimeMillis()

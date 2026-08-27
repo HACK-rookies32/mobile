@@ -12,6 +12,7 @@ sealed class Route(val path: String) {
     data object ParentChat : Route("parent/chat")
     data object ParentNotifications : Route("parent/notifications")
     data object ParentMypage : Route("parent/mypage")
+    data object ParentEditProfile : Route("parent/editprofile")
     data object ParentAppControl : Route("parent/appcontrol")
     data object ParentScreenshot : Route("parent/screenshot")
     data object ParentChildProfile : Route("parent/profile")
@@ -25,6 +26,7 @@ sealed class Route(val path: String) {
     data object ParentNotice : Route("parent/notice")
     data object ParentContact : Route("parent/contact")
     data object ParentPay : Route("parent/pay")
+    data object ParentCards : Route("parent/cards")
     data object ParentGeofence : Route("parent/geofence")
 
     data object ChildGraph : Route("child")
@@ -34,8 +36,19 @@ sealed class Route(val path: String) {
     data object ChildChat : Route("child/chat")
     data object ChildServices : Route("child/services")
     data object ChildCamera : Route("child/camera")
+    data object ChildCameraRequest : Route("child/camera?requestId={requestId}&gallery={gallery}") {
+        fun create(requestId: String) = "child/camera?requestId=$requestId&gallery=false"
+
+        /** 마이페이지 「카메라 갤러리」처럼 갤러리 탭을 바로 열 때. */
+        fun gallery() = "child/camera?gallery=true"
+
+        /** 하단 카메라 탭. 갤러리로 열린 적이 있어도 항상 카메라로 시작한다. */
+        fun camera() = "child/camera?gallery=false"
+    }
     data object ChildMypage : Route("child/mypage")
     data object ChildScreenshot : Route("child/screenshot")
+    data object ChildPay : Route("child/pay")
+    data object ChildProfileEdit : Route("child/profile/edit")
 }
 
 data class TabItem(

@@ -2,13 +2,20 @@ package com.hack.kidhack.domain.repository
 
 import androidx.paging.PagingData
 import com.hack.kidhack.domain.model.AppControlItem
+import com.hack.kidhack.domain.model.Allowance
+import com.hack.kidhack.domain.model.AllowanceEntry
+import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
+import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
+import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -16,22 +23,31 @@ import com.hack.kidhack.domain.model.Payment
 import com.hack.kidhack.domain.model.PointBalance
 import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
+import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
+import com.hack.kidhack.domain.model.Wallet
+import com.hack.kidhack.domain.model.WalletTransaction
+import com.hack.kidhack.domain.model.TransferResult
 import kotlinx.coroutines.flow.Flow
+import java.io.File
 
 interface AuthRepository {
     suspend fun signup(
         loginId: String,
+        username: String,
         password: String,
-        name: String,
-        role: Role,
-        phone: String,
+        nickname: String?,
         email: String?,
-        pairingCode: String?,
+        phoneNumber: String,
+        birthDate: String,
+        address: String?,
+        profileImageUrl: String? = null,
+        role: Role,
+        parentId: Long?,
     ): Session
 
     suspend fun login(loginId: String, password: String, preferredRole: Role? = null): Session
@@ -42,7 +58,14 @@ interface AuthRepository {
 
 interface UserRepository {
     suspend fun me(): User
-    suspend fun updateMe(name: String?, phone: String?, email: String?): User
+    suspend fun updateMe(
+        nickname: String?,
+        name: String?,
+        phone: String?,
+        email: String?,
+        profileImageUrl: String?,
+    ): User
+    suspend fun changePassword(newPassword: String)
     suspend fun deleteMe()
     suspend fun notificationSettings(): NotificationSettings
     suspend fun patchNotificationSettings(settings: NotificationSettings): NotificationSettings
@@ -56,7 +79,14 @@ interface PairingRepository {
 interface ChildRepository {
     suspend fun children(): List<ChildProfile>
     suspend fun child(childId: String): ChildProfile
-    suspend fun updateChild(childId: String, name: String?, alias: String?, profileImageUrl: String?): ChildProfile
+    suspend fun updateChild(
+        childId: String,
+        name: String?,
+        alias: String?,
+        profileImageUrl: String?,
+        birthDate: String?,
+        school: String?
+    ): ChildProfile
 }
 
 interface LocationRepository {
@@ -88,15 +118,92 @@ interface ScreenshotRepository {
     fun paged(childId: String): Flow<PagingData<Screenshot>>
     suspend fun list(childId: String): List<Screenshot>
     suspend fun requestCapture(childId: String)
+
+    /** 자녀 기기가 캡처한 이미지를 multipart 로 올린다. trigger 는 SCHEDULED | MANUAL. */
+    suspend fun upload(
+        childId: String,
+        file: File,
+        capturedAt: String,
+        trigger: String,
+    ): Screenshot
+}
+
+/** 자녀 카메라로 찍은 사진을 부모 계정으로 올린다. */
+interface PhotoRepository {
+    suspend fun upload(
+        childId: String,
+        file: File,
+        capturedAt: String,
+        requestId: String?,
+    ): ChildPhoto
+}
+
+/**
+ * 부모 → 자녀 원격 요청 수신 채널.
+ *
+ * Firebase(FCM)를 쓰지 않으므로 실시간 경로는 WebSocket, 백업 경로는 주기 폴링이다.
+ * [observe] 는 소켓 이벤트, [pending] 은 폴링에 쓴다.
+ */
+interface CommandRepository {
+    fun observe(): Flow<RemoteCommand>
+
+    /**
+     * 실시간 요청 채널(WebSocket)이 붙어 있는지.
+     *
+     * 끊겨 있으면 부모 요청이 15분 폴링으로만 들어오므로 화면에 그대로 알려 준다.
+     */
+    val connected: Flow<Boolean>
+
+    /** 상주 소켓을 내린다. 자녀 세션이 끝날 때(로그아웃/역할 변경) 호출한다. */
+    fun disconnect()
+
+    suspend fun pending(childId: String): List<RemoteCommand>
+    suspend fun ack(childId: String, requestId: String, status: String, message: String? = null)
 }
 
 interface CommunityRepository {
     fun pagedPosts(): Flow<PagingData<Post>>
     suspend fun posts(): List<Post>
     suspend fun post(postId: String): Post
-    suspend fun create(title: String, body: String): Post
+    suspend fun create(
+        title: String,
+        body: String,
+        imageUrls: List<String>? = null,
+        links: List<String>? = null
+    ): Post
     suspend fun like(postId: String)
     suspend fun comment(postId: String, body: String)
+    suspend fun reportPost(postId: String, reason: String, detail: String? = null)
+    suspend fun reportComment(postId: String, commentId: String, reason: String, detail: String? = null)
+}
+
+interface InquiryRepository {
+    suspend fun list(): List<Inquiry>
+    suspend fun create(title: String, body: String, imageUrls: List<String>? = null, links: List<String>? = null): Inquiry
+    suspend fun get(id: String): Inquiry
+}
+
+interface WalletRepository {
+    suspend fun getMyWallet(): Wallet
+    suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction>
+    suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult
+    suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult
+    suspend fun getChildWallet(childId: String): Wallet
+    suspend fun prepareCharge(amount: Int, method: String, cardId: String): Charge
+    suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet
+}
+
+interface CardRepository {
+    suspend fun register(
+        cardNumber: String,
+        expiry: String,
+        cvc: String,
+        cardPassword2: String,
+        birthDate: String,
+        ownerName: String
+    ): Card
+    suspend fun list(): List<Card>
+    suspend fun delete(cardId: String)
 }
 
 interface ChatRepository {
@@ -131,6 +238,37 @@ interface AppUsageRepository {
 
 interface AppControlRepository {
     suspend fun items(childId: String): List<AppControlItem>
+    suspend fun getInstalledApps(childId: String): List<com.hack.kidhack.domain.model.InstalledApp>
+    suspend fun updateAppControl(
+        childId: String,
+        packageName: String,
+        blocked: Boolean,
+        limitMinutes: Int?
+    ): AppControlItem
+    suspend fun deleteAppControl(childId: String, packageName: String)
+}
+
+/**
+ * 루키즈페이 용돈 지갑.
+ *
+ * 구독·결제 적립에 쓰는 [PointRepository] 와 분리된 별도 지갑이다.
+ * 잔액의 유일한 공급원은 부모의 [send] 이고, 자녀는 [pay] 로 소비만 한다.
+ */
+interface AllowanceRepository {
+    suspend fun balance(childId: String): Allowance
+    suspend fun history(childId: String): List<AllowanceEntry>
+
+    /** 부모 모드 전용 — 자녀 앱에는 이 UI 가 없다. */
+    suspend fun send(childId: String, amount: Int, memo: String?): Allowance
+
+    /** 부모 모드 전용 — 남은 용돈을 회수한다. */
+    suspend fun withdraw(childId: String, amount: Int, memo: String?): Allowance
+
+    /**
+     * 자녀 모드 QR 결제. 잔액 검증의 최종 권한은 서버에 있다.
+     * (부모가 방금 회수했을 수 있으므로 클라이언트 잔액만 믿으면 안 된다.)
+     */
+    suspend fun pay(childId: String, token: String, amount: Int, merchant: String?): AllowancePayment
 }
 
 interface SessionRepository {
@@ -158,3 +296,6 @@ interface ChildOnboardingStore {
     suspend fun isDone(): Boolean
     suspend fun markDone()
 }
+
+/** 자녀 앱에서 "내 childId". 서버 리소스 경로에 그대로 들어간다. */
+suspend fun SessionRepository.childId(): String = current()?.user?.id.orEmpty()

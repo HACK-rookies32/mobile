@@ -21,3 +21,6 @@ local.properties
 *.jks
 *.keystore
 google-services.json
+
+# 로컬 환경 변수(API 키 등 비밀 값). .env.example 은 커밋해도 됨
+.env

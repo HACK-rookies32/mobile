@@ -111,26 +111,21 @@ fun LoginScreen(
             Text("  또는  ", color = colors.muted, fontSize = 12.sp, fontWeight = FontBold)
             Box(Modifier.weight(1f).height(1.dp).background(colors.border))
         }
-        Text(
-            text = "계정이 없으신가요? 회원가입",
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onRegister),
-            color = colors.muted,
-            fontSize = 14.sp,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = "회원가입",
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onRegister),
-            color = colors.brand,
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 14.sp,
-            textAlign = TextAlign.Center,
-        )
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Text("계정이 없으신가요? ", color = colors.muted, fontSize = 14.sp)
+            Text(
+                text = "회원가입",
+                color = colors.brand,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 14.sp,
+            )
+        }
     }
 }
 

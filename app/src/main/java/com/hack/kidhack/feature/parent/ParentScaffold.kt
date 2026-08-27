@@ -48,7 +48,7 @@ fun ParentScreenScaffold(
     modifier: Modifier = Modifier,
     overlap: Boolean = true,
     scrollable: Boolean = true,
-    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 24.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
     bottomBar: @Composable () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {

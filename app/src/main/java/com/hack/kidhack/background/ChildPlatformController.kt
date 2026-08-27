@@ -2,23 +2,28 @@ package com.hack.kidhack.background
 
 import android.content.Context
 import com.hack.kidhack.background.capture.ScreenCaptureWorker
+import com.hack.kidhack.background.command.ChildCommandPollWorker
+import com.hack.kidhack.background.command.ChildCommandService
 import com.hack.kidhack.background.geofence.GeofenceRegistrar
 import com.hack.kidhack.background.location.GpsStatusMonitor
 import com.hack.kidhack.background.location.LocationBatchWorker
 import com.hack.kidhack.background.location.LocationTrackingService
 import com.hack.kidhack.background.usage.AppUsageWorker
+import com.hack.kidhack.core.permission.KidhackPermissions
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.repository.ChildOnboardingStore
 import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Starts child-role platform services only after login **and** onboarding.
+ * Starts child-role platform services only after login, onboarding, and required permissions.
  * Parent sessions never start these workers/services.
  */
 class ChildPlatformController(
@@ -29,16 +34,28 @@ class ChildPlatformController(
     private val geofenceRegistrar: GeofenceRegistrar,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val reevaluateTick = MutableStateFlow(0)
     private var running = false
 
     fun bind() {
         scope.launch {
-            combine(sessionRepository.session, onboardingStore.done) { session, done ->
-                session?.user?.role == Role.CHILD && done
+            combine(
+                sessionRepository.session,
+                onboardingStore.done,
+                reevaluateTick,
+            ) { session, done, _ ->
+                session?.user?.role == Role.CHILD &&
+                    done &&
+                    KidhackPermissions.hasAllRequiredForChildControl(context)
             }.distinctUntilChanged().collect { active ->
                 if (active) start() else stop()
             }
         }
+    }
+
+    /** Re-check permissions after onboarding/signup grants (when [done] may already be true). */
+    fun reevaluate() {
+        reevaluateTick.update { it + 1 }
     }
 
     private fun start() {
@@ -50,12 +67,16 @@ class ChildPlatformController(
         gpsStatusMonitor.start()
         AppUsageWorker.enqueuePeriodic(context)
         ScreenCaptureWorker.enqueuePeriodic(context)
+        // FCM 대체 경로: 상주 WebSocket(실시간) + 15분 폴링(백업)
+        ChildCommandService.start(context)
+        ChildCommandPollWorker.enqueuePeriodic(context)
         scope.launch { runCatching { geofenceRegistrar.sync() } }
     }
 
     private fun stop() {
         if (!running) {
             LocationTrackingService.stop(context)
+            ChildCommandService.stop(context)
             return
         }
         running = false
@@ -64,6 +85,8 @@ class ChildPlatformController(
         gpsStatusMonitor.stop()
         AppUsageWorker.cancel(context)
         ScreenCaptureWorker.cancel(context)
+        ChildCommandService.stop(context)
+        ChildCommandPollWorker.cancel(context)
         geofenceRegistrar.clear()
     }
 }

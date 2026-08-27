@@ -3,19 +3,23 @@ package com.hack.kidhack.feature.parent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -30,6 +34,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
+import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.StatCard
 import com.hack.kidhack.core.designsystem.component.UsageBar
@@ -89,6 +94,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
+                // TODO: Backend Integration - Real API 연결 시 childRepository의 실구현체(RealChildRepository)를 사용하도록 di/AppModule.kt 수정
                 val children = childRepository.children()
                 val selectedId = selectedChildRepository.resolveId(children)
                 Triple(children, selectedId, selectedId)
@@ -113,6 +119,7 @@ class DashboardViewModel(
         runCatching {
             val child = _state.value.children.find { it.id == childId }
                 ?: childRepository.child(childId)
+            // TODO: Backend Integration - API 엔드포인트에 따라 파라미터(날짜, 타입 등) 조정 필요
             val usages = appUsageRepository.list(childId, "APP")
             val notes = notificationRepository.list(null)
             val loc = runCatching { locationRepository.current(childId) }.getOrNull()
@@ -124,6 +131,7 @@ class DashboardViewModel(
                     selected = child,
                     usages = usages,
                     notifications = notes,
+                    // TODO: Backend Integration - 실 API가 위경도만 줄 경우 역지오코딩 로직 추가 필요
                     lastLocation = loc?.label,
                     lastLocationAt = loc?.recordedAt?.takeLast(5),
                 )
@@ -134,6 +142,7 @@ class DashboardViewModel(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParentDashboardScreen(
     onOpenNotifications: () -> Unit = {},
@@ -146,7 +155,7 @@ fun ParentDashboardScreen(
     val colors = LocalKidhackColors.current
     val child = state.selected
     val totalSec = state.usages.sumOf { it.durationSec }
-    val alertCount = state.notifications.count { !it.read }.coerceAtLeast(state.notifications.size.coerceAtMost(2))
+    val alertCount = state.notifications.count { !it.read }
     val maxUsage = state.usages.maxOfOrNull { it.durationSec }?.coerceAtLeast(1) ?: 1
 
     ParentScreenScaffold(
@@ -213,110 +222,151 @@ fun ParentDashboardScreen(
                 )
             }
         },
+        scrollable = false,
     ) {
-        ParentLoadingOrError(state.loading && child == null, state.error, viewModel::refresh)
-        if (child != null) {
-            KidCard(Modifier.clickable(onClick = onOpenProfile)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+        PullToRefreshBox(
+            isRefreshing = state.loading,
+            onRefresh = viewModel::refresh,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ParentLoadingOrError(state.loading && child == null, state.error, viewModel::refresh)
+
+                if (!state.loading && state.children.isEmpty()) {
                     Box(
                         modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Brush.linearGradient(listOf(colors.brand, colors.brandDark))),
+                            .fillMaxWidth()
+                            .padding(vertical = 64.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(child.avatarEmoji(), fontSize = 28.sp)
-                    }
-                    Spacer(Modifier.size(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(child.name, fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 18.sp, color = colors.text)
-                        Text(
-                            if (child.online) stringResource(R.string.parent_dashboard_online) else stringResource(R.string.parent_dashboard_offline),
-                            color = if (child.online) colors.safe else colors.muted,
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontBold,
-                            fontSize = 12.sp,
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(stringResource(R.string.parent_dashboard_last_location), color = colors.muted, fontSize = 11.sp, fontWeight = FontBold)
-                        Text(
-                            state.lastLocation?.let { "📍 ${it.substringAfterLast('(').removeSuffix(")").ifBlank { it }}" }
-                                ?: stringResource(R.string.parent_location_school),
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontBold,
-                            fontSize = 12.sp,
-                            color = colors.text,
-                        )
-                        Text(state.lastLocationAt ?: "", color = colors.muted, fontSize = 11.sp)
-                    }
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatCard("⏱️", stringResource(R.string.parent_dashboard_stat_screentime), formatDuration(totalSec), Modifier.weight(1f))
-                StatCard("🛡️", stringResource(R.string.parent_dashboard_stat_blocked), stringResource(R.string.parent_dashboard_blocked_count), Modifier.weight(1f))
-                StatCard("⚠️", stringResource(R.string.parent_dashboard_stat_alerts), "${alertCount}건", Modifier.weight(1f))
-            }
-            KidCard {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(R.string.parent_dashboard_usage_title),
-                        modifier = Modifier.weight(1f),
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBold,
-                        fontSize = 14.sp,
-                        color = colors.text,
-                    )
-                    Text(
-                        stringResource(R.string.parent_dashboard_see_all),
-                        modifier = Modifier.clickable(onClick = onOpenAppControl),
-                        color = colors.brand,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBold,
-                        fontSize = 12.sp,
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-                val barColors = listOf(Color(0xFFF87171), Color(0xFFFACC15), colors.info)
-                state.usages.forEachIndexed { i, u ->
-                    UsageBar(
-                        name = u.appName,
-                        timeLabel = formatDuration(u.durationSec),
-                        progress = u.durationSec.toFloat() / maxUsage,
-                        barColor = barColors.getOrElse(i) { colors.brand },
-                    )
-                    if (i < state.usages.lastIndex) Spacer(Modifier.height(10.dp))
-                }
-            }
-            KidCard {
-                Text(
-                    stringResource(R.string.parent_dashboard_recent),
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBold,
-                    fontSize = 14.sp,
-                    color = colors.text,
-                )
-                Spacer(Modifier.height(8.dp))
-                state.notifications.take(3).forEachIndexed { i, n ->
-                    val icon = when (n.type) {
-                        "HARMFUL" -> "🚫" to colors.danger
-                        "ARRIVAL" -> "📍" to colors.safe
-                        else -> "⏱️" to colors.warn
-                    }
-                    Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
-                        Text(icon.first, fontSize = 18.sp)
-                        Spacer(Modifier.size(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(n.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 12.sp, color = colors.text)
-                            Text(n.createdAt, fontFamily = KidhackFontFamily, fontWeight = FontSemibold, fontSize = 12.sp, color = colors.muted)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = stringResource(R.string.parent_dashboard_empty_child),
+                                fontFamily = KidhackFontFamily,
+                                fontWeight = FontSemibold,
+                                fontSize = 14.sp,
+                                color = colors.muted,
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            KidButton(
+                                text = stringResource(R.string.parent_dashboard_empty_pair_action),
+                                onClick = onOpenPairing,
+                            )
                         }
                     }
-                    if (i < state.notifications.take(3).lastIndex) {
-                        Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
+                }
+
+                if (child != null) {
+                    KidCard(Modifier.clickable(onClick = onOpenProfile)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Brush.linearGradient(listOf(colors.brand, colors.brandDark))),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(child.avatarEmoji(), fontSize = 28.sp)
+                            }
+                            Spacer(Modifier.size(16.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(child.name, fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 18.sp, color = colors.text)
+                                Text(
+                                    if (child.online) stringResource(R.string.parent_dashboard_online) else stringResource(R.string.parent_dashboard_offline),
+                                    color = if (child.online) colors.safe else colors.muted,
+                                    fontFamily = KidhackFontFamily,
+                                    fontWeight = FontBold,
+                                    fontSize = 12.sp,
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(stringResource(R.string.parent_dashboard_last_location), color = colors.muted, fontSize = 11.sp, fontWeight = FontBold)
+                                Text(
+                                    state.lastLocation?.let { "📍 ${it.substringAfterLast('(').removeSuffix(")").ifBlank { it }}" }
+                                        ?: stringResource(R.string.parent_location_school),
+                                    fontFamily = KidhackFontFamily,
+                                    fontWeight = FontBold,
+                                    fontSize = 12.sp,
+                                    color = colors.text,
+                                )
+                                Text(state.lastLocationAt ?: "", color = colors.muted, fontSize = 11.sp)
+                            }
+                        }
                     }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatCard("⏱️", stringResource(R.string.parent_dashboard_stat_screentime), formatDuration(totalSec), Modifier.weight(1f))
+                        // GAP-03: 앱통제 API 없음, docs/spec-gaps.md 참고 — Fake 상수, 실API 연결 금지
+                        // TODO: Backend Integration - 차단된 앱 개수를 반환하는 API가 추가되면 해당 값으로 교체
+                        StatCard("🛡️", stringResource(R.string.parent_dashboard_stat_blocked), stringResource(R.string.parent_dashboard_blocked_count), Modifier.weight(1f))
+                        StatCard("⚠️", stringResource(R.string.parent_dashboard_stat_alerts), "${alertCount}건", Modifier.weight(1f))
+                    }
+                    KidCard {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(R.string.parent_dashboard_usage_title),
+                                modifier = Modifier.weight(1f),
+                                fontFamily = KidhackFontFamily,
+                                fontWeight = FontBold,
+                                fontSize = 14.sp,
+                                color = colors.text,
+                            )
+                            Text(
+                                stringResource(R.string.parent_dashboard_see_all),
+                                modifier = Modifier.clickable(onClick = onOpenAppControl),
+                                color = colors.brand,
+                                fontFamily = KidhackFontFamily,
+                                fontWeight = FontBold,
+                                fontSize = 12.sp,
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        val barColors = listOf(Color(0xFFF87171), Color(0xFFFACC15), colors.info)
+                        state.usages.forEachIndexed { i, u ->
+                            UsageBar(
+                                name = u.appName,
+                                timeLabel = formatDuration(u.durationSec),
+                                progress = u.durationSec.toFloat() / maxUsage,
+                                barColor = barColors.getOrElse(i) { colors.brand },
+                            )
+                            if (i < state.usages.lastIndex) Spacer(Modifier.height(10.dp))
+                        }
+                    }
+                    KidCard {
+                        Text(
+                            stringResource(R.string.parent_dashboard_recent),
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 14.sp,
+                            color = colors.text,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        state.notifications.take(3).forEachIndexed { i, n ->
+                            val icon = when (n.type) {
+                                "HARMFUL" -> "🚫" to colors.danger
+                                "ARRIVAL" -> "📍" to colors.safe
+                                else -> "⏱️" to colors.warn
+                            }
+                            Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
+                                Text(icon.first, fontSize = 18.sp)
+                                Spacer(Modifier.size(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(n.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 12.sp, color = colors.text)
+                                    Text(n.createdAt, fontFamily = KidhackFontFamily, fontWeight = FontSemibold, fontSize = 12.sp, color = colors.muted)
+                                }
+                            }
+                            if (i < state.notifications.take(3).lastIndex) {
+                                Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
                 }
             }
-            Spacer(Modifier.height(8.dp))
         }
     }
 }
