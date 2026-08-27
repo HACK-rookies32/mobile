@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.background.ChildPlatformController
+import com.hack.kidhack.core.common.digitsOnlyPhone
 import com.hack.kidhack.core.common.formatPhoneNumber
 import com.hack.kidhack.core.permission.KidhackPermissions
 import com.hack.kidhack.data.remote.userMessage
@@ -66,7 +67,7 @@ class RegisterViewModel(
     fun onLoginId(v: String) = _state.update { it.copy(loginId = v) }
     fun onRealName(v: String) = _state.update { it.copy(realName = v) }
     fun onPhoneNumber(v: String) = _state.update {
-        it.copy(phoneNumber = formatPhoneNumber(v))
+        it.copy(phoneNumber = digitsOnlyPhone(v))
     }
     fun onEmail(v: String) = _state.update { it.copy(email = v) }
     fun onBirthDate(v: String) = _state.update { it.copy(birthDate = v) }
@@ -98,7 +99,8 @@ class RegisterViewModel(
         val parentIdValue = s.parentId.toLongOrNull()
         when {
             s.loginId.isBlank() -> _state.update { it.copy(error = "아이디를 입력해 주세요") }
-            s.realName.isBlank() -> _state.update { it.copy(error = "실명을 입력해 주세요") }
+            s.realName.isBlank() -> _state.update { it.copy(error = "이름을 입력해 주세요") }
+            s.nickname.isBlank() -> _state.update { it.copy(error = "닉네임을 입력해 주세요") }
             s.phoneNumber.isBlank() -> _state.update { it.copy(error = "휴대폰 번호를 입력해 주세요") }
             role != Role.CHILD && s.email.isBlank() ->
                 _state.update { it.copy(error = "이메일을 입력해 주세요") }
@@ -138,9 +140,9 @@ class RegisterViewModel(
                         loginId = s.loginId.trim(),
                         username = s.realName.trim(),
                         password = s.password,
-                        nickname = s.nickname.trim().ifBlank { null },
+                        nickname = s.nickname.trim(),
                         email = s.email.trim().ifBlank { null },
-                        phoneNumber = s.phoneNumber.trim(),
+                        phoneNumber = formatPhoneNumber(s.phoneNumber),
                         birthDate = s.birthDate.trim(),
                         address = s.address.trim().ifBlank { null },
                         role = role,

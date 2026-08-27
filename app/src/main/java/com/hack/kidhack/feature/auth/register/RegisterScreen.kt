@@ -41,6 +41,7 @@ import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.KidDateField
 import com.hack.kidhack.core.designsystem.component.KidTextField
+import com.hack.kidhack.core.common.PhoneNumberVisualTransformation
 import com.hack.kidhack.core.designsystem.component.StepProgressBar
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
@@ -132,7 +133,7 @@ fun RegisterScreen(
             )
             state.step == 1 && role != null -> InfoStep(
                 badge = if (role == Role.PARENT) "🛡️ 부모님으로 가입" else "😊 자녀로 가입",
-                nicknameLabel = if (role == Role.PARENT) "닉네임 (선택)" else "닉네임 (선택)",
+                nicknameLabel = "닉네임",
                 nicknamePlaceholder = if (role == Role.PARENT) "홍길동" else "나의 이름",
                 emailRequired = role != Role.CHILD,
                 showParentId = role == Role.CHILD,
@@ -210,7 +211,7 @@ private fun InfoStep(
     val colors = LocalKidhackColors.current
     Text(badge, color = colors.brandDark, fontWeight = FontBold, fontSize = 14.sp)
     KidTextField(state.loginId, viewModel::onLoginId, "아이디", placeholder = "로그인에 사용할 아이디")
-    KidTextField(state.realName, viewModel::onRealName, "실명", placeholder = "이름(실명)을 입력하세요")
+    KidTextField(state.realName, viewModel::onRealName, "이름", placeholder = "이름을 입력하세요")
     KidTextField(
         state.password,
         viewModel::onPassword,
@@ -233,6 +234,7 @@ private fun InfoStep(
         viewModel::onPhoneNumber,
         "휴대폰 번호",
         placeholder = "010-0000-0000",
+        visualTransformation = PhoneNumberVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
     )
     KidTextField(
@@ -385,9 +387,9 @@ private fun DoneStep(session: Session, onStart: () -> Unit) {
     }
     KidCard {
         Text(if (parent) "부모님 계정" else "자녀 계정", fontWeight = FontBold)
-        Text(session.user.loginId, color = colors.muted, fontSize = 12.sp)
+        Text("아이디  ${session.user.loginId}", color = colors.muted, fontSize = 12.sp)
         if (session.user.name.isNotBlank()) {
-            Text(session.user.name, color = colors.muted, fontSize = 12.sp)
+            Text("이름  ${session.user.name}", color = colors.muted, fontSize = 12.sp)
         }
     }
     KidButton(
