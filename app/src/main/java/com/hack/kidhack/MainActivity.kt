@@ -5,6 +5,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.hack.kidhack.background.alert.ParentAlertBus
+import com.hack.kidhack.background.alert.ParentAlertNotifier
 import com.hack.kidhack.background.command.ChildCommandBus
 import com.hack.kidhack.background.command.ChildCommandNotifier
 import com.hack.kidhack.core.designsystem.theme.KidhackTheme
@@ -26,6 +28,7 @@ val LocalPermissionRequester = staticCompositionLocalOf<PermissionRequester> {
 class MainActivity : ComponentActivity() {
 
     private val commandBus: ChildCommandBus by inject()
+    private val parentAlertBus: ParentAlertBus by inject()
     /** Registered before STARTED so system permission dialogs can be shown reliably. */
     val permissionRequester = PermissionRequester(this)
 
@@ -33,6 +36,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         routeRemoteCommand(intent)
+        routeParentAlert(intent)
         setContent {
             CompositionLocalProvider(LocalPermissionRequester provides permissionRequester) {
                 KidhackTheme {
@@ -47,6 +51,15 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         routeRemoteCommand(intent)
+        routeParentAlert(intent)
+    }
+
+    /** 부모 기기의 안전 알림 푸시 탭 → 알림 탭. 실제 이동은 `KidhackNavHost` 가 한다. */
+    private fun routeParentAlert(intent: Intent?) {
+        if (intent?.action != ParentAlertNotifier.ACTION_PARENT_ALERT) return
+        parentAlertBus.post(intent.getStringExtra(ParentAlertNotifier.EXTRA_ALERT_ID).orEmpty())
+        // 회전·복귀 때 같은 인텐트로 다시 이동하지 않도록 액션을 지운다.
+        intent.action = null
     }
 
     /**

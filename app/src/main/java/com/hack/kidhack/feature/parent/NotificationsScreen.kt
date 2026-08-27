@@ -25,6 +25,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
+import com.hack.kidhack.background.alert.ParentAlertSync
 import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.KidSwitch
 import com.hack.kidhack.core.designsystem.theme.FontBold
@@ -33,7 +34,6 @@ import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.NotificationSettings
-import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -51,7 +51,7 @@ data class NotificationsUiState(
 
 class NotificationsViewModel(
     private val userRepository: UserRepository,
-    private val notificationRepository: NotificationRepository,
+    private val alertSync: ParentAlertSync,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NotificationsUiState())
@@ -62,15 +62,19 @@ class NotificationsViewModel(
     fun load() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
-            runCatching {
-                val s = userRepository.notificationSettings()
-                val n = notificationRepository.list(null)
-                s to n
-            }.onSuccess { (s, n) ->
-                _state.update { it.copy(loading = false, settings = s, notifications = n) }
-            }.onFailure { t ->
-                _state.update { it.copy(loading = false, error = t.message) }
-            }
+            // 알림 목록은 로컬 보관함이 원본이라 서버가 실패해도 비지 않는다.
+            // 실패를 화면에 알리는 건 수신 설정 쪽뿐이다.
+            val alerts = alertSync.sync().alerts
+            runCatching { userRepository.notificationSettings() }
+                .onSuccess { s ->
+                    _state.update { it.copy(loading = false, settings = s, notifications = alerts) }
+                }
+                .onFailure { t ->
+                    _state.update { it.copy(loading = false, notifications = alerts, error = t.message) }
+                }
+            // 목록을 본 시점에 읽음 처리한다. 화면에 찍힌 미확인 점은 이번 조회 결과라
+            // 그대로 남고, 대시보드의 「알림 N건」은 다음 새로고침에 0 이 된다.
+            alertSync.markAllRead()
         }
     }
 

@@ -21,9 +21,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -34,6 +36,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
+import com.hack.kidhack.core.permission.KidhackPermissions
+import com.hack.kidhack.permissionRequester
+import com.hack.kidhack.background.alert.ParentAlertSync
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.StatCard
@@ -49,7 +54,6 @@ import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.LocationRepository
-import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -74,7 +78,7 @@ class DashboardViewModel(
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
     private val appUsageRepository: AppUsageRepository,
-    private val notificationRepository: NotificationRepository,
+    private val alertSync: ParentAlertSync,
     private val locationRepository: LocationRepository,
 ) : ViewModel() {
 
@@ -121,7 +125,9 @@ class DashboardViewModel(
                 ?: childRepository.child(childId)
             // TODO: Backend Integration - API 엔드포인트에 따라 파라미터(날짜, 타입 등) 조정 필요
             val usages = appUsageRepository.list(childId, "APP")
-            val notes = notificationRepository.list(null)
+            // 서버 목록을 로컬 보관함에 합쳐 저장하고, 새 알림은 푸시로 띄운 뒤 전체 목록을 받는다.
+            // 서버 조회가 실패해도 보관해 둔 알림은 그대로 보인다.
+            val notes = alertSync.sync().alerts
             val loc = runCatching { locationRepository.current(childId) }.getOrNull()
             _state.update {
                 it.copy(
@@ -153,6 +159,20 @@ fun ParentDashboardScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
+    val context = LocalContext.current
+    val permissions = permissionRequester()
+
+    // 안전 구역 이탈·유해 사이트 차단을 푸시로 받으려면 알림 권한이 필요하다(안드로이드 13+).
+    // 이미 거절해서 시스템 대화상자가 뜨지 않는 상태면 조용히 넘어간다.
+    LaunchedEffect(Unit) {
+        val permission = KidhackPermissions.notifications ?: return@LaunchedEffect
+        val activity = KidhackPermissions.findActivity(context) ?: return@LaunchedEffect
+        if (!KidhackPermissions.canShowSystemDialog(activity, permission)) return@LaunchedEffect
+        permissions.requestOne(permission) { granted ->
+            if (!granted) KidhackPermissions.recordDeny(context, permission)
+        }
+    }
+
     val child = state.selected
     val totalSec = state.usages.sumOf { it.durationSec }
     val alertCount = state.notifications.count { !it.read }

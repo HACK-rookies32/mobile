@@ -7,6 +7,7 @@ import com.hack.kidhack.core.common.KidhackJson
 import com.hack.kidhack.data.local.CapturedShotStore
 import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.local.ChildAlertStore
+import com.hack.kidhack.data.local.ParentAlertStore
 import com.hack.kidhack.data.local.ChildPhotoStore
 import com.hack.kidhack.data.local.ProfileScopeStore
 import com.hack.kidhack.data.local.ChildOnboardingStoreImpl
@@ -161,6 +162,7 @@ val appModule = module {
     single<ChildOnboardingStore> { ChildOnboardingStoreImpl(androidContext()) }
     single { ChatMessageStore(androidContext()) }
     single { ChildAlertStore(androidContext()) }
+    single { ParentAlertStore(androidContext()) }
     single { ChildPhotoStore(androidContext()) }
     single { CapturedShotStore(androidContext()) }
     single { ProfileScopeStore(androidContext()) }

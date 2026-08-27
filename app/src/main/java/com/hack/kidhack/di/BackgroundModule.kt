@@ -2,6 +2,10 @@ package com.hack.kidhack.di
 
 import com.hack.kidhack.background.ChildDeviceStatus
 import com.hack.kidhack.background.ChildPlatformController
+import com.hack.kidhack.background.ParentPlatformController
+import com.hack.kidhack.background.alert.ParentAlertBus
+import com.hack.kidhack.background.alert.ParentAlertNotifier
+import com.hack.kidhack.background.alert.ParentAlertSync
 import com.hack.kidhack.background.command.ChildCommandBus
 import com.hack.kidhack.background.command.ChildCommandNotifier
 import com.hack.kidhack.background.geofence.GeofenceRegistrar
@@ -22,4 +26,8 @@ val backgroundModule = module {
     single { GpsStatusMonitor(androidContext(), get()) }
     single { GeofenceRegistrar(androidContext(), get(), get()) }
     single { ChildPlatformController(androidContext(), get(), get(), get(), get()) }
+    single { ParentAlertBus() }
+    single { ParentAlertNotifier(androidContext()) }
+    single { ParentAlertSync(get(), get(), get(), get(), get()) }
+    single { ParentPlatformController(androidContext(), get()) }
 }
