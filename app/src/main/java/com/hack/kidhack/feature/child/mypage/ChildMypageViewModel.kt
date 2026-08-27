@@ -69,7 +69,7 @@ class ChildMypageViewModel(
                 ?: 0
             // 서비스 현황 탭과 같은 값을 보여야 하므로 동일한 수집기를 쓴다.
             val usage = usageCollector.todayUsage()
-            val notifications = runCatching { notificationRepository.list(null) }.getOrDefault(emptyList())
+            val notifications = runCatching { notificationRepository.list(childId) }.getOrDefault(emptyList())
             val balance = runCatching { allowanceRepository.balance(childId).balance }.getOrDefault(0)
             val blockedToday = alertStore.countToday(ChildAlertStore.TYPE_HARMFUL_BLOCK)
 

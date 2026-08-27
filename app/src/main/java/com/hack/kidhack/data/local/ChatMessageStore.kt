@@ -19,7 +19,7 @@ import java.io.File
  *
  * 방마다 JSON 파일 하나(`files/chat/<roomId>.json`)를 쓴다. 메시지 수는 [MAX_MESSAGES] 로
  * 잘라 파일이 무한정 커지지 않게 한다. 서버가 살아 있으면 항상 서버 값이 우선이고,
- * 이 저장소는 **오프라인/콜드 스타트용 캐시**다.
+ * 이 저장소는 **로그인 중 오프라인/콜드 스타트용 캐시**다. 로그아웃하면 [clear]로 비운다.
  */
 class ChatMessageStore(context: Context) {
 

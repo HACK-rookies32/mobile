@@ -5,7 +5,9 @@ import android.content.Context
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -30,7 +32,8 @@ class AppUsageWorker(
         val childId = sessionRepository.current()?.user?.id ?: return Result.success()
 
         // 자녀가 앱을 열지 않아도 한도 도달은 기록돼야 한다.
-        screenTimeWatcher.check(usageCollector.todayUsage().totalMinutes)
+        // 바로 아래에서 사용량을 보고하므로 여기서는 즉시 보고를 다시 예약하지 않는다.
+        screenTimeWatcher.check(usageCollector.todayUsage().totalMinutes, reportToServer = false)
 
         val manager = applicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
             ?: return Result.success()
@@ -62,6 +65,7 @@ class AppUsageWorker(
 
     companion object {
         const val UNIQUE = "kidhack.app.usage"
+        private const val UNIQUE_NOW = "kidhack.app.usage.now"
 
         fun enqueuePeriodic(context: Context) {
             val request = PeriodicWorkRequestBuilder<AppUsageWorker>(1, TimeUnit.HOURS)
@@ -76,8 +80,28 @@ class AppUsageWorker(
             )
         }
 
+        /**
+         * 다음 정시(1시간 주기)를 기다리지 않고 지금 보고한다.
+         *
+         * 스크린타임 한도 도달처럼 보호자가 바로 알아야 하는 순간에 쓴다.
+         * 서버가 사용량을 받아야 「사용량 한도」 알림을 만들 수 있다.
+         */
+        fun enqueueNow(context: Context) {
+            val request = OneTimeWorkRequestBuilder<AppUsageWorker>()
+                .setConstraints(
+                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+                )
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                UNIQUE_NOW,
+                ExistingWorkPolicy.REPLACE,
+                request,
+            )
+        }
+
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE)
+            WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NOW)
         }
     }
 }

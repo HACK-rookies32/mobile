@@ -13,17 +13,30 @@
     <string name="parent_dashboard_empty_pair_action">자녀 기기 연결하기</string>
     <string name="parent_dashboard_usage_title">오늘 앱 사용 현황</string>
     <string name="parent_dashboard_see_all">전체 보기</string>
+    <string name="parent_usage_detail_title">앱 사용량 상세</string>
     <string name="parent_dashboard_recent">최근 알림</string>
     <string name="parent_add_child">+ 추가</string>
     <string name="parent_location_school">📍 학교</string>
 
+    <string name="parent_map_fullscreen">전체화면</string>
+    <string name="parent_map_close">닫기</string>
     <string name="parent_location_title">자녀 위치 확인</string>
     <string name="parent_map_placeholder">지도 영역</string>
     <string name="parent_location_current">현재 위치</string>
     <string name="parent_location_live">실시간</string>
     <string name="parent_location_recent">최근 위치</string>
+    <string name="parent_location_realtime_toggle">실시간 추적</string>
+    <string name="parent_location_route_show">오늘 이동 경로 확인</string>
+    <string name="parent_location_route_hide">이동 경로 숨기기</string>
     <string name="parent_location_route">오늘 이동 경로</string>
     <string name="parent_location_empty_history">아직 기록된 이동 경로가 없어요</string>
+    <string name="parent_geofence_type_geofence">위험구역</string>
+    <string name="parent_geofence_type_destination">목적지</string>
+    <string name="parent_geofence_pick_hint">지도를 눌러 위치를 선택하세요</string>
+    <string name="parent_geofence_event_entered">%1$s에 도착하였습니다</string>
+    <string name="parent_geofence_event_exit">%1$s에서 이동했습니다</string>
+    <string name="parent_geofence_event_unknown_place">등록된 장소</string>
+    <string name="parent_geofence_events">최근 출입 기록</string>
     <string name="parent_geofence_manage">지정 장소 관리</string>
 
     <string name="parent_geofence_title">지정 장소 관리</string>
@@ -64,6 +77,7 @@
     <string name="parent_mypage_child_manage">자녀 관리</string>
     <string name="parent_mypage_app_control">앱 통제</string>
     <string name="parent_mypage_screenshot">화면 캡처</string>
+    <string name="parent_mypage_camera">카메라 촬영</string>
     <string name="parent_mypage_child_profile">자녀 프로필</string>
     <string name="parent_mypage_harmful">유해사이트 관리</string>
     <string name="parent_mypage_pairing">자녀 페어링</string>
@@ -130,6 +144,18 @@
     <string name="parent_screenshot_requesting">캡처 요청 중...</string>
     <string name="parent_screenshot_recent">최근 캡처 내역</string>
     <string name="parent_screenshot_empty">아직 캡처된 화면이 없어요</string>
+
+    <string name="parent_camera_title">카메라 촬영 요청</string>
+    <string name="parent_camera_live">실시간 카메라 촬영</string>
+    <string name="parent_camera_desc">자녀 기기의 카메라로 지금 사진을 찍어 달라고 요청합니다</string>
+    <string name="parent_camera_request">촬영 요청 보내기</string>
+    <string name="parent_camera_requesting">자녀의 촬영을 기다리는 중...</string>
+    <string name="parent_camera_recent">최근 촬영 내역</string>
+    <string name="parent_camera_empty">아직 촬영된 사진이 없어요</string>
+    <string name="parent_camera_view">보기</string>
+    <string name="parent_camera_close">닫기</string>
+    <string name="parent_camera_item_requested">요청 촬영</string>
+    <string name="parent_camera_item_self">자녀가 직접 촬영</string>
     <string name="parent_screenshot_view">보기</string>
 
     <string name="parent_profile_title">자녀 프로필 관리</string>
@@ -156,6 +182,9 @@
     <string name="parent_harmful_keyword_hint">URL 또는 키워드</string>
     <string name="parent_harmful_keyword_add">추가</string>
     <string name="parent_harmful_keywords">차단 키워드</string>
+    <string name="parent_harmful_keyword_remove">삭제</string>
+    <string name="parent_harmful_category_count">키워드 %1$d개</string>
+    <string name="parent_harmful_saving">저장 중…</string>
 
     <string name="parent_pairing_title">자녀 기기 연결</string>
     <string name="parent_pairing_install_title">자녀 기기에</string>
@@ -248,4 +277,27 @@
     <string name="parent_loading">불러오는 중…</string>
     <string name="parent_empty">표시할 내용이 없어요</string>
     <string name="parent_dash">—</string>
+    <string name="parent_notif_test_section">알림 테스트 (개발용)</string>
+    <string name="parent_notif_test_desc">누르면 최근 알림에 기록되고 푸시로도 떠요. 수신 설정이 꺼진 종류는 기록만 됩니다.</string>
+    <string name="parent_notif_test_gps">GPS 꺼짐 알림 보내기</string>
+    <string name="parent_notif_test_gps_title">자녀 기기의 GPS가 꺼졌어요</string>
+    <string name="parent_notif_test_gps_body">위치를 확인할 수 없어요. 자녀에게 위치 서비스를 켜 달라고 알려 주세요.</string>
+    <string name="parent_notif_test_geofence">안전 구역 이탈 알림 보내기</string>
+    <string name="parent_notif_test_geofence_title">안전 구역 이탈</string>
+    <string name="parent_notif_test_geofence_body">자녀가 「학교」 구역을 벗어났어요.</string>
+    <string name="parent_notif_test_harmful">유해 사이트 차단 알림 보내기</string>
+    <string name="parent_notif_test_harmful_title">유해 사이트 접속 차단</string>
+    <string name="parent_notif_test_harmful_body">부적절한 사이트 접속 시도가 차단되었어요.</string>
+    <string name="parent_notif_test_usage">앱 사용량 알림 보내기</string>
+    <string name="parent_notif_test_usage_title">앱 사용 시간 한도 도달</string>
+    <string name="parent_notif_test_usage_body">오늘 사용 시간이 정해 둔 한도에 도달했어요.</string>
+    <string name="parent_notif_test_notice">공지 알림 보내기</string>
+    <string name="parent_notif_test_notice_title">새 공지가 등록됐어요</string>
+    <string name="parent_notif_test_notice_body">루키즈 업데이트 안내를 확인해 주세요.</string>
+
+    <string name="parent_alert_channel">자녀 안전 알림</string>
+    <string name="parent_alert_channel_desc">안전 구역 이탈·유해 사이트 차단처럼 바로 확인해야 하는 알림</string>
+    <string name="parent_alert_default_title">새 알림이 도착했어요</string>
+    <string name="parent_alert_permission_rationale">알림을 켜면 안전 구역 이탈·유해 사이트 차단을 바로 받아볼 수 있어요</string>
+
 </resources>

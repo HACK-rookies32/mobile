@@ -133,6 +133,18 @@ class CapturedShotStore(context: Context) {
             Entry("s1", null, "오늘 14:22", "YouTube 시청 중", "MANUAL", 0),
             Entry("s2", null, "오늘 11:05", "카카오톡", "MANUAL", 0),
             Entry("s3", null, "어제 18:40", "Chrome", "SCHEDULED", 0),
-        )
+        ) + (4..36).map { i ->
+            // MAX_SHOTS(50) 캡을 넘지 않는 선에서 기존 패턴을 순환 생성한다.
+            val descs = listOf("YouTube 시청 중", "카카오톡", "Chrome", "인스타그램", "게임 중", "네이버 검색")
+            val triggers = listOf("MANUAL", "SCHEDULED")
+            Entry(
+                id = "s$i",
+                fileName = null,
+                capturedAt = "%02d.%02d %02d:%02d".format(8, (i % 28) + 1, i % 24, (i * 7) % 60),
+                description = descs[i % descs.size],
+                trigger = triggers[i % triggers.size],
+                atMillis = 0,
+            )
+        }
     }
 }

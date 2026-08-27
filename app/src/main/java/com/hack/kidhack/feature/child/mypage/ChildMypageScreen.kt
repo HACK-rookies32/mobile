@@ -40,6 +40,7 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun ChildMypageScreen(
     onServices: () -> Unit = {},
+    onLinkParent: () -> Unit = {},
     onScreenshot: () -> Unit = {},
     onCamera: () -> Unit = {},
     onPay: () -> Unit = {},
@@ -178,6 +179,11 @@ fun ChildMypageScreen(
                 fontSize = 12.sp,
             )
             ListRow(title = stringResource(R.string.child_mypage_edit_profile), onClick = onEditProfile)
+            ListRow(
+                title = stringResource(R.string.child_mypage_link_parent),
+                leading = "\uD83D\uDD17",
+                onClick = onLinkParent,
+            )
             ListRow(
                 title = stringResource(R.string.child_mypage_change_password),
                 onClick = comingSoon,

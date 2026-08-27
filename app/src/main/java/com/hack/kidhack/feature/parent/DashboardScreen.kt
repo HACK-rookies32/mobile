@@ -21,9 +21,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -31,9 +36,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
+import com.hack.kidhack.core.permission.KidhackPermissions
+import com.hack.kidhack.permissionRequester
+import com.hack.kidhack.background.alert.ParentAlertSync
+import com.hack.kidhack.background.alert.ParentChildWatcher
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.StatCard
@@ -44,12 +55,11 @@ import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.AppNotification
-import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.ChildRepository
-import com.hack.kidhack.domain.repository.LocationRepository
-import com.hack.kidhack.domain.repository.NotificationRepository
+import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,18 +74,32 @@ data class DashboardUiState(
     val selected: ChildProfile? = null,
     val lastLocation: String? = null,
     val lastLocationAt: String? = null,
-    val usages: List<AppUsage> = emptyList(),
-    val notifications: List<AppNotification> = emptyList(),
+    val usages: List<AppUsageStat> = emptyList(),
+    /** 보관함 전체. 화면에 그리는 건 아래 [notifications] 로 걸러 낸 것이다. */
+    val allNotifications: List<AppNotification> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
-)
+) {
+    /**
+     * 지금 고른 자녀의 알림.
+     *
+     * 자녀가 여러 명이면 대시보드의 모든 지표가 고른 자녀 기준이어야 한다.
+     * 사용량·위치는 원래 childId 로 받아 오는데 알림만 계정 단위라 섞여 보였다.
+     *
+     * 자녀를 특정할 수 없는 알림(서버가 childId 를 안 준 경우)은 감추지 않는다.
+     * 잘못 숨기면 보호자가 사건 자체를 놓친다.
+     */
+    val notifications: List<AppNotification>
+        get() = allNotifications.filter { it.childId == null || it.childId == selectedId }
+}
 
 class DashboardViewModel(
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
     private val appUsageRepository: AppUsageRepository,
-    private val notificationRepository: NotificationRepository,
-    private val locationRepository: LocationRepository,
+    private val dashboardRepository: DashboardRepository,
+    private val alertSync: ParentAlertSync,
+    private val childWatcher: ParentChildWatcher,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DashboardUiState())
@@ -87,7 +111,33 @@ class DashboardViewModel(
                 if (_state.value.children.isNotEmpty()) loadFor(id)
             }
         }
+        // 알림 보관함을 구독한다. 워커가 새 알림을 받아 넣거나 기기에서 사건이 감지되면
+        // 당겨서 새로고침하지 않아도 「최근 알림」이 바로 바뀐다.
+        viewModelScope.launch {
+            alertSync.alerts.collect { alerts ->
+                _state.update { it.copy(allNotifications = alerts) }
+            }
+        }
         refresh()
+    }
+
+    /**
+     * 알림만 다시 받아 온다.
+     *
+     * 자녀 목록·사용량까지 다시 부르는 [refresh] 와 달리 가볍기 때문에
+     * 대시보드 탭으로 돌아올 때마다 호출해도 부담이 없다.
+     */
+    fun refreshAlerts() {
+        viewModelScope.launch { alertSync.sync() }
+    }
+
+    /**
+     * 자녀 상태를 지금 판정한다.
+     *
+     * 15분 주기 워커를 기다리지 않고 당겨서 새로고침하면 바로 확인할 수 있게 한다.
+     */
+    private fun evaluateChildren() {
+        viewModelScope.launch { runCatching { childWatcher.evaluateAll() } }
     }
 
     fun refresh() {
@@ -101,6 +151,7 @@ class DashboardViewModel(
             }.onSuccess { (children, selectedId, _) ->
                 _state.update { it.copy(children = children, selectedId = selectedId) }
                 loadFor(selectedId)
+                evaluateChildren()
             }.onFailure { t ->
                 _state.update { it.copy(loading = false, error = t.message ?: "불러오지 못했어요") }
             }
@@ -120,9 +171,10 @@ class DashboardViewModel(
             val child = _state.value.children.find { it.id == childId }
                 ?: childRepository.child(childId)
             // TODO: Backend Integration - API 엔드포인트에 따라 파라미터(날짜, 타입 등) 조정 필요
+            // 앱 사용량은 대시보드 통합 응답에 없어 개별 유지.
             val usages = appUsageRepository.list(childId, "APP")
-            val notes = notificationRepository.list(null)
-            val loc = runCatching { locationRepository.current(childId) }.getOrNull()
+            val dashboard = dashboardRepository.get(childId)
+            alertSync.sync()
             _state.update {
                 it.copy(
                     loading = false,
@@ -130,10 +182,8 @@ class DashboardViewModel(
                     selectedId = childId,
                     selected = child,
                     usages = usages,
-                    notifications = notes,
-                    // TODO: Backend Integration - 실 API가 위경도만 줄 경우 역지오코딩 로직 추가 필요
-                    lastLocation = loc?.label,
-                    lastLocationAt = loc?.recordedAt?.takeLast(5),
+                    lastLocation = dashboard.currentLocation?.label,
+                    lastLocationAt = dashboard.currentLocation?.updatedAt?.takeLast(5),
                 )
             }
         }.onFailure { t ->
@@ -146,13 +196,34 @@ class DashboardViewModel(
 @Composable
 fun ParentDashboardScreen(
     onOpenNotifications: () -> Unit = {},
-    onOpenAppControl: () -> Unit = {},
+    onOpenUsageDetail: () -> Unit = {},
     onOpenPairing: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     viewModel: DashboardViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
+    val context = LocalContext.current
+    val permissions = permissionRequester()
+
+    // 대시보드로 돌아올 때마다 알림만 가볍게 다시 받아 온다.
+    // (앱이 꺼져 있는 동안 서버에 쌓인 알림은 화면을 열어야 확인할 수 있다.)
+    var firstResume by remember { mutableStateOf(true) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (firstResume) firstResume = false else viewModel.refreshAlerts()
+    }
+
+    // 안전 구역 이탈·유해 사이트 차단을 푸시로 받으려면 알림 권한이 필요하다(안드로이드 13+).
+    // 이미 거절해서 시스템 대화상자가 뜨지 않는 상태면 조용히 넘어간다.
+    LaunchedEffect(Unit) {
+        val permission = KidhackPermissions.notifications ?: return@LaunchedEffect
+        val activity = KidhackPermissions.findActivity(context) ?: return@LaunchedEffect
+        if (!KidhackPermissions.canShowSystemDialog(activity, permission)) return@LaunchedEffect
+        permissions.requestOne(permission) { granted ->
+            if (!granted) KidhackPermissions.recordDeny(context, permission)
+        }
+    }
+
     val child = state.selected
     val totalSec = state.usages.sumOf { it.durationSec }
     val alertCount = state.notifications.count { !it.read }
@@ -317,7 +388,7 @@ fun ParentDashboardScreen(
                             )
                             Text(
                                 stringResource(R.string.parent_dashboard_see_all),
-                                modifier = Modifier.clickable(onClick = onOpenAppControl),
+                                modifier = Modifier.clickable(onClick = onOpenUsageDetail),
                                 color = colors.brand,
                                 fontFamily = KidhackFontFamily,
                                 fontWeight = FontBold,
@@ -325,15 +396,17 @@ fun ParentDashboardScreen(
                             )
                         }
                         Spacer(Modifier.height(12.dp))
-                        val barColors = listOf(Color(0xFFF87171), Color(0xFFFACC15), colors.info)
-                        state.usages.forEachIndexed { i, u ->
+                        // 대시보드에는 많이 사용한 순으로 상위 3개만 노출한다(전체는 '전체 보기').
+                        val topUsages = state.usages.sortedByDescending { it.durationSec }.take(3)
+                        topUsages.forEachIndexed { i, u ->
                             UsageBar(
-                                name = u.appName,
+                                name = u.key,
                                 timeLabel = formatDuration(u.durationSec),
                                 progress = u.durationSec.toFloat() / maxUsage,
-                                barColor = barColors.getOrElse(i) { colors.brand },
+                                // 앱 사용량 상세 화면(APP 탭)과 같은 기준으로 색을 배정한다.
+                                barColor = appColor(u.key),
                             )
-                            if (i < state.usages.lastIndex) Spacer(Modifier.height(10.dp))
+                            if (i < topUsages.lastIndex) Spacer(Modifier.height(10.dp))
                         }
                     }
                     KidCard {
@@ -355,7 +428,7 @@ fun ParentDashboardScreen(
                                 Text(icon.first, fontSize = 18.sp)
                                 Spacer(Modifier.size(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(n.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 12.sp, color = colors.text)
+                                    Text(n.message, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 12.sp, color = colors.text)
                                     Text(n.createdAt, fontFamily = KidhackFontFamily, fontWeight = FontSemibold, fontSize = 12.sp, color = colors.muted)
                                 }
                             }

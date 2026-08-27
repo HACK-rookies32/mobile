@@ -2,9 +2,10 @@ package com.hack.kidhack
 
 import android.app.Application
 import com.hack.kidhack.background.ChildPlatformController
+import com.hack.kidhack.background.push.PushTokenRegistrar
+import com.hack.kidhack.background.ParentPlatformController
 import com.hack.kidhack.data.local.CapturedShotStore
 import com.hack.kidhack.data.local.ChatMessageStore
-import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.data.local.ChildPhotoStore
 import com.hack.kidhack.data.local.ProfileScopeStore
 import com.hack.kidhack.domain.repository.SessionRepository
@@ -37,18 +38,27 @@ class KidhackApplication : Application() {
         startupScope.launch {
             val koin = GlobalContext.get()
             koin.get<ChildPlatformController>().bind()
-            // 로컬 기록은 **계정이 바뀔 때만** 비운다.
-            // 로그아웃마다 지우면 같은 자녀가 다시 로그인했을 때 최근 알림·대화가 사라진다.
+            // 부모 세션은 15분 주기로 서버 알림을 긁어와 보관함에 넣고 푸시로 띄운다.
+            koin.get<ParentPlatformController>().bind()
+            // FCM 토큰을 로그인한 계정에 묶는다. 세션이 생기면 등록, 사라지면 해제.
+            val pushRegistrar = koin.get<PushTokenRegistrar>()
+            // 채팅과 사진은 계정이 바뀔 때 비운다.
+            // 알림 보관함(ChildAlertStore/ParentAlertStore)은 계정별 파일로 나뉘어 있어
+            // 여기서 지우지 않는다. 지우면 부모와 자녀를 오갈 때마다 최근 알림이 비워진다.
             val chatStore = koin.get<ChatMessageStore>()
-            val alertStore = koin.get<ChildAlertStore>()
             val photoStore = koin.get<ChildPhotoStore>()
             val shotStore = koin.get<CapturedShotStore>()
             val profileScope = koin.get<ProfileScopeStore>()
+            var pushBoundTo: String? = null
             koin.get<SessionRepository>().session.collect { session ->
-                val userId = session?.user?.id ?: return@collect
+                val userId = session?.user?.id
+                if (userId == null) {
+                    if (pushBoundTo != null) { pushRegistrar.onSignedOut(); pushBoundTo = null }
+                    return@collect
+                }
+                if (pushBoundTo != userId) { pushRegistrar.onSignedIn(); pushBoundTo = userId }
                 if (profileScope.switchTo(userId)) {
                     chatStore.clear()
-                    alertStore.clear()
                     photoStore.clear()
                     shotStore.clear()
                 }

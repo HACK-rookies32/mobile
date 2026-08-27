@@ -15,24 +15,43 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.Color as AndroidColor
+import android.view.MotionEvent
+import androidx.core.graphics.createBitmap
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.Circle
 import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.GoogleMapComposable
 import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberMarkerState
+import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -41,13 +60,19 @@ import com.hack.kidhack.core.designsystem.component.BrandGradientHeader
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
+import com.hack.kidhack.core.designsystem.component.KidSwitch
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.LocationEvent
+import com.hack.kidhack.domain.model.LocationEventType
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.repository.ChildRepository
+import com.hack.kidhack.domain.repository.LocationEventRepository
 import com.hack.kidhack.domain.repository.LocationRepository
+import com.hack.kidhack.domain.repository.PlaceRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,21 +82,35 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 data class LocationUiState(
-    val current: LocationPoint? = null,
     val history: List<LocationPoint> = emptyList(),
+    /** 지도에 반경 원으로 겹쳐 그릴 등록 장소들. */
+    val places: List<Geofence> = emptyList(),
+    /** 등록 장소 진입/이탈 기록. 화면 맨 아래 "최근 출입 기록"에 쓴다. */
+    val events: List<LocationEvent> = emptyList(),
+    val realtimeEnabled: Boolean = false,
+    /** "오늘 이동 경로 확인" 토글. 켜면 지도에 동선을 선으로 잇는다. */
+    val showRoute: Boolean = false,
     val hasChildren: Boolean = true,
     val loading: Boolean = true,
     val error: String? = null,
-)
+) {
+    /** 동선은 최신순이라 첫 항목이 현재 위치다(실시간 ON이면 방금 좌표). */
+    val current: LocationPoint? get() = history.firstOrNull()
+}
 
 class LocationViewModel(
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
     private val locationRepository: LocationRepository,
+    private val placeRepository: PlaceRepository,
+    private val locationEventRepository: LocationEventRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LocationUiState())
     val state: StateFlow<LocationUiState> = _state.asStateFlow()
+
+    /** 실시간 토글에 쓸 현재 선택된 자녀. refresh()에서만 갱신한다. */
+    private var childId: String? = null
 
     init {
         viewModelScope.launch {
@@ -86,20 +125,130 @@ class LocationViewModel(
                 // TODO: Backend Integration - 실 API 연결 시 RealChildRepository 사용하도록 수정 필요
                 val children = childRepository.children()
                 val id = selectedChildRepository.resolveId(children)
+                childId = id
                 if (id == null) {
                     _state.update { it.copy(loading = false, hasChildren = false) }
                     return@runCatching
                 }
-                // TODO: Backend Integration - 자녀의 실시간 위치 및 경로 이력을 가져오는 API 연결
-                val current = locationRepository.current(id)
                 val history = locationRepository.history(id)
-                _state.update { it.copy(loading = false, hasChildren = true, current = current, history = history) }
+                // 장소·출입 기록은 부가 정보라 실패해도 위치 표시는 그대로 간다.
+                val places = runCatching { placeRepository.list(id) }.getOrDefault(emptyList())
+                val events = runCatching { locationEventRepository.events(id) }.getOrDefault(emptyList())
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        hasChildren = true,
+                        history = history,
+                        places = places,
+                        events = events,
+                    )
+                }
             }.onFailure { t ->
                 _state.update { it.copy(loading = false, error = t.message) }
             }
         }
     }
+
+    fun toggleRoute() = _state.update { it.copy(showRoute = !it.showRoute) }
+
+    // TODO: Backend Integration - 실시간 상태 조회 API가 없어 토글 결과만 로컬에 들고 있다
+    fun setRealtime(enabled: Boolean) {
+        val id = childId ?: return
+        viewModelScope.launch {
+            runCatching { locationRepository.toggleRealtime(id, enabled) }
+                .onSuccess { applied -> _state.update { it.copy(realtimeEnabled = applied, error = null) } }
+                .onFailure { t -> _state.update { it.copy(error = t.message) } }
+        }
+    }
 }
+
+/** 등록 장소 표시색. 아이 위치(빨강)와 겹치지 않도록 브랜드색 대신 파랑을 쓴다. */
+private val PLACE_BLUE = Color(0xFF2563EB)
+
+/** 장소 이름을 항상 띄우기 위한 텍스트 비트맵 마커 아이콘. 이름이 바뀔 때만 다시 만든다. */
+@Composable
+private fun rememberPlaceLabelIcon(text: String): BitmapDescriptor {
+    val density = LocalDensity.current.density
+    return remember(text, density) {
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.WHITE
+            textSize = 11f * density
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        val padH = 6f * density
+        val padV = 3f * density
+        val metrics = textPaint.fontMetrics
+        val width = (textPaint.measureText(text) + padH * 2).toInt().coerceAtLeast(1)
+        val height = ((metrics.descent - metrics.ascent) + padV * 2).toInt().coerceAtLeast(1)
+        val bitmap = createBitmap(width, height)
+        val canvas = Canvas(bitmap)
+        val radius = 6f * density
+        val background = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = PLACE_BLUE.toArgb() }
+        canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), radius, radius, background)
+        canvas.drawText(text, padH, padV - metrics.ascent, textPaint)
+        BitmapDescriptorFactory.fromBitmap(bitmap)
+    }
+}
+
+/** 작은 지도와 전체화면 지도가 같은 내용을 그리도록 한 곳에 모아둔다. */
+@Composable
+@GoogleMapComposable
+private fun LocationMapContent(
+    childPos: LatLng?,
+    childTitle: String,
+    places: List<Geofence>,
+    routePoints: List<LatLng>,
+) {
+    val colors = LocalKidhackColors.current
+    if (childPos != null) {
+        // 아이 실시간 위치는 빨강, 등록 장소는 파랑으로 구분한다.
+        Marker(
+            state = rememberMarkerState(key = "child_${childPos.latitude}_${childPos.longitude}", position = childPos),
+            title = childTitle,
+            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
+        )
+    }
+    places.forEach { place ->
+        val lat = place.lat.toDoubleOrNull()
+        val lng = place.lng.toDoubleOrNull()
+        if (lat != null && lng != null) {
+            val center = LatLng(lat, lng)
+            Circle(
+                center = center,
+                radius = place.radius.toDouble(),
+                strokeColor = PLACE_BLUE,
+                strokeWidth = 2f,
+                fillColor = PLACE_BLUE.copy(alpha = 0.15f),
+            )
+            Marker(
+                state = rememberMarkerState(key = place.id, position = center),
+                title = place.name,
+                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
+            )
+            // 이름은 탭해야 뜨는 InfoWindow 대신 항상 보이도록 별도 마커로 그린다.
+            Marker(
+                state = rememberMarkerState(key = "${place.id}_label", position = center),
+                title = place.name,
+                icon = rememberPlaceLabelIcon(place.name),
+                anchor = Offset(0.5f, -0.2f),
+                zIndex = 1f,
+            )
+        }
+    }
+    if (routePoints.size >= 2) {
+        Polyline(points = routePoints, color = colors.brand, width = 6f)
+    }
+}
+
+/** 이탈만 이동으로 보고, 나머지(ENTER·과거 ARRIVED)는 도착으로 묶는다. */
+private fun isExitEvent(type: LocationEventType): Boolean = type == LocationEventType.EXIT
+
+private fun eventIcon(type: LocationEventType): String = if (isExitEvent(type)) "🚶" else "🏠"
+
+/** "2026-08-25T17:05:00" -> "17:05". 파싱 실패하면 기존처럼 뒤 5글자. */
+private fun hourMinute(raw: String): String =
+    runCatching { java.time.LocalDateTime.parse(raw).toLocalTime().toString().take(5) }
+        .getOrDefault(raw.takeLast(5))
 
 @Composable
 fun ParentLocationScreen(
@@ -110,7 +259,8 @@ fun ParentLocationScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
 
-    val isCurrentLive = state.current?.recordedAt?.let {
+    // 서버가 준 updatedAt이 실제 갱신 시각이다. 없으면 기존처럼 recordedAt.
+    val isCurrentLive = state.current?.let { it.updatedAt ?: it.recordedAt }?.let {
         runCatching {
             val instant = java.time.LocalDateTime.parse(it).atZone(java.time.ZoneId.systemDefault()).toInstant()
             java.time.Duration.between(instant, java.time.Instant.now()).toMinutes() < 10
@@ -144,25 +294,85 @@ fun ParentLocationScreen(
                     cameraPositionState.position = CameraPosition.fromLatLngZoom(childPos, 16f)
                 }
             }
+            val childTitle = state.current?.label ?: stringResource(R.string.parent_location_current)
+            // history는 최신순이라 뒤집어야 과거 -> 현재 순서로 선이 그려진다.
+            val routePoints = if (state.showRoute) {
+                state.history
+                    .mapNotNull { p ->
+                        p.lat.toDoubleOrNull()?.let { lat -> p.lng.toDoubleOrNull()?.let { lng -> LatLng(lat, lng) } }
+                    }
+                    .reversed()
+            } else {
+                emptyList()
+            }
+            var mapExpanded by remember { mutableStateOf(false) }
+            // 전체화면 지도는 별도 카메라 상태를 쓴다. 하나를 두 GoogleMap이 공유하면 maps-compose가 예외를 던진다.
+            val fullCameraState = rememberCameraPositionState()
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(224.dp),
+                    .height(224.dp)
+                    // 지도 위에서 손가락을 움직이는 동안에는 상위 verticalScroll이 제스처를 가져가지 못하게 막는다.
+                    // DOWN/UP은 그대로 흘려보내야 onMapClick·마커 탭이 살아있다.
+                    .pointerInteropFilter { event -> event.action == MotionEvent.ACTION_MOVE },
             ) {
                 GoogleMap(
                     modifier = Modifier.fillMaxSize(),
                     cameraPositionState = cameraPositionState,
                 ) {
-                    if (childPos != null) {
-                        Marker(
-                            state = MarkerState(position = childPos),
-                            title = state.current?.label ?: stringResource(R.string.parent_location_current),
+                    LocationMapContent(childPos, childTitle, state.places, routePoints)
+                }
+                MapChipButton(
+                    label = stringResource(R.string.parent_map_fullscreen),
+                    modifier = Modifier.align(Alignment.TopEnd),
+                ) {
+                    fullCameraState.position = cameraPositionState.position
+                    mapExpanded = true
+                }
+            }
+            if (mapExpanded) {
+                val closeFullscreen = {
+                    // 전체화면에서 옮겨둔 시야를 작은 지도에도 이어준다.
+                    cameraPositionState.position = fullCameraState.position
+                    mapExpanded = false
+                }
+                Dialog(
+                    onDismissRequest = closeFullscreen,
+                    properties = DialogProperties(usePlatformDefaultWidth = false),
+                ) {
+                    Box(Modifier.fillMaxSize().background(colors.surface)) {
+                        GoogleMap(
+                            modifier = Modifier.fillMaxSize(),
+                            cameraPositionState = fullCameraState,
+                        ) {
+                            LocationMapContent(childPos, childTitle, state.places, routePoints)
+                        }
+                        MapChipButton(
+                            label = stringResource(R.string.parent_map_close),
+                            modifier = Modifier.align(Alignment.TopEnd),
+                            onClick = closeFullscreen,
                         )
                     }
                 }
             }
             Column(Modifier.padding(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
                 ParentLoadingOrError(state.loading && state.current == null, state.error) { viewModel.refresh() }
+
+                if (state.hasChildren) {
+                    KidCard {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(R.string.parent_location_realtime_toggle),
+                                modifier = Modifier.weight(1f),
+                                fontFamily = KidhackFontFamily,
+                                fontWeight = FontBold,
+                                fontSize = 14.sp,
+                                color = colors.text,
+                            )
+                            KidSwitch(state.realtimeEnabled, viewModel::setRealtime)
+                        }
+                    }
+                }
 
                 val current = state.current
                 if (!state.loading && !state.hasChildren) {
@@ -223,42 +433,39 @@ fun ParentLocationScreen(
                         modifier = Modifier.fillMaxWidth(),
                         variant = KidButtonVariant.Secondary,
                     )
+                    KidButton(
+                        text = if (state.showRoute) stringResource(R.string.parent_location_route_hide)
+                        else stringResource(R.string.parent_location_route_show),
+                        onClick = viewModel::toggleRoute,
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = KidButtonVariant.Secondary,
+                        // 이을 점이 둘은 있어야 선이 된다.
+                        enabled = state.history.size >= 2,
+                    )
+                }
+                if (state.events.isNotEmpty()) {
                     KidCard {
-                        Text(stringResource(R.string.parent_location_route), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
+                        Text(stringResource(R.string.parent_geofence_events), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
                         Spacer(Modifier.height(8.dp))
-
-                        if (state.history.isEmpty()) {
-                            Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                        state.events.take(5).forEach { event ->
+                            Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(eventIcon(event.eventType), fontSize = 16.sp)
+                                Spacer(Modifier.size(12.dp))
+                                val placeName = state.places.find { it.id == event.placeId }?.name
+                                    ?: stringResource(R.string.parent_geofence_event_unknown_place)
                                 Text(
-                                    stringResource(R.string.parent_location_empty_history),
-                                    color = colors.muted,
+                                    stringResource(
+                                        if (isExitEvent(event.eventType)) R.string.parent_geofence_event_exit
+                                        else R.string.parent_geofence_event_entered,
+                                        placeName,
+                                    ),
+                                    modifier = Modifier.weight(1f),
+                                    fontFamily = KidhackFontFamily,
+                                    fontWeight = FontBold,
                                     fontSize = 13.sp,
-                                    fontFamily = KidhackFontFamily
+                                    color = colors.text,
                                 )
-                            }
-                        } else {
-                            state.history.forEachIndexed { i, point ->
-                                val last = i == state.history.lastIndex
-                                // TODO: Backend Integration - 라벨 텍스트 기반 추정. 백엔드가 place type 필드를 주면 그걸로 교체 필요
-                                val icon = when {
-                                    point.label?.contains("집") == true -> "🏠"
-                                    point.label?.contains("학교") == true -> "🏫"
-                                    point.label?.contains("학원") == true -> "📚"
-                                    else -> "📍"
-                                }
-                                Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(icon, fontSize = 18.sp)
-                                    Spacer(Modifier.size(12.dp))
-                                    Text(
-                                        point.label ?: stringResource(R.string.parent_location_current),
-                                        modifier = Modifier.weight(1f),
-                                        fontFamily = KidhackFontFamily,
-                                        fontWeight = FontSemibold,
-                                        fontSize = 14.sp,
-                                        color = if (last) colors.brand else colors.text,
-                                    )
-                                    Text(point.recordedAt.takeLast(5), color = colors.muted, fontSize = 12.sp)
-                                }
+                                Text(hourMinute(event.occurredAt), color = colors.muted, fontSize = 12.sp)
                             }
                         }
                     }

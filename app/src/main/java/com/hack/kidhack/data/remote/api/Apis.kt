@@ -9,7 +9,7 @@ import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
 import com.hack.kidhack.data.remote.dto.AppControlDto
 import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
-import com.hack.kidhack.data.remote.dto.AppUsageDto
+import com.hack.kidhack.data.remote.dto.AppUsageAggregateResponse
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.BlocklistResponse
@@ -24,6 +24,7 @@ import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
+import com.hack.kidhack.data.remote.dto.CreateChatRoomRequest
 import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
@@ -32,23 +33,30 @@ import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
 import com.hack.kidhack.data.remote.dto.FindIdResponse
-import com.hack.kidhack.data.remote.dto.GeofenceDto
-import com.hack.kidhack.data.remote.dto.GpsStatusRequest
+import com.hack.kidhack.data.remote.dto.DashboardResponse
+import com.hack.kidhack.data.remote.dto.DeviceEventRequest
+import com.hack.kidhack.data.remote.dto.PushTokenRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
 import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
 import com.hack.kidhack.data.remote.dto.InstalledAppsResponse
-import com.hack.kidhack.data.remote.dto.LocationDto
+import com.hack.kidhack.data.remote.dto.LocationEventDto
+import com.hack.kidhack.data.remote.dto.LocationTrackRequest
+import com.hack.kidhack.data.remote.dto.LocationTrackResponse
 import com.hack.kidhack.data.remote.dto.LoginRequest
 import com.hack.kidhack.data.remote.dto.LoginResponse
+import com.hack.kidhack.data.remote.dto.ChildAlertDto
 import com.hack.kidhack.data.remote.dto.NotificationDto
 import com.hack.kidhack.data.remote.dto.NotificationSettingsDto
 import com.hack.kidhack.data.remote.dto.PairingCodeDto
 import com.hack.kidhack.data.remote.dto.PairingConnectRequest
 import com.hack.kidhack.data.remote.dto.PaymentDto
+import com.hack.kidhack.data.remote.dto.PlaceRequest
+import com.hack.kidhack.data.remote.dto.PlaceResponse
 import com.hack.kidhack.data.remote.dto.PointBalanceDto
 import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
+import com.hack.kidhack.data.remote.dto.RealtimeToggleResponse
 import com.hack.kidhack.data.remote.dto.RefreshRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandDto
@@ -70,6 +78,7 @@ import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -149,46 +158,87 @@ interface ChildApi {
 }
 
 interface LocationApi {
-    @GET("children/{childId}/location/current")
-    suspend fun current(@Path("childId") childId: String): ApiEnvelope<LocationDto>
+    /** 자녀 앱 전용(CHILD). 좌표를 올리면 서버가 지오펜스/도착을 판정한다. */
+    @POST("location/track")
+    suspend fun track(@Body body: LocationTrackRequest): ApiEnvelope<LocationTrackResponse>
 
-    @GET("children/{childId}/location/history")
-    suspend fun history(@Path("childId") childId: String): ApiEnvelope<List<LocationDto>>
+    /** 최신순 세그먼트. 실시간 ON이면 첫 항목이 현재 위치. */
+    @GET("location/track/{childId}")
+    suspend fun history(@Path("childId") childId: String): ApiEnvelope<List<LocationTrackResponse>>
 
-    @POST("locations/batch")
-    suspend fun batch(@Body body: List<LocationDto>): ApiEnvelope<Unit>
+    /** body 없이 query `enabled`만 사용한다. */
+    @PATCH("location/tracking/{childId}/realtime")
+    suspend fun toggleRealtime(
+        @Path("childId") childId: String,
+        @Query("enabled") enabled: Boolean,
+    ): ApiEnvelope<RealtimeToggleResponse>
 
-    @POST("devices/gps-status")
-    suspend fun gpsStatus(@Body body: GpsStatusRequest): ApiEnvelope<Unit>
 }
 
-interface GeofenceApi {
-    @GET("children/{childId}/geofences")
-    suspend fun list(@Path("childId") childId: String): ApiEnvelope<List<GeofenceDto>>
+interface DeviceApi {
+    /** 기기 전원/GPS 꺼짐 보고. type = "POWER_OFF" | "GPS_OFF" (명세 4.16). */
+    @POST("device/event")
+    suspend fun reportEvent(@Body body: DeviceEventRequest): ApiEnvelope<Unit>
 
-    @POST("children/{childId}/geofences")
-    suspend fun create(
-        @Path("childId") childId: String,
-        @Body body: GeofenceDto,
-    ): ApiEnvelope<GeofenceDto>
+    /** FCM 토큰 등록·해제 (신규 제안 계약). */
+    @POST("devices/push-token")
+    suspend fun registerPushToken(@Body body: PushTokenRequest): ApiEnvelope<Unit>
 
-    @DELETE("children/{childId}/geofences/{geofenceId}")
-    suspend fun delete(
-        @Path("childId") childId: String,
-        @Path("geofenceId") geofenceId: String,
-    ): ApiEnvelope<Unit>
+    @HTTP(method = "DELETE", path = "devices/push-token", hasBody = true)
+    suspend fun unregisterPushToken(@Body body: PushTokenRequest): ApiEnvelope<Unit>
+}
+
+interface DashboardApi {
+    /** 위치·실시간·최근알림3·차단·공간 통합 조회 (명세 4.3). */
+    @GET("children/{childId}/dashboard")
+    suspend fun get(@Path("childId") childId: String): ApiEnvelope<DashboardResponse>
+}
+
+interface PlaceApi {
+    @POST("location/places")
+    suspend fun create(@Body body: PlaceRequest): ApiEnvelope<PlaceResponse>
+
+    @GET("location/places/{childId}")
+    suspend fun list(@Path("childId") childId: String): ApiEnvelope<List<PlaceResponse>>
+
+    /** v0.2 명세에 없는 경로. 백엔드에 신설 요청한 계약을 선반영한 것이다(docs/spec-gaps.md). */
+    @DELETE("location/places/{placeId}")
+    suspend fun delete(@Path("placeId") placeId: String): ApiEnvelope<Unit>
+}
+
+interface LocationEventApi {
+    @GET("location/events/{childId}")
+    suspend fun events(@Path("childId") childId: String): ApiEnvelope<List<LocationEventDto>>
 }
 
 interface NotificationApi {
-    @GET("notifications")
+    /** 명세 4.5. childId는 서버가 지원하면 자녀별로 걸러 받는다. */
+    @GET("notifications/{recipientId}")
     suspend fun list(
-        @Query("type") type: String? = null,
-        @Query("page") page: Int = 0,
-        @Query("size") size: Int = 20,
-    ): ApiEnvelope<PageResponse<NotificationDto>>
+        @Path("recipientId") recipientId: String,
+        @Query("childId") childId: String? = null,
+    ): ApiEnvelope<List<NotificationDto>>
 
     @PATCH("notifications/{notificationId}")
     suspend fun markRead(@Path("notificationId") notificationId: String): ApiEnvelope<Unit>
+}
+
+/**
+ * 자녀 안전 사건 동기화 (docs/child-push-contract.md 4절 제안 계약).
+ * 자녀 앱이 upload, 보호자 앱이 list 를 쓴다. 서버에 아직 없어도 앱은 정상 동작한다.
+ */
+interface ChildAlertApi {
+    @POST("children/{childId}/alerts")
+    suspend fun upload(
+        @Path("childId") childId: String,
+        @Body body: List<ChildAlertDto>,
+    ): ApiEnvelope<Unit>
+
+    @GET("children/{childId}/alerts")
+    suspend fun list(
+        @Path("childId") childId: String,
+        @Query("size") size: Int = 50,
+    ): ApiEnvelope<List<ChildAlertDto>>
 }
 
 interface BlocklistApi {
@@ -215,6 +265,8 @@ interface ScreenshotApi {
     @GET("children/{childId}/screenshots")
     suspend fun list(
         @Path("childId") childId: String,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
         @Query("page") page: Int = 0,
         @Query("size") size: Int = 20,
     ): ApiEnvelope<PageResponse<ScreenshotDto>>
@@ -235,6 +287,7 @@ interface ScreenshotApi {
 interface CommunityApi {
     @GET("community/posts")
     suspend fun posts(
+        @Query("keyword") keyword: String? = null,
         @Query("page") page: Int = 0,
         @Query("size") size: Int = 20,
     ): ApiEnvelope<PageResponse<PostDto>>
@@ -282,6 +335,9 @@ interface CommunityApi {
 }
 
 interface ChatApi {
+    @POST("chat/rooms")
+    suspend fun createOrGetRoom(@Body body: CreateChatRoomRequest): ApiEnvelope<ChatRoomDto>
+
     @GET("chat/rooms")
     suspend fun rooms(): ApiEnvelope<List<ChatRoomDto>>
 
@@ -290,7 +346,8 @@ interface ChatApi {
         @Path("roomId") roomId: String,
         @Query("before") before: String? = null,
         @Query("size") size: Int = 30,
-    ): ApiEnvelope<List<ChatMessageDto>>
+        @Query("page") page: Int = 0,
+    ): ApiEnvelope<PageResponse<ChatMessageDto>>
 }
 
 interface PaymentApi {
@@ -330,17 +387,16 @@ interface SubscriptionApi {
 }
 
 interface AppUsageApi {
-    @GET("children/{childId}/app-usage")
+    @POST("monitoring/usage")
+    suspend fun report(@Body body: AppUsageReportRequest): ApiEnvelope<Int>
+
+    @GET("monitoring/usage/{childId}")
     suspend fun list(
         @Path("childId") childId: String,
-        @Query("groupBy") groupBy: String = "APP",
-    ): ApiEnvelope<List<AppUsageDto>>
-
-    @POST("children/{childId}/app-usage")
-    suspend fun report(
-        @Path("childId") childId: String,
-        @Body body: AppUsageReportRequest,
-    ): ApiEnvelope<Unit>
+        @Query("groupBy") groupBy: String = "DAY",
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
+    ): ApiEnvelope<AppUsageAggregateResponse>
 }
 
 /**
@@ -361,8 +417,15 @@ interface CommandApi {
     ): ApiEnvelope<Unit>
 }
 
-/** 자녀 카메라 촬영본 업로드 (신규 제안 계약). */
+/** 자녀 카메라 촬영본 업로드·조회·요청 (신규 제안 계약, ScreenshotApi 와 대칭). */
 interface PhotoApi {
+    @GET("children/{childId}/photos")
+    suspend fun list(
+        @Path("childId") childId: String,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20,
+    ): ApiEnvelope<PageResponse<ChildPhotoDto>>
+
     @Multipart
     @POST("children/{childId}/photos")
     suspend fun upload(
@@ -371,6 +434,10 @@ interface PhotoApi {
         @Part("capturedAt") capturedAt: RequestBody,
         @Part("requestId") requestId: RequestBody?,
     ): ApiEnvelope<ChildPhotoDto>
+
+    /** 202 를 기대한다. 서버는 자녀 소켓/pending 큐로 CAMERA_REQUEST 를 밀어 줘야 한다. */
+    @POST("children/{childId}/photos/request")
+    suspend fun requestShot(@Path("childId") childId: String): ApiEnvelope<Unit>
 }
 
 /** 루키즈페이 용돈 지갑 (신규 제안 계약, GAP-05). */

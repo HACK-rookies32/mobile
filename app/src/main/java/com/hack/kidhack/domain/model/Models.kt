@@ -17,6 +17,8 @@ data class User(
     val phone: String = "",
     val email: String? = null,
     val profileImageUrl: String? = null,
+    /** 자녀 계정만. 연결된 부모 member id. */
+    val parentId: Long? = null,
 )
 
 data class ChildProfile(
@@ -36,9 +38,13 @@ data class LocationPoint(
     val lng: String,
     val recordedAt: String,
     val label: String? = null,
+    val segmentStart: String? = null,
+    val segmentEnd: String? = null,
+    val updatedAt: String? = null,
 )
 
-fun LocationPoint.toDto(): com.hack.kidhack.data.remote.dto.LocationDto = com.hack.kidhack.data.remote.dto.LocationDto(lat, lng, recordedAt, label)
+/** 지오펜스(진입/이탈) / 목적지(도착) 구분. */
+enum class PlaceType { GEOFENCE, DESTINATION }
 
 data class Geofence(
     val id: String,
@@ -47,15 +53,49 @@ data class Geofence(
     val lng: String,
     val radius: Int,
     val notifyOnArrival: Boolean,
+    val type: PlaceType = PlaceType.GEOFENCE,
+)
+
+enum class LocationEventType { ENTER, EXIT, ARRIVED }
+
+data class LocationEvent(
+    val id: String,
+    val placeId: String,
+    val eventType: LocationEventType,
+    val occurredAt: String,
 )
 
 data class AppNotification(
     val id: String,
     val type: String,
-    val title: String,
-    val body: String,
+    val message: String,
     val createdAt: String,
     val read: Boolean,
+    /**
+     * 어느 자녀의 알림인지. 자녀를 여러 명 둔 보호자가 대시보드에서 한 명을 고르면
+     * 그 자녀의 알림만 보여 주는 데 쓴다.
+     *
+     * null 이면 「어느 자녀인지 알 수 없음」이다(서버가 알려 주지 않은 경우).
+     * 그런 알림은 숨기지 않고 모든 자녀에게 공통으로 보여 준다 — 감춰서 놓치는 것보다 낫다.
+     */
+    val childId: String? = null,
+)
+
+/** ingyu 알림 경로가 쓰던 title/body. 서버 계약의 message를 첫 줄/나머지로 나눈다. */
+val AppNotification.title: String
+    get() = message.substringBefore('\n').ifBlank { message }
+
+val AppNotification.body: String
+    get() = message.substringAfter('\n', missingDelimiterValue = "")
+
+/** GET /children/{childId}/dashboard 통합 조회 결과. */
+data class ChildDashboard(
+    val childId: String,
+    val currentLocation: LocationPoint?,
+    val realtimeEnabled: Boolean,
+    val recentNotifications: List<AppNotification>,
+    val blockRulePatterns: List<String>,
+    val places: List<Geofence>,
 )
 
 data class NotificationSettings(
@@ -123,6 +163,9 @@ data class ChatRoom(
     val lastMessage: String,
     val lastAt: String,
     val online: Boolean,
+    /** 서버 방 소유자. 계정 전환 시 잘못된 room 재사용 방지용. */
+    val parentId: Long? = null,
+    val childId: Long? = null,
 )
 
 data class ChatMessage(
@@ -163,6 +206,42 @@ data class AppUsage(
     val durationSec: Int,
     val category: String? = null,
 )
+
+/** 서버 GET /monitoring/usage 집계 결과. groupBy에 따라 key의 의미가 달라진다
+ *  (APP=앱 이름, HOUR="00"~"23", DAY="yyyy-MM-dd"). */
+data class AppUsageStat(
+    val key: String,
+    val durationSec: Int,
+)
+
+/**
+ * 자녀 기기에서 감지된 안전 사건.
+ *
+ * 자녀 홈 「최근 알림」([com.hack.kidhack.data.local.ChildAlertStore])과 같은 데이터를
+ * 서버로 나르는 단위다. id 는 기기가 만든 고유값이라 재업로드·재조회에도 중복되지 않는다.
+ */
+data class ChildAlertEvent(
+    val id: String,
+    val type: String,
+    val title: String,
+    val body: String = "",
+    val occurredAt: String = "",
+)
+
+/**
+ * 자녀 기기 사건 타입 → 보호자 알림 타입.
+ *
+ * 보호자 화면의 아이콘 매핑과 수신 설정(위치/유해/앱사용) 필터가 이 값 기준으로 돈다.
+ * null 이면 안전 사건이 아니라는 뜻이다(캡처 요청 등) — 보호자에게 나르지 않는다.
+ */
+fun childAlertTypeToParent(type: String): String? = when (type.trim().uppercase()) {
+    "HARMFUL_BLOCK" -> "HARMFUL"
+    "GEOFENCE_EXIT" -> "LOCATION"
+    "GEOFENCE_ENTER" -> "ARRIVAL"
+    "SCREEN_TIME_LIMIT" -> "APP_USAGE"
+    "GPS_OFF" -> "GPS_OFF"
+    else -> null
+}
 
 data class PairingCode(
     val pairingCode: String,

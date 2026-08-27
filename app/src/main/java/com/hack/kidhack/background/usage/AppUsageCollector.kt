@@ -40,7 +40,9 @@ class AppUsageCollector(
         if (local.isNotEmpty()) return@withContext Result(local, fromDevice = true)
 
         val fallback = runCatching {
+            // list()가 이제 AppUsageStat(key=앱이름, durationSec)을 주므로 AppUsage로 매핑한다.
             appUsageRepository.list(sessionRepository.childId(), "APP")
+                .map { AppUsage(appName = it.key, durationSec = it.durationSec, category = null) }
         }.getOrDefault(emptyList())
         Result(fallback.sortedByDescending { it.durationSec }.take(limit), fromDevice = false)
     }
