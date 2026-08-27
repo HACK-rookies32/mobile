@@ -9,7 +9,7 @@ import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
 import com.hack.kidhack.data.remote.dto.AppControlDto
 import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
-import com.hack.kidhack.data.remote.dto.AppUsageDto
+import com.hack.kidhack.data.remote.dto.AppUsageAggregateResponse
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.BlocklistResponse
@@ -350,17 +350,16 @@ interface SubscriptionApi {
 }
 
 interface AppUsageApi {
-    @GET("children/{childId}/app-usage")
+    @POST("monitoring/usage")
+    suspend fun report(@Body body: AppUsageReportRequest): ApiEnvelope<Int>
+
+    @GET("monitoring/usage/{childId}")
     suspend fun list(
         @Path("childId") childId: String,
-        @Query("groupBy") groupBy: String = "APP",
-    ): ApiEnvelope<List<AppUsageDto>>
-
-    @POST("children/{childId}/app-usage")
-    suspend fun report(
-        @Path("childId") childId: String,
-        @Body body: AppUsageReportRequest,
-    ): ApiEnvelope<Unit>
+        @Query("groupBy") groupBy: String = "DAY",
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
+    ): ApiEnvelope<AppUsageAggregateResponse>
 }
 
 /**

@@ -3,6 +3,7 @@ package com.hack.kidhack.data.repository.fake
 import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
@@ -111,10 +112,26 @@ object FakeData {
         LocationEvent("1", "2", LocationEventType.ARRIVED, "2026-08-24T16:31:50"),
     )
 
-    val usages = listOf(
-        AppUsage("YouTube", 80 * 60, "동영상"),
-        AppUsage("카카오톡", 35 * 60, "메신저"),
-        AppUsage("Chrome", 22 * 60, "브라우저"),
+    val usages: List<AppUsage> = listOf(
+        AppUsage("YouTube", 4800, "동영상"),
+        AppUsage("카카오톡", 2100, "메신저"),
+        AppUsage("Chrome", 1320, "브라우저"),
+        AppUsage("인스타그램", 2700, "소셜"),
+        AppUsage("네이버", 900, "브라우저"),
+        AppUsage("게임", 3600, "게임"),
+    )
+
+    val usagesByHour: List<AppUsageStat> = listOf(
+        AppUsageStat("07", 600), AppUsageStat("09", 1200), AppUsageStat("12", 1800),
+        AppUsageStat("15", 2400), AppUsageStat("18", 2100), AppUsageStat("20", 3000),
+        AppUsageStat("22", 1500), AppUsageStat("23", 900),
+    )
+
+    val usagesByDay: List<AppUsageStat> = listOf(
+        AppUsageStat("2026-08-21", 5400), AppUsageStat("2026-08-22", 3600),
+        AppUsageStat("2026-08-23", 7200), AppUsageStat("2026-08-24", 2700),
+        AppUsageStat("2026-08-25", 8200), AppUsageStat("2026-08-26", 6300),
+        AppUsageStat("2026-08-27", 4100),
     )
 
     val chatMessages = listOf(

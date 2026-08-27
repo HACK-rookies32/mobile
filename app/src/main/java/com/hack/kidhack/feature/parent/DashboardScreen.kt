@@ -44,7 +44,7 @@ import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.AppNotification
-import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.ChildRepository
@@ -63,7 +63,7 @@ data class DashboardUiState(
     val selected: ChildProfile? = null,
     val lastLocation: String? = null,
     val lastLocationAt: String? = null,
-    val usages: List<AppUsage> = emptyList(),
+    val usages: List<AppUsageStat> = emptyList(),
     val notifications: List<AppNotification> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
@@ -146,7 +146,7 @@ class DashboardViewModel(
 @Composable
 fun ParentDashboardScreen(
     onOpenNotifications: () -> Unit = {},
-    onOpenAppControl: () -> Unit = {},
+    onOpenUsageDetail: () -> Unit = {},
     onOpenPairing: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     viewModel: DashboardViewModel = koinViewModel(),
@@ -317,7 +317,7 @@ fun ParentDashboardScreen(
                             )
                             Text(
                                 stringResource(R.string.parent_dashboard_see_all),
-                                modifier = Modifier.clickable(onClick = onOpenAppControl),
+                                modifier = Modifier.clickable(onClick = onOpenUsageDetail),
                                 color = colors.brand,
                                 fontFamily = KidhackFontFamily,
                                 fontWeight = FontBold,
@@ -325,15 +325,17 @@ fun ParentDashboardScreen(
                             )
                         }
                         Spacer(Modifier.height(12.dp))
-                        val barColors = listOf(Color(0xFFF87171), Color(0xFFFACC15), colors.info)
-                        state.usages.forEachIndexed { i, u ->
+                        // 대시보드에는 많이 사용한 순으로 상위 3개만 노출한다(전체는 '전체 보기').
+                        val topUsages = state.usages.sortedByDescending { it.durationSec }.take(3)
+                        topUsages.forEachIndexed { i, u ->
                             UsageBar(
-                                name = u.appName,
+                                name = u.key,
                                 timeLabel = formatDuration(u.durationSec),
                                 progress = u.durationSec.toFloat() / maxUsage,
-                                barColor = barColors.getOrElse(i) { colors.brand },
+                                // 앱 사용량 상세 화면(APP 탭)과 같은 기준으로 색을 배정한다.
+                                barColor = appColor(u.key),
                             )
-                            if (i < state.usages.lastIndex) Spacer(Modifier.height(10.dp))
+                            if (i < topUsages.lastIndex) Spacer(Modifier.height(10.dp))
                         }
                     }
                     KidCard {

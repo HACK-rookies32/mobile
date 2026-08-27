@@ -14,6 +14,7 @@ import com.hack.kidhack.domain.model.AllowanceType
 import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.Charge
@@ -589,7 +590,16 @@ class FakeSubscriptionRepository : SubscriptionRepository {
 }
 
 class FakeAppUsageRepository : AppUsageRepository {
-    override suspend fun list(childId: String, groupBy: String): List<AppUsage> = FakeData.usages
+    override suspend fun list(
+        childId: String,
+        groupBy: String,
+        from: String?,
+        to: String?,
+    ): List<AppUsageStat> = when (groupBy) {
+        "HOUR" -> FakeData.usagesByHour
+        "DAY" -> FakeData.usagesByDay
+        else -> FakeData.usages.map { AppUsageStat(it.appName, it.durationSec) }
+    }
     override suspend fun report(childId: String, usages: List<AppUsage>) {}
 }
 

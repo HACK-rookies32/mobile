@@ -7,6 +7,7 @@ import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.Charge
@@ -254,7 +255,12 @@ interface SubscriptionRepository {
 }
 
 interface AppUsageRepository {
-    suspend fun list(childId: String, groupBy: String): List<AppUsage>
+    suspend fun list(
+        childId: String,
+        groupBy: String = "DAY",
+        from: String? = null,
+        to: String? = null,
+    ): List<AppUsageStat>
     suspend fun report(childId: String, usages: List<AppUsage>)
 }
 

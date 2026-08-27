@@ -134,6 +134,7 @@ import com.hack.kidhack.feature.parent.CommunityListViewModel
 import com.hack.kidhack.feature.parent.CommunityWriteViewModel
 import com.hack.kidhack.feature.parent.ContactViewModel
 import com.hack.kidhack.feature.parent.EditProfileViewModel
+import com.hack.kidhack.feature.parent.AppUsageDetailViewModel
 import com.hack.kidhack.feature.parent.DashboardViewModel
 import com.hack.kidhack.feature.parent.GeofenceViewModel
 import com.hack.kidhack.feature.parent.HarmfulViewModel
@@ -308,6 +309,7 @@ val appModule = module {
     viewModel { ForgotViewModel(get()) }
 
     viewModel { DashboardViewModel(get(), get(), get(), get()) }
+    viewModel { AppUsageDetailViewModel(get(), get(), get()) }
     viewModel { LocationViewModel(get(), get(), get(), get(), get()) }
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
     viewModel { ParentChatViewModel(get(), get(), get()) }

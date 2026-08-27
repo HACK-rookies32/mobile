@@ -13,6 +13,7 @@
     <string name="parent_dashboard_empty_pair_action">자녀 기기 연결하기</string>
     <string name="parent_dashboard_usage_title">오늘 앱 사용 현황</string>
     <string name="parent_dashboard_see_all">전체 보기</string>
+    <string name="parent_usage_detail_title">앱 사용량 상세</string>
     <string name="parent_dashboard_recent">최근 알림</string>
     <string name="parent_add_child">+ 추가</string>
     <string name="parent_location_school">📍 학교</string>

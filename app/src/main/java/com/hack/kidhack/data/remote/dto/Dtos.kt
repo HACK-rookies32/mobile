@@ -346,14 +346,31 @@ data class SubscriptionDto(
 )
 
 @Serializable
-data class AppUsageDto(
+data class AppUsageReportItemDto(
     val appName: String,
     val durationSec: Int,
-    val category: String? = null,
+    val recordedAt: String,
 )
 
 @Serializable
-data class AppUsageReportRequest(val usages: List<AppUsageDto>)
+data class AppUsageReportRequest(
+    val childId: Long,
+    val usages: List<AppUsageReportItemDto>,
+)
+
+@Serializable
+data class AppUsageStatDto(
+    val key: String,
+    val durationSec: Int,
+)
+
+/** GET /monitoring/usage/{childId} 집계 응답. groupBy = APP | HOUR | DAY. */
+@Serializable
+data class AppUsageAggregateResponse(
+    val childId: Long,
+    val groupBy: String,
+    val items: List<AppUsageStatDto> = emptyList(),
+)
 
 /**
  * 부모가 보낸 원격 요청.

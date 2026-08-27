@@ -4,7 +4,7 @@ import com.hack.kidhack.data.remote.dto.AllowanceDto
 import com.hack.kidhack.data.remote.dto.AllowanceEntryDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentDto
 import com.hack.kidhack.data.remote.dto.AppControlDto
-import com.hack.kidhack.data.remote.dto.AppUsageDto
+import com.hack.kidhack.data.remote.dto.AppUsageStatDto
 import com.hack.kidhack.data.remote.dto.CardDto
 import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
@@ -41,6 +41,7 @@ import com.hack.kidhack.data.remote.dto.WalletTransactionDto
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
@@ -225,7 +226,7 @@ fun PointHistoryDto.toDomain(): PointHistory = PointHistory(id, description, poi
 
 fun SubscriptionDto.toDomain(): Subscription = Subscription(planId, status, method)
 
-fun AppUsageDto.toDomain(): AppUsage = AppUsage(appName, durationSec, category)
+fun AppUsageStatDto.toDomain(): AppUsageStat = AppUsageStat(key, durationSec)
 
 fun PairingCodeDto.toDomain(): PairingCode = PairingCode(pairingCode, expiresIn)
 

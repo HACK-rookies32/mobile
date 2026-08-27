@@ -33,7 +33,7 @@ import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
 import com.hack.kidhack.data.remote.api.WalletApi
 import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
-import com.hack.kidhack.data.remote.dto.AppUsageDto
+import com.hack.kidhack.data.remote.dto.AppUsageReportItemDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.CardRegisterRequest
@@ -76,6 +76,7 @@ import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.ChildDashboard
@@ -521,12 +522,23 @@ class RealSubscriptionRepository(private val api: SubscriptionApi) : Subscriptio
 }
 
 class RealAppUsageRepository(private val api: AppUsageApi) : AppUsageRepository {
-    override suspend fun list(childId: String, groupBy: String): List<AppUsage> =
-        api.list(childId, groupBy).unwrap().map { it.toDomain() }
+    override suspend fun list(
+        childId: String,
+        groupBy: String,
+        from: String?,
+        to: String?,
+    ): List<AppUsageStat> =
+        api.list(childId, groupBy, from, to).unwrap().items.map { it.toDomain() }
+
     override suspend fun report(childId: String, usages: List<AppUsage>) {
+        val recordedAt = java.time.Instant.now().toString()
         api.report(
-            childId,
-            AppUsageReportRequest(usages.map { AppUsageDto(it.appName, it.durationSec, it.category) }),
+            AppUsageReportRequest(
+                childId = childId.toServerId(),
+                usages = usages.map {
+                    AppUsageReportItemDto(it.appName, it.durationSec, recordedAt)
+                },
+            ),
         ).unwrapOrNull()
     }
 }

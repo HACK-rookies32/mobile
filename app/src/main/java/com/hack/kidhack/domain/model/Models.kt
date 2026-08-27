@@ -187,6 +187,13 @@ data class AppUsage(
     val category: String? = null,
 )
 
+/** 서버 GET /monitoring/usage 집계 결과. groupBy에 따라 key의 의미가 달라진다
+ *  (APP=앱 이름, HOUR="00"~"23", DAY="yyyy-MM-dd"). */
+data class AppUsageStat(
+    val key: String,
+    val durationSec: Int,
+)
+
 data class PairingCode(
     val pairingCode: String,
     val expiresIn: Int,
