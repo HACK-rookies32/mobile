@@ -56,6 +56,14 @@ data class AppNotification(
     val body: String,
     val createdAt: String,
     val read: Boolean,
+    /**
+     * 어느 자녀의 알림인지. 자녀를 여러 명 둔 보호자가 대시보드에서 한 명을 고르면
+     * 그 자녀의 알림만 보여 주는 데 쓴다.
+     *
+     * null 이면 「어느 자녀인지 알 수 없음」이다(서버가 알려 주지 않은 경우).
+     * 그런 알림은 숨기지 않고 모든 자녀에게 공통으로 보여 준다 — 감춰서 놓치는 것보다 낫다.
+     */
+    val childId: String? = null,
 )
 
 data class NotificationSettings(
@@ -163,6 +171,35 @@ data class AppUsage(
     val durationSec: Int,
     val category: String? = null,
 )
+
+/**
+ * 자녀 기기에서 감지된 안전 사건.
+ *
+ * 자녀 홈 「최근 알림」([com.hack.kidhack.data.local.ChildAlertStore])과 같은 데이터를
+ * 서버로 나르는 단위다. id 는 기기가 만든 고유값이라 재업로드·재조회에도 중복되지 않는다.
+ */
+data class ChildAlertEvent(
+    val id: String,
+    val type: String,
+    val title: String,
+    val body: String = "",
+    val occurredAt: String = "",
+)
+
+/**
+ * 자녀 기기 사건 타입 → 보호자 알림 타입.
+ *
+ * 보호자 화면의 아이콘 매핑과 수신 설정(위치/유해/앱사용) 필터가 이 값 기준으로 돈다.
+ * null 이면 안전 사건이 아니라는 뜻이다(캡처 요청 등) — 보호자에게 나르지 않는다.
+ */
+fun childAlertTypeToParent(type: String): String? = when (type.trim().uppercase()) {
+    "HARMFUL_BLOCK" -> "HARMFUL"
+    "GEOFENCE_EXIT" -> "LOCATION"
+    "GEOFENCE_ENTER" -> "ARRIVAL"
+    "SCREEN_TIME_LIMIT" -> "APP_USAGE"
+    "GPS_OFF" -> "GPS_OFF"
+    else -> null
+}
 
 data class PairingCode(
     val pairingCode: String,

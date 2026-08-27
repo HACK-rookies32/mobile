@@ -70,6 +70,9 @@ class ChildPlatformController(
         // FCM 대체 경로: 상주 WebSocket(실시간) + 15분 폴링(백업)
         ChildCommandService.start(context)
         ChildCommandPollWorker.enqueuePeriodic(context)
+        // 소켓이 없던 동안 쌓인 안전 사건(유해 차단 등)을 보호자 쪽으로 밀어 올린다.
+        ChildAlertUploadWorker.enqueuePeriodic(context)
+        ChildAlertUploadWorker.enqueueNow(context)
         scope.launch { runCatching { geofenceRegistrar.sync() } }
     }
 
@@ -87,6 +90,7 @@ class ChildPlatformController(
         ScreenCaptureWorker.cancel(context)
         ChildCommandService.stop(context)
         ChildCommandPollWorker.cancel(context)
+        ChildAlertUploadWorker.cancel(context)
         geofenceRegistrar.clear()
     }
 }

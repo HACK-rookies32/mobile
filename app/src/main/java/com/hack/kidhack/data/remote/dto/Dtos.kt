@@ -150,6 +150,10 @@ data class LocationDto(
 @Serializable
 data class GpsStatusRequest(val gpsEnabled: Boolean, val reportedAt: String)
 
+/** FCM 토큰 등록 (신규 제안 계약). platform 은 서버가 발송 채널을 고르는 데 쓴다. */
+@Serializable
+data class PushTokenRequest(val token: String, val platform: String = "ANDROID")
+
 @Serializable
 data class GeofenceDto(
     val id: String? = null,
@@ -168,6 +172,18 @@ data class NotificationDto(
     val body: String,
     val createdAt: String,
     val read: Boolean = false,
+    /** 명세에는 없지만 서버가 주면 자녀별로 나눠 보여 준다(GAP: 알림에 자녀 식별자 없음). */
+    val childId: String? = null,
+)
+
+/** docs/child-push-contract.md 4절 — 자녀 안전 사건 동기화 제안 계약. */
+@Serializable
+data class ChildAlertDto(
+    val id: String,
+    val type: String,
+    val title: String,
+    val body: String = "",
+    val occurredAt: String = "",
 )
 
 @Serializable

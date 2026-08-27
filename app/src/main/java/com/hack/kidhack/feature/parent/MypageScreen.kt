@@ -189,6 +189,7 @@ fun ParentMypageScreen(
     onOpenNotifications: () -> Unit = {},
     onOpenAppControl: () -> Unit = {},
     onOpenScreenshot: () -> Unit = {},
+    onOpenCamera: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     onOpenHarmful: () -> Unit = {},
     onOpenPairing: () -> Unit = {},
@@ -333,6 +334,7 @@ fun ParentMypageScreen(
 
             ListRow(stringResource(R.string.parent_mypage_app_control), leading = "🛡️", onClick = onOpenAppControl)
             ListRow(stringResource(R.string.parent_mypage_screenshot), leading = "📸", onClick = onOpenScreenshot)
+            ListRow(stringResource(R.string.parent_mypage_camera), leading = "📷", onClick = onOpenCamera)
             ListRow(stringResource(R.string.parent_mypage_child_profile), leading = "👦", onClick = onOpenProfile)
             ListRow(stringResource(R.string.parent_mypage_harmful), leading = "🚫", onClick = onOpenHarmful)
             ListRow(stringResource(R.string.parent_mypage_pay), leading = "💳", onClick = onOpenPay, showDivider = false)

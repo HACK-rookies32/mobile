@@ -6,8 +6,11 @@ import com.hack.kidhack.background.ParentPlatformController
 import com.hack.kidhack.background.alert.ParentAlertBus
 import com.hack.kidhack.background.alert.ParentAlertNotifier
 import com.hack.kidhack.background.alert.ParentAlertSync
+import com.hack.kidhack.background.alert.ParentChildWatcher
 import com.hack.kidhack.background.command.ChildCommandBus
 import com.hack.kidhack.background.command.ChildCommandNotifier
+import com.hack.kidhack.background.push.PushMessageRouter
+import com.hack.kidhack.background.push.PushTokenRegistrar
 import com.hack.kidhack.background.geofence.GeofenceRegistrar
 import com.hack.kidhack.background.location.GpsStatusMonitor
 import com.hack.kidhack.background.location.LocationQueue
@@ -21,13 +24,16 @@ val backgroundModule = module {
     single { ChildCommandBus() }
     single { ChildDeviceStatus(androidContext()) }
     single { AppUsageCollector(androidContext(), get(), get()) }
-    single { ScreenTimeWatcher(get()) }
+    single { ScreenTimeWatcher(get(), androidContext()) }
     single { ChildCommandNotifier(androidContext()) }
-    single { GpsStatusMonitor(androidContext(), get()) }
+    single { PushTokenRegistrar(get(), get(), get()) }
+    single { PushMessageRouter(androidContext(), get(), get(), get(), get(), get(), get()) }
+    single { GpsStatusMonitor(androidContext(), get(), get()) }
     single { GeofenceRegistrar(androidContext(), get(), get()) }
     single { ChildPlatformController(androidContext(), get(), get(), get(), get()) }
     single { ParentAlertBus() }
     single { ParentAlertNotifier(androidContext()) }
     single { ParentAlertSync(get(), get(), get(), get(), get()) }
+    single { ParentChildWatcher(get(), get(), get(), get(), get(), get(), get()) }
     single { ParentPlatformController(androidContext(), get()) }
 }

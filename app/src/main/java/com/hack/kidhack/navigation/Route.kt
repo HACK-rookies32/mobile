@@ -15,6 +15,7 @@ sealed class Route(val path: String) {
     data object ParentEditProfile : Route("parent/editprofile")
     data object ParentAppControl : Route("parent/appcontrol")
     data object ParentScreenshot : Route("parent/screenshot")
+    data object ParentCameraRequest : Route("parent/camera")
     data object ParentChildProfile : Route("parent/profile")
     data object ParentHarmful : Route("parent/harmful")
     data object ParentPairing : Route("parent/pairing")
@@ -49,6 +50,7 @@ sealed class Route(val path: String) {
     data object ChildScreenshot : Route("child/screenshot")
     data object ChildPay : Route("child/pay")
     data object ChildProfileEdit : Route("child/profile/edit")
+    data object ChildPairing : Route("child/pairing")
 }
 
 data class TabItem(

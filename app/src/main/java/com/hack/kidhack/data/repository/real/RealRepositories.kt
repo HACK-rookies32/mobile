@@ -17,6 +17,8 @@ import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.GeofenceApi
 import com.hack.kidhack.data.remote.api.InquiryApi
 import com.hack.kidhack.data.remote.api.LocationApi
+import com.hack.kidhack.data.remote.api.ChildAlertApi
+import com.hack.kidhack.data.remote.api.DeviceApi
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
 import com.hack.kidhack.data.remote.api.PhotoApi
@@ -35,6 +37,7 @@ import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.CardRegisterRequest
 import com.hack.kidhack.data.remote.dto.ChangePasswordRequest
+import com.hack.kidhack.data.remote.dto.PushTokenRequest
 import com.hack.kidhack.data.remote.dto.ChargeConfirmRequest
 import com.hack.kidhack.data.remote.dto.ChargePrepareRequest
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
@@ -62,6 +65,7 @@ import com.hack.kidhack.data.remote.paging.PageResponsePagingSource
 import com.hack.kidhack.data.remote.unwrap
 import com.hack.kidhack.data.remote.unwrapOrNull
 import com.hack.kidhack.data.repository.toDomain
+import com.hack.kidhack.data.repository.toRoleOrNull
 import com.hack.kidhack.data.repository.toDto
 import com.hack.kidhack.data.ws.ChatWebSocketClient
 import com.hack.kidhack.data.ws.ChatWsEvent
@@ -71,6 +75,7 @@ import com.hack.kidhack.domain.model.Allowance
 import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AppNotification
+import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.Card
@@ -109,6 +114,8 @@ import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.GeofenceRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
 import com.hack.kidhack.domain.repository.LocationRepository
+import com.hack.kidhack.domain.repository.ChildAlertRepository
+import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
@@ -185,7 +192,7 @@ class RealAuthRepository(
 
     override suspend fun login(loginId: String, password: String, preferredRole: Role?): Session {
         val login = api.login(LoginRequest(loginId, password)).unwrap()
-        return establishSession(login)
+        return establishSession(login, preferredRole)
     }
 
     override suspend fun logout() {
@@ -201,11 +208,19 @@ class RealAuthRepository(
         api.resetPassword(ResetPasswordRequest(loginId, verifyCode, newPassword)).unwrapOrNull()
     }
 
-    private suspend fun establishSession(login: LoginResponse): Session {
+    /**
+     * 역할 결정 순서: 로그인 응답 → `GET /users/me` → 로그인 화면에서 고른 값 → PARENT.
+     *
+     * 예전에는 응답의 role 문자열을 `Role.valueOf` 로만 읽어서, 서버가 필드를 안 주거나
+     * `ROLE_CHILD` 같은 표기를 쓰면 **말없이 PARENT 로 떨어졌다**. 자녀 계정으로 로그인해도
+     * 부모 화면이 열린 이유다. 이제 표기를 폭넓게 받아들이고([toRoleOrNull]), 그래도 알 수
+     * 없을 때만 사용자가 고른 [preferredRole] 을 쓴다.
+     */
+    private suspend fun establishSession(login: LoginResponse, preferredRole: Role?): Session {
         val access = login.resolvedAccessToken()?.takeIf { it.isNotBlank() }
             ?: error("로그인 토큰이 없습니다")
         val refresh = login.refreshToken.orEmpty()
-        val loginRole = runCatching { Role.valueOf(login.role.orEmpty()) }.getOrNull()
+        val loginRole = login.role.toRoleOrNull() ?: login.user?.role.toRoleOrNull()
         val fromUser = login.user?.toDomain()
         val placeholder = User(
             id = fromUser?.id.orEmpty(),
@@ -213,18 +228,21 @@ class RealAuthRepository(
                 ?: fromUser?.loginId.orEmpty(),
             name = login.username?.takeIf { it.isNotBlank() }
                 ?: fromUser?.name.orEmpty(),
-            role = loginRole ?: fromUser?.role ?: Role.PARENT,
+            role = loginRole ?: preferredRole ?: Role.PARENT,
             phone = fromUser?.phone.orEmpty(),
             email = fromUser?.email,
             profileImageUrl = fromUser?.profileImageUrl,
         )
         sessionRepository.save(Session(access, refresh, placeholder))
         return try {
-            val me = userApi.me().unwrap().toDomain()
+            // DTO 를 먼저 잡아 둔다. toDomain() 은 모르는 role 을 PARENT 로 메워 버려서
+            // 「서버가 PARENT 라고 했다」와 「서버가 아무 말도 안 했다」를 구분할 수 없다.
+            val meDto = userApi.me().unwrap()
+            val me = meDto.toDomain()
             val merged = me.copy(
                 loginId = me.loginId.ifBlank { placeholder.loginId },
                 name = me.name.ifBlank { placeholder.name },
-                role = loginRole ?: me.role,
+                role = loginRole ?: meDto.role.toRoleOrNull() ?: preferredRole ?: Role.PARENT,
             )
             Session(access, refresh, merged).also { sessionRepository.save(it) }
         } catch (t: Throwable) {
@@ -301,16 +319,38 @@ class RealGeofenceRepository(private val api: GeofenceApi) : GeofenceRepository 
     }
 }
 
-class RealNotificationRepository(private val api: NotificationApi) : NotificationRepository {
-    override fun paged(type: String?): Flow<PagingData<AppNotification>> =
-        Pager(PagingConfig(pageSize = 20)) {
-            PageResponsePagingSource { page, size -> api.list(type, page, size).unwrap() }
-        }.flow.map { paging -> paging.map { it.toDomain() } }
+class RealDeviceRepository(private val api: DeviceApi) : DeviceRepository {
+    override suspend fun registerPushToken(token: String) {
+        api.registerPushToken(PushTokenRequest(token)).unwrapOrNull()
+    }
 
-    override suspend fun list(type: String?): List<AppNotification> =
-        api.list(type, 0, 50).unwrap().content.map { it.toDomain() }
+    override suspend fun unregisterPushToken(token: String) {
+        api.unregisterPushToken(PushTokenRequest(token)).unwrapOrNull()
+    }
 }
 
+<<<<<<< HEAD
+=======
+class RealChildAlertRepository(private val api: ChildAlertApi) : ChildAlertRepository {
+    override suspend fun upload(childId: String, alerts: List<ChildAlertEvent>) {
+        api.upload(childId, alerts.map { it.toDto() }).unwrapOrNull()
+    }
+
+    override suspend fun list(childId: String): List<ChildAlertEvent> =
+        api.list(childId).unwrap().map { it.toDomain() }
+}
+
+class RealNotificationRepository(private val api: NotificationApi) : NotificationRepository {
+    override fun paged(type: String?, childId: String?): Flow<PagingData<AppNotification>> =
+        Pager(PagingConfig(pageSize = 20)) {
+            PageResponsePagingSource { page, size -> api.list(type, childId, page, size).unwrap() }
+        }.flow.map { paging -> paging.map { it.toDomain() } }
+
+    override suspend fun list(type: String?, childId: String?): List<AppNotification> =
+        api.list(type, childId, 0, 50).unwrap().content.map { it.toDomain() }
+}
+
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
 /**
  * GAP-04: `GET /children/{childId}/blocklist` 가 문자열 배열만 주므로 응답에 itemId 가 없다.
  *
@@ -535,6 +575,13 @@ class RealAppControlRepository(private val api: AppControlApi) : AppControlRepos
 }
 
 class RealPhotoRepository(private val api: PhotoApi) : PhotoRepository {
+    override suspend fun list(childId: String): List<ChildPhoto> =
+        api.list(childId, 0, 50).unwrap().content.map { it.toDomain() }
+
+    override suspend fun requestShot(childId: String) {
+        api.requestShot(childId).unwrapOrNull()
+    }
+
     override suspend fun upload(
         childId: String,
         file: File,

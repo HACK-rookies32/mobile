@@ -81,11 +81,50 @@ class ParentAlertSync(
      * @return 푸시가 실제로 떴는지. 수신 설정이 꺼져 있거나 알림 권한이 없으면 false 다
      *  (그 경우에도 보관함에는 남는다).
      */
+<<<<<<< HEAD
     suspend fun emitLocal(type: String, title: String, body: String): Boolean {
         val id = "local-" + type + "-" + System.currentTimeMillis()
         val alert = store.record(id = id, type = type, title = title, body = body) ?: return false
         val settings = runCatching { userRepository.notificationSettings() }.getOrNull()
         val pushed = notifier.notifyAll(listOf(alert), settings)
+=======
+    suspend fun emitLocal(
+        type: String,
+        title: String,
+        body: String,
+        childId: String? = null,
+    ): Boolean = recordRemote(
+        id = "local-" + type + "-" + System.currentTimeMillis(),
+        type = type,
+        title = title,
+        body = body,
+        childId = childId,
+    )
+
+    /**
+     * 자녀 기기·서버에서 유래한 알림을 **고정 id** 로 기록하고 푸시까지 띄운다.
+     *
+     * 같은 id 가 이미 보관함에 있으면 아무 일도 하지 않는다. 폴링이 같은 사건을
+     * 몇 번을 다시 가져와도 푸시는 처음 한 번만 울린다.
+     */
+    suspend fun recordRemote(
+        id: String,
+        type: String,
+        title: String,
+        body: String,
+        childId: String? = null,
+    ): Boolean {
+        val alert = store.record(
+            id = id,
+            type = type,
+            title = title,
+            body = body,
+            childId = childId,
+        ) ?: return false
+        val settings = runCatching { userRepository.notificationSettings() }.getOrNull()
+        val pushed = notifier.notifyAll(listOf(alert), settings)
+        store.markNotified(listOf(alert.id))
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
         refreshUnread()
         return pushed.isNotEmpty()
     }

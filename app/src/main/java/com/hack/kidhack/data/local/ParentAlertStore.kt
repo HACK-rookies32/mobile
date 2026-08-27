@@ -2,6 +2,7 @@ package com.hack.kidhack.data.local
 
 import com.hack.kidhack.core.common.KidhackJson
 import com.hack.kidhack.domain.model.AppNotification
+import com.hack.kidhack.domain.repository.SessionRepository
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +31,10 @@ import java.util.Locale
  *
  * 자녀 기기 사건을 남기는 [ChildAlertStore] 의 부모 버전이다.
  */
-class ParentAlertStore(context: Context) {
+class ParentAlertStore(
+    context: Context,
+    private val sessionRepository: SessionRepository,
+) {
 
     @Serializable
     private data class Entry(
@@ -45,6 +49,8 @@ class ParentAlertStore(context: Context) {
         val read: Boolean = false,
         /** 푸시 알림을 이미 띄웠는지. 재시도 중복 발송을 막는다. */
         val notified: Boolean = false,
+        /** 어느 자녀의 알림인지. null 이면 모든 자녀에게 공통으로 보여 준다. */
+        val childId: String? = null,
     )
 
     private val _alerts = MutableStateFlow<List<AppNotification>>(emptyList())
@@ -57,7 +63,19 @@ class ParentAlertStore(context: Context) {
      */
     val alerts: StateFlow<List<AppNotification>> = _alerts.asStateFlow()
 
+<<<<<<< HEAD
     private val file = File(context.filesDir, "parent_alerts.json")
+=======
+    private val dir = context.filesDir
+    private val legacyFile = File(dir, "parent_alerts.json")
+
+    @Volatile
+    private var cachedScope: String? = null
+
+    @Volatile
+    private var cachedFile: File = legacyFile
+
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
     private val mutex = Mutex()
     private val json = KidhackJson.instance
     private val serializer = ListSerializer(Entry.serializer())
@@ -69,8 +87,9 @@ class ParentAlertStore(context: Context) {
      */
     suspend fun merge(remote: List<AppNotification>): List<AppNotification> =
         withContext(Dispatchers.IO) {
+            val file = file()
             mutex.withLock {
-                val stored = readUnlocked()
+                val stored = readUnlocked(file)
                 val byId = stored.associateBy { it.id }.toMutableMap()
                 val now = System.currentTimeMillis()
                 val fresh = mutableListOf<Entry>()
@@ -90,6 +109,7 @@ class ParentAlertStore(context: Context) {
                             receivedAtMillis = now - index,
                             read = item.read,
                             notified = false,
+                            childId = item.childId,
                         )
                         byId[id] = entry
                         fresh += entry
@@ -99,7 +119,7 @@ class ParentAlertStore(context: Context) {
                     }
                 }
 
-                writeUnlocked(byId.values.sortedByDescending { it.receivedAtMillis })
+                writeUnlocked(file, byId.values.sortedByDescending { it.receivedAtMillis })
                 fresh.filter { !it.notified }
                     .sortedBy { it.receivedAtMillis }
                     .map { it.toDomain() }
@@ -112,9 +132,11 @@ class ParentAlertStore(context: Context) {
         type: String,
         title: String,
         body: String = "",
+        childId: String? = null,
     ): AppNotification? = withContext(Dispatchers.IO) {
+        val file = file()
         mutex.withLock {
-            val stored = readUnlocked()
+            val stored = readUnlocked(file)
             if (stored.any { it.id == id }) return@withLock null
             val entry = Entry(
                 id = id,
@@ -122,8 +144,9 @@ class ParentAlertStore(context: Context) {
                 title = title,
                 body = body,
                 receivedAtMillis = System.currentTimeMillis(),
+                childId = childId,
             )
-            writeUnlocked(listOf(entry) + stored)
+            writeUnlocked(file, listOf(entry) + stored)
             entry.toDomain()
         }
     }
@@ -132,36 +155,40 @@ class ParentAlertStore(context: Context) {
     suspend fun markNotified(ids: List<String>) = withContext(Dispatchers.IO) {
         if (ids.isEmpty()) return@withContext
         val target = ids.toSet()
+        val file = file()
         mutex.withLock {
-            val next = readUnlocked().map {
+            val next = readUnlocked(file).map {
                 if (it.id in target) it.copy(notified = true) else it
             }
-            writeUnlocked(next)
+            writeUnlocked(file, next)
         }
         Unit
     }
 
     /** 알림 탭을 열었을 때. 대시보드의 미확인 건수를 0 으로 만든다. */
     suspend fun markAllRead() = withContext(Dispatchers.IO) {
+        val file = file()
         mutex.withLock {
-            val stored = readUnlocked()
+            val stored = readUnlocked(file)
             if (stored.none { !it.read }) return@withLock
-            writeUnlocked(stored.map { it.copy(read = true) })
+            writeUnlocked(file, stored.map { it.copy(read = true) })
         }
         Unit
     }
 
     suspend fun markRead(id: String) = withContext(Dispatchers.IO) {
+        val file = file()
         mutex.withLock {
-            val stored = readUnlocked()
+            val stored = readUnlocked(file)
             if (stored.none { it.id == id && !it.read }) return@withLock
-            writeUnlocked(stored.map { if (it.id == id) it.copy(read = true) else it })
+            writeUnlocked(file, stored.map { if (it.id == id) it.copy(read = true) else it })
         }
         Unit
     }
 
     suspend fun all(limit: Int = MAX_ENTRIES): List<AppNotification> = withContext(Dispatchers.IO) {
-        mutex.withLock { readUnlocked() }
+        val file = file()
+        mutex.withLock { readUnlocked(file) }
             .sortedByDescending { it.receivedAtMillis }
             .take(limit)
             .map { it.toDomain() }
@@ -170,11 +197,13 @@ class ParentAlertStore(context: Context) {
     }
 
     suspend fun unreadCount(): Int = withContext(Dispatchers.IO) {
-        mutex.withLock { readUnlocked() }.count { !it.read }
+        val file = file()
+        mutex.withLock { readUnlocked(file) }.count { !it.read }
     }
 
-    /** 다른 계정의 알림이 보이지 않도록 계정 전환 시에만 비운다. */
+    /** 계정 탈퇴처럼 정말 지워야 할 때만 쓴다. 계정 전환은 파일이 분리돼 있어 지울 필요가 없다. */
     suspend fun clear() = withContext(Dispatchers.IO) {
+        val file = file()
         mutex.withLock { runCatching { file.delete() } }
         _alerts.value = emptyList()
         Unit
@@ -187,19 +216,45 @@ class ParentAlertStore(context: Context) {
         body = body,
         createdAt = createdAt.ifBlank { timeLabel(receivedAtMillis) },
         read = read,
+        childId = childId,
     )
 
     /** 서버가 id 를 비워 보내도 같은 알림이 매번 새 알림으로 쌓이지 않게 한다. */
     private fun AppNotification.identity(): String =
         id.ifBlank { LOCAL_ID_PREFIX + listOf(type, title, body, createdAt).joinToString("|").hashCode() }
 
-    private fun readUnlocked(): List<Entry> {
+    /**
+     * 지금 로그인한 계정의 보관함 파일.
+     *
+     * 예전에는 파일이 하나뿐이라 다른 계정이 로그인하면 통째로 지워야 했고, 그래서
+     * 부모와 자녀를 오갈 때마다 「최근 알림」이 매번 비워졌다. 계정별로 나눠 두면
+     * 지울 필요가 없고, 돌아왔을 때 그대로 남아 있다.
+     */
+    private suspend fun file(): File {
+        val scope = runCatching { sessionRepository.current()?.user?.id }
+            .getOrNull().orEmpty().ifBlank { ANON_SCOPE }
+        if (scope != cachedScope) {
+            val next = File(dir, "parent_alerts_" + scope + ".json")
+            // 계정별 분리 이전에 쌓인 기록은 지금 계정 것으로 넘겨 준다(한 번만).
+            if (!next.exists() && legacyFile.exists()) {
+                runCatching {
+                    legacyFile.copyTo(next, overwrite = true)
+                    legacyFile.delete()
+                }
+            }
+            cachedScope = scope
+            cachedFile = next
+        }
+        return cachedFile
+    }
+
+    private fun readUnlocked(file: File): List<Entry> {
         if (!file.exists()) return emptyList()
         return runCatching { json.decodeFromString(serializer, file.readText()) }
             .getOrDefault(emptyList())
     }
 
-    private fun writeUnlocked(entries: List<Entry>) {
+    private fun writeUnlocked(file: File, entries: List<Entry>) {
         val capped = entries.sortedByDescending { it.receivedAtMillis }.take(MAX_ENTRIES)
         runCatching { file.writeText(json.encodeToString(serializer, capped)) }
         _alerts.value = capped.map { it.toDomain() }
@@ -218,6 +273,7 @@ class ParentAlertStore(context: Context) {
         const val TYPE_GEOFENCE_EXIT = "LOCATION"
         const val TYPE_HARMFUL = "HARMFUL"
 
+        private const val ANON_SCOPE = "anon"
         private const val LOCAL_ID_PREFIX = "local-"
         private const val MAX_ENTRIES = 200
     }

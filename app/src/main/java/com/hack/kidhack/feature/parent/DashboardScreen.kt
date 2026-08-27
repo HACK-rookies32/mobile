@@ -44,6 +44,7 @@ import com.hack.kidhack.R
 import com.hack.kidhack.core.permission.KidhackPermissions
 import com.hack.kidhack.permissionRequester
 import com.hack.kidhack.background.alert.ParentAlertSync
+import com.hack.kidhack.background.alert.ParentChildWatcher
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.StatCard
@@ -74,10 +75,23 @@ data class DashboardUiState(
     val lastLocation: String? = null,
     val lastLocationAt: String? = null,
     val usages: List<AppUsage> = emptyList(),
-    val notifications: List<AppNotification> = emptyList(),
+    /** 보관함 전체. 화면에 그리는 건 아래 [notifications] 로 걸러 낸 것이다. */
+    val allNotifications: List<AppNotification> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
-)
+) {
+    /**
+     * 지금 고른 자녀의 알림.
+     *
+     * 자녀가 여러 명이면 대시보드의 모든 지표가 고른 자녀 기준이어야 한다.
+     * 사용량·위치는 원래 childId 로 받아 오는데 알림만 계정 단위라 섞여 보였다.
+     *
+     * 자녀를 특정할 수 없는 알림(서버가 childId 를 안 준 경우)은 감추지 않는다.
+     * 잘못 숨기면 보호자가 사건 자체를 놓친다.
+     */
+    val notifications: List<AppNotification>
+        get() = allNotifications.filter { it.childId == null || it.childId == selectedId }
+}
 
 class DashboardViewModel(
     private val childRepository: ChildRepository,
@@ -85,6 +99,7 @@ class DashboardViewModel(
     private val appUsageRepository: AppUsageRepository,
     private val alertSync: ParentAlertSync,
     private val locationRepository: LocationRepository,
+    private val childWatcher: ParentChildWatcher,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DashboardUiState())
@@ -100,7 +115,11 @@ class DashboardViewModel(
         // 당겨서 새로고침하지 않아도 「최근 알림」이 바로 바뀐다.
         viewModelScope.launch {
             alertSync.alerts.collect { alerts ->
+<<<<<<< HEAD
                 _state.update { it.copy(notifications = alerts) }
+=======
+                _state.update { it.copy(allNotifications = alerts) }
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
             }
         }
         refresh()
@@ -116,6 +135,19 @@ class DashboardViewModel(
         viewModelScope.launch { alertSync.sync() }
     }
 
+<<<<<<< HEAD
+=======
+    /**
+     * 자녀 상태를 지금 판정한다.
+     *
+     * 15분 주기 워커를 기다리지 않고 당겨서 새로고침하면 바로 확인할 수 있게 한다.
+     * 자녀당 API 를 세 번 부르므로 화면에 들어올 때마다가 아니라 새로고침에서만 돈다.
+     */
+    private fun evaluateChildren() {
+        viewModelScope.launch { runCatching { childWatcher.evaluateAll() } }
+    }
+
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
     fun refresh() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
@@ -127,6 +159,7 @@ class DashboardViewModel(
             }.onSuccess { (children, selectedId, _) ->
                 _state.update { it.copy(children = children, selectedId = selectedId) }
                 loadFor(selectedId)
+                evaluateChildren()
             }.onFailure { t ->
                 _state.update { it.copy(loading = false, error = t.message ?: "불러오지 못했어요") }
             }

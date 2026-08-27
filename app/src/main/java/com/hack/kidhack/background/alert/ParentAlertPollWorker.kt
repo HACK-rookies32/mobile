@@ -27,9 +27,12 @@ class ParentAlertPollWorker(
 ) : CoroutineWorker(appContext, params), KoinComponent {
 
     private val alertSync: ParentAlertSync by inject()
+    private val watcher: ParentChildWatcher by inject()
 
     override suspend fun doWork(): Result {
         val result = runCatching { alertSync.sync() }.getOrElse { return Result.retry() }
+        // 서버가 알림을 만들어 주지 않는 사건은 보호자 앱이 직접 판정한다.
+        runCatching { watcher.evaluateAll() }
         return if (result.remoteFailed) Result.retry() else Result.success()
     }
 

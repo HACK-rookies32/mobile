@@ -38,6 +38,8 @@ import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.NotificationSettings
+import com.hack.kidhack.domain.repository.ChildRepository
+import com.hack.kidhack.domain.repository.SelectedChildRepository
 import com.hack.kidhack.domain.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,6 +60,8 @@ data class NotificationsUiState(
 class NotificationsViewModel(
     private val userRepository: UserRepository,
     private val alertSync: ParentAlertSync,
+    private val childRepository: ChildRepository,
+    private val selectedChildRepository: SelectedChildRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NotificationsUiState())
@@ -93,13 +97,33 @@ class NotificationsViewModel(
      */
     fun sendTestAlert(label: String, type: String, title: String, body: String) {
         viewModelScope.launch {
+<<<<<<< HEAD
             val pushed = alertSync.emitLocal(type, title, body)
+=======
+            // 대시보드가 고른 자녀 기준으로 알림을 거르므로, 테스트 알림도 그 자녀 앞으로
+            // 발생시켜야 「자녀를 바꾸면 목록이 바뀐다」를 확인할 수 있다.
+            val child = runCatching {
+                val children = childRepository.children()
+                val id = selectedChildRepository.resolveId(children)
+                children.firstOrNull { it.id == id }
+            }.getOrNull()
+            val pushed = alertSync.emitLocal(
+                type = type,
+                title = title,
+                body = child?.let { it.name + " · " + body } ?: body,
+                childId = child?.id,
+            )
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
             val alerts = alertSync.cached()
             _state.update {
                 it.copy(
                     notifications = alerts,
                     notice = if (pushed) {
+<<<<<<< HEAD
                         label + " 알림을 보냈어요. 상단바를 확인해 주세요."
+=======
+                        label + " 알림을 " + (child?.name ?: "전체") + " 앞으로 보냈어요. 상단바를 확인해 주세요."
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
                     } else {
                         label + " 알림을 기록했어요. 수신 설정이나 알림 권한이 꺼져 있어 푸시는 뜨지 않았어요."
                     },

@@ -11,6 +11,10 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
 import android.widget.Toast
 import com.hack.kidhack.R
+<<<<<<< HEAD
+=======
+import com.hack.kidhack.background.ChildAlertUploadWorker
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
 import com.hack.kidhack.core.common.HarmfulKeywordMatcher
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.domain.model.BlocklistItem
@@ -114,6 +118,8 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
             runCatching {
                 blocklistRepository.reportHarmfulAccess(matched, Instant.now().toString())
             }
+            // 보호자가 다음 폴링에서 바로 받도록 방금 남긴 기록을 즉시 올린다.
+            ChildAlertUploadWorker.enqueueNow(applicationContext)
         }
     }
 

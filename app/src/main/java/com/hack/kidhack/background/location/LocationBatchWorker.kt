@@ -10,6 +10,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.hack.kidhack.background.geofence.GeofenceRegistrar
 import com.hack.kidhack.domain.repository.LocationRepository
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -22,8 +23,14 @@ class LocationBatchWorker(
 
     private val queue: LocationQueue by inject()
     private val locationRepository: LocationRepository by inject()
+    private val geofenceRegistrar: GeofenceRegistrar by inject()
 
     override suspend fun doWork(): Result {
+        // 안전 구역을 다시 등록한다. 자녀 앱이 시작할 때 한 번만 등록하면, 그 뒤에
+        // 보호자가 추가한 구역은 자녀 기기에 영영 걸리지 않아 이탈이 감지되지 않는다.
+        // 같은 구역을 다시 넣는 건 무해하므로 위치 배치를 올릴 때마다 맞춰 준다.
+        runCatching { geofenceRegistrar.sync() }
+
         val batch = queue.drain()
         if (batch.isEmpty()) return Result.success()
         return runCatching {
