@@ -32,6 +32,14 @@ class ParentAlertSync(
     /** 워커와 화면 새로고침이 동시에 돌 때 같은 알림을 두 번 띄우지 않도록 직렬화한다. */
     private val mutex = Mutex()
 
+    /**
+     * 보관함의 최신 알림 목록.
+     *
+     * 워커가 백그라운드에서 새 알림을 받아 넣든, 테스트 버튼이 직접 기록하든
+     * 같은 [ParentAlertStore] 를 거치므로 구독 중인 화면에 즉시 반영된다.
+     */
+    val alerts: StateFlow<List<AppNotification>> get() = store.alerts
+
     private val _unreadCount = MutableStateFlow(0)
 
     /** 대시보드 종 아이콘 배지에 쓰는 미확인 건수. */
@@ -61,6 +69,25 @@ class ParentAlertSync(
             }
         }
         Result(alerts = store.all(), remoteFailed = remote.isFailure).also { refreshUnread() }
+    }
+
+    /**
+     * 서버를 거치지 않고 알림 하나를 **직접** 발생시킨다.
+     *
+     * 기기에서 바로 감지되는 사건(GPS 꺼짐 등)과 알림 탭의 테스트 버튼이 쓴다.
+     * 서버 폴링 경로와 똑같이 보관함에 남기고 푸시까지 띄우므로,
+     * 「최근 알림 기록 + 푸시」 전체 경로를 그대로 검증할 수 있다.
+     *
+     * @return 푸시가 실제로 떴는지. 수신 설정이 꺼져 있거나 알림 권한이 없으면 false 다
+     *  (그 경우에도 보관함에는 남는다).
+     */
+    suspend fun emitLocal(type: String, title: String, body: String): Boolean {
+        val id = "local-" + type + "-" + System.currentTimeMillis()
+        val alert = store.record(id = id, type = type, title = title, body = body) ?: return false
+        val settings = runCatching { userRepository.notificationSettings() }.getOrNull()
+        val pushed = notifier.notifyAll(listOf(alert), settings)
+        refreshUnread()
+        return pushed.isNotEmpty()
     }
 
     /** 서버를 건드리지 않고 보관함만 읽는다. */

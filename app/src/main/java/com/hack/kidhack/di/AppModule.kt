@@ -6,7 +6,9 @@ import com.hack.kidhack.BuildConfig
 import com.hack.kidhack.core.common.KidhackJson
 import com.hack.kidhack.data.local.CapturedShotStore
 import com.hack.kidhack.data.local.ChatMessageStore
+import com.hack.kidhack.data.local.BlocklistStore
 import com.hack.kidhack.data.local.ChildAlertStore
+import com.hack.kidhack.data.local.HarmfulSettingsStore
 import com.hack.kidhack.data.local.ParentAlertStore
 import com.hack.kidhack.data.local.ChildPhotoStore
 import com.hack.kidhack.data.local.ProfileScopeStore
@@ -163,6 +165,8 @@ val appModule = module {
     single { ChatMessageStore(androidContext()) }
     single { ChildAlertStore(androidContext()) }
     single { ParentAlertStore(androidContext()) }
+    single { HarmfulSettingsStore(androidContext()) }
+    single { BlocklistStore(androidContext()) }
     single { ChildPhotoStore(androidContext()) }
     single { CapturedShotStore(androidContext()) }
     single { ProfileScopeStore(androidContext()) }
@@ -237,7 +241,7 @@ val appModule = module {
     single<NotificationRepository> {
         if (useMock) FakeNotificationRepository() else RealNotificationRepository(get())
     }
-    single<BlocklistRepository> { if (useMock) FakeBlocklistRepository() else RealBlocklistRepository(get()) }
+    single<BlocklistRepository> { if (useMock) FakeBlocklistRepository(get()) else RealBlocklistRepository(get()) }
     single<ScreenshotRepository> {
         if (useMock) FakeScreenshotRepository(get()) else RealScreenshotRepository(get())
     }
@@ -299,7 +303,7 @@ val appModule = module {
     viewModel { AppControlViewModel(get(), get(), get()) }
     viewModel { ScreenshotViewModel(get(), get(), get()) }
     viewModel { ChildProfileViewModel(get(), get()) }
-    viewModel { HarmfulViewModel(get(), get(), get()) }
+    viewModel { HarmfulViewModel(get(), get(), get(), get()) }
     viewModel { PairingViewModel(get(), get()) }
     viewModel { CommunityListViewModel(get()) }
     viewModel { params -> CommunityDetailViewModel(params.get(), get(), get()) }

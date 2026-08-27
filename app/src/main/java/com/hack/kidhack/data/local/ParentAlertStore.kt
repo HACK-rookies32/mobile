@@ -4,6 +4,9 @@ import com.hack.kidhack.core.common.KidhackJson
 import com.hack.kidhack.domain.model.AppNotification
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -43,6 +46,16 @@ class ParentAlertStore(context: Context) {
         /** 푸시 알림을 이미 띄웠는지. 재시도 중복 발송을 막는다. */
         val notified: Boolean = false,
     )
+
+    private val _alerts = MutableStateFlow<List<AppNotification>>(emptyList())
+
+    /**
+     * 화면이 구독하는 최신 목록.
+     *
+     * 보관함이 바뀔 때마다(서버 동기화·직접 기록·읽음 처리) 새로 흘려 보낸다.
+     * 대시보드가 이걸 구독하므로 당겨서 새로고침하지 않아도 「최근 알림」이 바로 갱신된다.
+     */
+    val alerts: StateFlow<List<AppNotification>> = _alerts.asStateFlow()
 
     private val file = File(context.filesDir, "parent_alerts.json")
     private val mutex = Mutex()
@@ -152,6 +165,8 @@ class ParentAlertStore(context: Context) {
             .sortedByDescending { it.receivedAtMillis }
             .take(limit)
             .map { it.toDomain() }
+            // 프로세스가 새로 뜬 직후에는 파일을 아직 안 읽었으므로 여기서 처음 채운다.
+            .also { if (limit >= MAX_ENTRIES) _alerts.value = it }
     }
 
     suspend fun unreadCount(): Int = withContext(Dispatchers.IO) {
@@ -161,6 +176,7 @@ class ParentAlertStore(context: Context) {
     /** 다른 계정의 알림이 보이지 않도록 계정 전환 시에만 비운다. */
     suspend fun clear() = withContext(Dispatchers.IO) {
         mutex.withLock { runCatching { file.delete() } }
+        _alerts.value = emptyList()
         Unit
     }
 
@@ -186,6 +202,7 @@ class ParentAlertStore(context: Context) {
     private fun writeUnlocked(entries: List<Entry>) {
         val capped = entries.sortedByDescending { it.receivedAtMillis }.take(MAX_ENTRIES)
         runCatching { file.writeText(json.encodeToString(serializer, capped)) }
+        _alerts.value = capped.map { it.toDomain() }
     }
 
     private fun timeLabel(atMillis: Long): String {

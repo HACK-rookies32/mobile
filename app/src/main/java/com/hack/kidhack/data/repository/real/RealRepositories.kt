@@ -311,11 +311,19 @@ class RealNotificationRepository(private val api: NotificationApi) : Notificatio
         api.list(type, 0, 50).unwrap().content.map { it.toDomain() }
 }
 
+/**
+ * GAP-04: `GET /children/{childId}/blocklist` 가 문자열 배열만 주므로 응답에 itemId 가 없다.
+ *
+ * 예전에는 인덱스로 `black-0` 같은 id 를 만들어 `DELETE .../blocklist/{itemId}` 에 넘겼는데,
+ * 그런 id 는 서버에 존재하지 않아 카테고리 토글을 꺼도 아무것도 지워지지 않았다.
+ * 응답에서 유일하게 안정적인 식별자는 **키워드 문자열**이라 그것을 itemId 로 쓴다.
+ * 백엔드가 `{ id, listType, keyword }[]` 로 스키마를 고치면 여기만 바꾸면 된다.
+ */
 class RealBlocklistRepository(private val api: BlocklistApi) : BlocklistRepository {
     override suspend fun get(childId: String): List<BlocklistItem> {
         val raw = api.get(childId).unwrap()
-        return raw.blacklist.mapIndexed { i, kw -> BlocklistItem("black-$i", "BLACK", kw) } +
-            raw.whitelist.mapIndexed { i, kw -> BlocklistItem("white-$i", "WHITE", kw) }
+        return raw.blacklist.map { BlocklistItem(it, "BLACK", it) } +
+            raw.whitelist.map { BlocklistItem(it, "WHITE", it) }
     }
     override suspend fun add(childId: String, listType: String, keyword: String) {
         api.add(childId, BlocklistAddRequest(listType, keyword)).unwrapOrNull()

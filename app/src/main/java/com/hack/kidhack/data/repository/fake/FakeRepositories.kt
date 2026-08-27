@@ -12,6 +12,7 @@ import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AllowanceType
 import com.hack.kidhack.domain.model.AppControlItem
+import com.hack.kidhack.data.local.BlocklistStore
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.BlocklistItem
@@ -244,16 +245,25 @@ class FakeNotificationRepository : NotificationRepository {
     ).filter { type == null || it.type == type }
 }
 
-class FakeBlocklistRepository : BlocklistRepository {
-    private val black = mutableListOf("욕설", "폭력", "성인")
-    private val white = mutableListOf("https://edu.example.com", "https://library.org")
+/**
+ * 목업 블랙/화이트리스트.
+ *
+ * 예전에는 목록을 메모리에만 들고 있어서 앱을 다시 켜면 부모가 바꾼 차단 설정이 통째로
+ * 초기값으로 돌아갔고, `remove` 가 빈 함수라 카테고리 토글을 꺼도 아무 일도 일어나지 않았다.
+ *
+ * id 는 인덱스가 아니라 **키워드 그 자체**다. 인덱스로 만들면 목록이 바뀔 때마다 id 가 밀려서
+ * `remove(itemId)` 가 엉뚱한 항목을 지운다. 실구현체도 같은 규칙을 쓴다.
+ */
+class FakeBlocklistRepository(private val store: BlocklistStore) : BlocklistRepository {
     override suspend fun get(childId: String): List<BlocklistItem> =
-        black.mapIndexed { i, kw -> BlocklistItem("b$i", "BLACK", kw) } +
-            white.mapIndexed { i, kw -> BlocklistItem("w$i", "WHITE", kw) }
+        store.blacklist().map { BlocklistItem(it, "BLACK", it) } +
+            store.whitelist().map { BlocklistItem(it, "WHITE", it) }
     override suspend fun add(childId: String, listType: String, keyword: String) {
-        if (listType == "BLACK") black.add(keyword) else white.add(keyword)
+        store.add(listType, keyword)
     }
-    override suspend fun remove(childId: String, itemId: String) {}
+    override suspend fun remove(childId: String, itemId: String) {
+        store.remove(itemId)
+    }
     override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) {}
 }
 
