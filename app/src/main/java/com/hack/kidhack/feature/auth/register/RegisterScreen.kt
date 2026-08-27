@@ -141,7 +141,11 @@ fun RegisterScreen(
                 viewModel = viewModel,
             )
             state.step == 2 -> TermsStep(state = state, viewModel = viewModel)
-            onDoneStep -> DoneStep(session = state.session!!, onStart = { onRegistered(state.session!!) })
+            onDoneStep -> DoneStep(
+                session = state.session!!,
+                loading = state.loading,
+                onStart = { viewModel.startApp(onRegistered) },
+            )
         }
         if (state.error != null) {
             Text(state.error.orEmpty(), color = colors.danger, fontSize = 13.sp)
@@ -364,7 +368,7 @@ private fun TermsCheckRow(
 }
 
 @Composable
-private fun DoneStep(session: Session, onStart: () -> Unit) {
+private fun DoneStep(session: Session, loading: Boolean, onStart: () -> Unit) {
     val colors = LocalKidhackColors.current
     val parent = session.user.role == Role.PARENT
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
@@ -393,8 +397,13 @@ private fun DoneStep(session: Session, onStart: () -> Unit) {
         }
     }
     KidButton(
-        text = if (parent) "부모님 앱 시작하기 →" else "자녀 앱 시작하기 →",
+        text = when {
+            loading -> "로그인 중..."
+            parent -> "부모님 앱 시작하기 →"
+            else -> "자녀 앱 시작하기 →"
+        },
         onClick = onStart,
         modifier = Modifier.fillMaxWidth(),
+        enabled = !loading,
     )
 }

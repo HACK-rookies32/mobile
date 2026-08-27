@@ -151,7 +151,6 @@ class RegisterViewModel(
                 }.onSuccess { session ->
                     if (role == Role.CHILD) {
                         onboardingStore.markDone()
-                        platformController.reevaluate()
                     }
                     _state.update {
                         it.copy(
@@ -164,6 +163,29 @@ class RegisterViewModel(
                     _state.update {
                         it.copy(loading = false, error = t.userMessage("가입에 실패했어요"))
                     }
+                }
+            }
+        }
+    }
+
+    /** 가입 응답에는 토큰이 없다. 앱 시작하기에서 로그인해서 토큰을 받은 뒤 홈으로 보낸다. */
+    fun startApp(onAuthed: (Session) -> Unit) {
+        val s = _state.value
+        val role = s.role ?: return
+        if (s.loading) return
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null) }
+            runCatching {
+                authRepository.login(s.loginId.trim(), s.password, preferredRole = role)
+            }.onSuccess { session ->
+                if (role == Role.CHILD) {
+                    platformController.reevaluate()
+                }
+                _state.update { it.copy(loading = false, session = session) }
+                onAuthed(session)
+            }.onFailure { t ->
+                _state.update {
+                    it.copy(loading = false, error = t.userMessage("로그인에 실패했어요"))
                 }
             }
         }
