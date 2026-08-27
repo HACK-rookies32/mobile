@@ -183,6 +183,8 @@ fun ChatRoomDto.toDomain(titleOverride: String? = null): ChatRoom = ChatRoom(
     lastMessage = lastMessage,
     lastAt = lastAt,
     online = online,
+    parentId = parentId,
+    childId = childId,
 )
 
 fun ChatMessageDto.toDomain(myUserId: Long? = null, myRole: Role = Role.PARENT): ChatMessage {

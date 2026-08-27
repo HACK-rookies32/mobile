@@ -40,6 +40,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.BrandGradientHeader
@@ -49,6 +50,7 @@ import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.Role
+import com.hack.kidhack.feature.parent.formatChatSentAt
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -60,6 +62,11 @@ fun ChildChatScreen(
     val listState = rememberLazyListState()
 
     val context = LocalContext.current
+
+    LifecycleResumeEffect(Unit) {
+        viewModel.onScreenResume()
+        onPauseOrDispose { }
+    }
 
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
@@ -271,7 +278,7 @@ private fun ChatBubble(message: ChatMessage) {
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = message.sentAt,
+                text = formatChatSentAt(message.sentAt),
                 color = if (mine) Color.White.copy(alpha = 0.75f) else colors.muted,
                 fontSize = 12.sp,
             )

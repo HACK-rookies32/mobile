@@ -2,6 +2,7 @@ package com.hack.kidhack.data.ws
 
 import android.util.Log
 import com.hack.kidhack.core.common.KidhackJson
+import com.hack.kidhack.data.remote.dto.FlexibleDateTimeSerializer
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.repository.SessionRepository
@@ -70,12 +71,19 @@ class ChatWebSocketClient(
         }
     }
 
+    /** 로그아웃 등 — 구독/연결을 즉시 끊고 이전 roomId를 버린다. */
+    fun reset() {
+        observers.set(0)
+        wanted = false
+        scope.launch { disconnect() }
+    }
+
     /** 특정 방 토픽을 구독한다. 방이 바뀌면 이전 구독을 교체한다. */
     fun subscribeRoom(roomId: String) {
         activeRoomId = roomId
         scope.launch {
             ensureConnected()
-            subscribeTopic(roomId)
+            subscribeTopicWhenReady(roomId)
         }
     }
 
@@ -128,7 +136,7 @@ class ChatWebSocketClient(
                     when (event.type) {
                         LifecycleEvent.Type.OPENED -> {
                             Log.d(TAG, "stomp opened")
-                            activeRoomId?.let { roomId -> subscribeTopic(roomId) }
+                            activeRoomId?.let { roomId -> subscribeTopicWhenReady(roomId) }
                         }
                         LifecycleEvent.Type.ERROR -> {
                             Log.w(TAG, "stomp error", event.exception)
@@ -160,19 +168,47 @@ class ChatWebSocketClient(
         }
     }
 
+    /** WebSocket OPENED 직후에는 STOMP CONNECTED 전이라 isConnected=false일 수 있어 재시도한다. */
+    private fun subscribeTopicWhenReady(roomId: String) {
+        scope.launch {
+            repeat(MAX_SUBSCRIBE_ATTEMPTS) { attempt ->
+                val client = stomp
+                if (client != null && client.isConnected) {
+                    subscribeTopic(roomId)
+                    return@launch
+                }
+                if (attempt == 0) {
+                    Log.d(TAG, "stomp subscribe waiting for CONNECTED room=$roomId")
+                }
+                delay(SUBSCRIBE_RETRY_MS)
+            }
+            Log.w(TAG, "stomp subscribe timeout room=$roomId")
+            _events.tryEmit(ChatWsEvent.Error("채팅방 구독에 실패했어요"))
+        }
+    }
+
     private fun subscribeTopic(roomId: String) {
-        val client = stomp ?: return
-        if (!client.isConnected) return
+        val client = stomp
+        if (client == null) {
+            Log.w(TAG, "stomp subscribe skipped: no client room=$roomId")
+            return
+        }
+        if (!client.isConnected) {
+            Log.w(TAG, "stomp subscribe skipped: not connected room=$roomId")
+            return
+        }
         synchronized(this) {
             topicDisposable?.dispose()
             topicDisposable = client.topic("/topic/chat/$roomId").subscribe(
                 { message ->
+                    Log.d(TAG, "stomp recv room=$roomId payload=${message.payload}")
                     val payload = runCatching {
                         json.decodeFromString(
                             StompChatMessagePayload.serializer(),
                             message.payload,
                         )
-                    }.getOrElse {
+                    }.getOrElse { t ->
+                        Log.w(TAG, "stomp payload parse failed: ${message.payload}", t)
                         _events.tryEmit(ChatWsEvent.Error("잘못된 채팅 메시지"))
                         return@subscribe
                     }
@@ -187,12 +223,14 @@ class ChatWebSocketClient(
                             else -> Role.PARENT
                         }
                         val chat = ChatMessage(
-                            id = payload.id ?: "stomp-${System.currentTimeMillis()}",
+                            id = payload.id?.takeIf { it.isNotBlank() }
+                                ?: "stomp-${System.currentTimeMillis()}",
                             roomId = payload.roomId ?: roomId,
                             fromRole = fromRole,
                             text = payload.content.orEmpty(),
                             sentAt = payload.sentAt.orEmpty(),
                         )
+                        Log.d(TAG, "stomp message parsed id=${chat.id} from=$fromRole")
                         _events.tryEmit(ChatWsEvent.Message(chat))
                     }
                 },
@@ -202,6 +240,7 @@ class ChatWebSocketClient(
                 },
             )
             topicDisposable?.let { disposables.add(it) }
+            Log.d(TAG, "stomp subscribed /topic/chat/$roomId")
         }
     }
 
@@ -231,6 +270,8 @@ class ChatWebSocketClient(
 
     companion object {
         private const val TAG = "ChatStomp"
+        private const val MAX_SUBSCRIBE_ATTEMPTS = 30
+        private const val SUBSCRIBE_RETRY_MS = 100L
     }
 }
 
@@ -246,5 +287,6 @@ data class StompChatMessagePayload(
     val roomId: String? = null,
     val senderId: Long? = null,
     val content: String? = null,
+    @Serializable(with = FlexibleDateTimeSerializer::class)
     val sentAt: String? = null,
 )

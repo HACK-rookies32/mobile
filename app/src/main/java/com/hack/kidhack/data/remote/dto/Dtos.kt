@@ -7,6 +7,7 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -19,6 +20,37 @@ internal object FlexibleStringSerializer : KSerializer<String> {
         val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeString()
         val primitive = jsonDecoder.decodeJsonElement() as? JsonPrimitive ?: return ""
         return primitive.content
+    }
+
+    override fun serialize(encoder: Encoder, value: String) {
+        encoder.encodeString(value)
+    }
+}
+
+/**
+ * Spring STOMP(Jackson)은 LocalDateTime을 ISO 문자열이 아니라
+ * `[year, month, day, hour, minute, second, nano]` 배열로 보낼 수 있다.
+ */
+internal object FlexibleDateTimeSerializer : KSerializer<String> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("FlexibleDateTime", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): String {
+        val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeString()
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            is JsonPrimitive -> element.content
+            is JsonArray -> {
+                val parts = element.mapNotNull { (it as? JsonPrimitive)?.content?.toIntOrNull() }
+                when {
+                    parts.size >= 6 -> "%04d-%02d-%02dT%02d:%02d:%02d".format(
+                        parts[0], parts[1], parts[2], parts[3], parts[4], parts[5],
+                    )
+                    parts.size >= 5 -> "%02d:%02d".format(parts[3], parts[4])
+                    else -> ""
+                }
+            }
+            else -> ""
+        }
     }
 
     override fun serialize(encoder: Encoder, value: String) {

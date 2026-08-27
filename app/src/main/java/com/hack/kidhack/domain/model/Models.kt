@@ -125,6 +125,9 @@ data class ChatRoom(
     val lastMessage: String,
     val lastAt: String,
     val online: Boolean,
+    /** 서버 방 소유자. 계정 전환 시 잘못된 room 재사용 방지용. */
+    val parentId: Long? = null,
+    val childId: Long? = null,
 )
 
 data class ChatMessage(

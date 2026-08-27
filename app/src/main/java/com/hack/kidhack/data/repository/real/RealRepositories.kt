@@ -4,6 +4,7 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.remote.api.AllowanceApi
 import com.hack.kidhack.data.remote.api.AppControlApi
 import com.hack.kidhack.data.remote.api.AppUsageApi
@@ -141,6 +142,8 @@ class RealAuthRepository(
     private val userApi: UserApi,
     private val sessionRepository: SessionRepository,
     private val sessionEvents: SessionEvents,
+    private val chatMessageStore: ChatMessageStore,
+    private val chatWebSocketClient: ChatWebSocketClient,
 ) : AuthRepository {
     override suspend fun signup(
         loginId: String,
@@ -192,6 +195,8 @@ class RealAuthRepository(
     override suspend fun logout() {
         runCatching { api.logout() }
         sessionRepository.clear()
+        chatMessageStore.clear()
+        chatWebSocketClient.reset()
         sessionEvents.emitLogout()
     }
 
@@ -461,8 +466,8 @@ class RealChatRepository(
     override fun observeMessages(roomId: String): Flow<ChatMessage> =
         ws.events
             .onStart {
-                ws.start()
                 ws.subscribeRoom(roomId)
+                ws.start()
             }
             .onCompletion { ws.stop() }
             .filterIsInstance<ChatWsEvent.Message>()

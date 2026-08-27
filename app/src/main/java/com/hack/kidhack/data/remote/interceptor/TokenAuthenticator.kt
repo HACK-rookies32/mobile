@@ -1,11 +1,13 @@
 package com.hack.kidhack.data.remote.interceptor
 
 import com.hack.kidhack.core.common.KidhackJson
+import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.remote.ApiEnvelope
 import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.RefreshRequest
 import com.hack.kidhack.data.remote.unwrap
 import com.hack.kidhack.data.repository.toDomain
+import com.hack.kidhack.data.ws.ChatWebSocketClient
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
@@ -23,6 +25,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 class TokenAuthenticator(
     private val sessionRepository: SessionRepository,
     private val sessionEvents: SessionEvents,
+    private val chatMessageStore: ChatMessageStore,
+    private val chatWebSocketClient: ChatWebSocketClient,
     private val baseUrl: String,
     private val refreshClient: OkHttpClient,
 ) : Authenticator {
@@ -86,7 +90,11 @@ class TokenAuthenticator(
     }
 
     private fun failLogout() {
-        runBlocking { sessionRepository.clear() }
+        runBlocking {
+            sessionRepository.clear()
+            chatMessageStore.clear()
+            chatWebSocketClient.reset()
+        }
         sessionEvents.emitLogout()
     }
 

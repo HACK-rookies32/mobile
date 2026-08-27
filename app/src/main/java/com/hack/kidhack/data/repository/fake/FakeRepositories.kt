@@ -4,9 +4,11 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.hack.kidhack.data.local.CapturedShotStore
+import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.remote.PageResponse
 import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.paging.PageResponsePagingSource
+import com.hack.kidhack.data.ws.ChatWebSocketClient
 import com.hack.kidhack.domain.model.Allowance
 import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
@@ -79,6 +81,8 @@ import java.util.Locale
 class FakeAuthRepository(
     private val sessionRepository: SessionRepository,
     private val sessionEvents: SessionEvents,
+    private val chatMessageStore: ChatMessageStore,
+    private val chatWebSocketClient: ChatWebSocketClient,
 ) : AuthRepository {
     override suspend fun signup(
         loginId: String,
@@ -136,6 +140,8 @@ class FakeAuthRepository(
 
     override suspend fun logout() {
         sessionRepository.clear()
+        chatMessageStore.clear()
+        chatWebSocketClient.reset()
         sessionEvents.emitLogout()
     }
 
@@ -449,15 +455,31 @@ class FakeChatRepository(
 
     override suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom {
         return when (childId) {
-            102L -> ChatRoom("room-jia", "이지아", "아직 대화가 없어요", "", false)
-            else -> ChatRoom("room-minjun", "김민준", "학원 끝나요", "14:32", true)
+            102L -> ChatRoom(
+                id = "room-jia",
+                title = "이지아",
+                lastMessage = "아직 대화가 없어요",
+                lastAt = "",
+                online = false,
+                parentId = parentId,
+                childId = childId,
+            )
+            else -> ChatRoom(
+                id = "room-minjun",
+                title = "김민준",
+                lastMessage = "학원 끝나요",
+                lastAt = "14:32",
+                online = true,
+                parentId = parentId,
+                childId = childId,
+            )
         }
     }
 
     /** 방 제목은 보는 쪽 기준으로 바뀐다 — 부모는 자녀 이름을, 자녀는 보호자 이름을 본다. */
     override suspend fun rooms(): List<ChatRoom> = listOf(
-        ChatRoom("room-minjun", "김민준", "학원 끝나요", "14:32", true),
-        ChatRoom("room-jia", "이지아", "아직 대화가 없어요", "", false),
+        ChatRoom("room-minjun", "김민준", "학원 끝나요", "14:32", true, parentId = 1L, childId = 101L),
+        ChatRoom("room-jia", "이지아", "아직 대화가 없어요", "", false, parentId = 1L, childId = 102L),
     )
 
     override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> =
