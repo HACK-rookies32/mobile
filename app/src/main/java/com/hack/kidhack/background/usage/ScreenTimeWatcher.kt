@@ -1,5 +1,7 @@
 package com.hack.kidhack.background.usage
 
+import android.content.Context
+import com.hack.kidhack.background.ChildAlertUploadWorker
 import com.hack.kidhack.data.local.ChildAlertStore
 
 /**
@@ -11,17 +13,34 @@ import com.hack.kidhack.data.local.ChildAlertStore
  */
 class ScreenTimeWatcher(
     private val alertStore: ChildAlertStore,
+    private val context: Context,
 ) {
     val dailyLimitMinutes: Int = DEFAULT_DAILY_LIMIT_MINUTES
 
-    /** 한도에 닿았으면 하루 한 번만 기록한다. 이미 남긴 날이면 아무 일도 하지 않는다. */
-    suspend fun check(usedMinutes: Int) {
-        if (usedMinutes < dailyLimitMinutes) return
-        alertStore.recordOncePerDay(
+    /**
+     * 한도에 닿았으면 하루 한 번만 기록한다. 이미 남긴 날이면 아무 일도 하지 않는다.
+     *
+     * 처음 닿은 순간에는 사용량을 **즉시** 서버로 보낸다. 그러지 않으면 다음 정시
+     * (1시간 주기 [AppUsageWorker])까지 서버가 모르고, 보호자의 「앱 사용량」 알림도
+     * 그만큼 늦게 뜬다.
+     *
+     * @param reportToServer 이미 사용량을 보고하는 중이면(=워커 내부) false 로 꺼서
+     *  같은 보고를 두 번 예약하지 않는다.
+     * @return 이번에 처음 한도에 닿았으면 true.
+     */
+    suspend fun check(usedMinutes: Int, reportToServer: Boolean = true): Boolean {
+        if (usedMinutes < dailyLimitMinutes) return false
+        val recorded = alertStore.recordOncePerDay(
             type = ChildAlertStore.TYPE_SCREEN_TIME,
             title = "오늘 스크린타임 한도에 도달했어요",
             body = "오늘 " + formatMinutes(usedMinutes) + " 사용 · 한도 " + formatMinutes(dailyLimitMinutes),
         )
+        if (recorded) {
+            // 자녀 홈에 남긴 이 사건을 보호자에게도 나른다(docs/child-push-contract.md 4절).
+            ChildAlertUploadWorker.enqueueNow(context)
+            if (reportToServer) AppUsageWorker.enqueueNow(context)
+        }
+        return recorded
     }
 
     private fun formatMinutes(minutes: Int): String {

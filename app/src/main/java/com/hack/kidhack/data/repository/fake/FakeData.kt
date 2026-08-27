@@ -134,6 +134,31 @@ object FakeData {
         AppUsageStat("2026-08-27", 4100),
     )
 
+    private val jiaUsages = listOf(
+        AppUsage("Roblox", 46 * 60, "게임"),
+        AppUsage("YouTube Kids", 25 * 60, "동영상"),
+        AppUsage("클래스팅", 12 * 60, "학습"),
+    )
+
+    /**
+     * 자녀마다 다른 사용 현황.
+     *
+     * 예전에는 어느 자녀를 골라도 같은 목록이 나와서, 대시보드의 자녀 선택이
+     * 동작하는지 눈으로 확인할 수 없었다.
+     */
+    fun usagesFor(childId: String): List<AppUsage> =
+        if (childId == jia.id) jiaUsages else usages
+
+    fun locationFor(childId: String): LocationPoint =
+        if (childId == jia.id) {
+            LocationPoint("37.5410", "127.0270", "2024.08.20 15:10", "📍 집")
+        } else {
+            LocationPoint("37.5665", "126.9780", "2024.08.20 14:30", "📍 서울시청")
+        }
+
+    /** 목업 자녀 계정([childUser], 김민준)에 대응하는 프로필 id. */
+    val loggedInChildProfileId: String get() = minjun.id
+
     val chatMessages = listOf(
         ChatMessage("m1", "room-minjun", Role.PARENT, "민준아, 지금 어디야?", "14:30"),
         ChatMessage("m2", "room-minjun", Role.CHILD, "엄마 저 학원이요! 6시에 끝나요", "14:31"),

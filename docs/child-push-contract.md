@@ -117,3 +117,46 @@ KIDHACKPAY1|{childId}|{amount}|{token}|{expiresAtMillis}
 디버그 빌드(`USE_MOCK=true`)에서 자녀 계정으로 로그인 후
 **서비스 현황 탭 → 「요청 테스트 (개발용)」** 카드의 버튼을 누르면
 실제 알림이 뜨고 캡처/촬영 전체 흐름이 그대로 돈다.
+
+## 4. 자녀 안전 사건 동기화 (신규 · 제안)
+
+자녀 홈 「최근 알림」에 남는 안전 사건을 보호자 기기로 나르는 경로다.
+FCM 이 없으므로 자녀가 올리고 보호자가 폴링한다(15분 주기 + 대시보드 새로고침).
+
+```
+POST /children/{childId}/alerts            ← 자녀 앱 (사건 감지 즉시 + 15분 백업)
+     body: [ { "id", "type", "title", "body", "occurredAt" } ]
+     id 는 기기가 만든 고유값 — 같은 id 재업로드는 무시해야 한다.
+
+GET  /children/{childId}/alerts?size=50    ← 보호자 앱
+     → { "success": true, "data": [ …같은 스키마… ] }
+```
+
+`type`: `HARMFUL_BLOCK` | `GEOFENCE_EXIT` | `GEOFENCE_ENTER` | `SCREEN_TIME_LIMIT` | `GPS_OFF`
+
+**아직 서버에 없어도 앱은 정상 동작한다.** 업로드 실패는 다음 주기에 재시도하고
+조회 실패는 빈 목록으로 처리한다. 이 경우에도 보호자 앱은 기존 읽기 API 로
+이탈·사용량·위치 끊김 3종을 스스로 판정한다(`ParentChildWatcher`).
+단 **유해 사이트 차단은 이 경로가 없으면 보호자에게 전해질 수 없다**
+(`POST /harmful-access/report` 는 쓰기 전용이라 보호자가 읽을 수 없다).
+보호자 앱은 사건 id 로 합치므로 서버 알림과 겹쳐도 중복 푸시는 없다.
+
+| 클라이언트 코드 | 역할 |
+|---|---|
+| `data/local/ChildAlertStore.kt` | 원본(자녀 홈 목록) + 업로드 대기열 |
+| `background/ChildAlertUploadWorker.kt` | 자녀 → 서버 업로드 |
+| `background/alert/ParentChildWatcher.kt` | 보호자 폴링 + 파생 판정 |
+
+## 5. 카메라 촬영 요청·조회 (신규 · 제안)
+
+부모 마이페이지 「카메라 촬영」이 쓰는 경로다. `screenshots` 와 완전히 대칭이다.
+
+```
+POST /children/{childId}/photos/request     ← 부모 앱. 202 를 기대한다.
+     서버는 1절의 소켓/pending 큐로 CAMERA_REQUEST 를 자녀에게 민다.
+
+GET  /children/{childId}/photos?page&size   ← 부모 앱 갤러리.
+     → PageResponse<{ "id", "capturedAt", "imageUrl" }>
+```
+
+업로드(`POST /children/{childId}/photos`, multipart)는 기존 계약 그대로다.

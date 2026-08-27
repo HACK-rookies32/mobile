@@ -9,6 +9,7 @@ import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
+import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
@@ -106,6 +107,10 @@ interface LocationRepository {
 interface DeviceRepository {
     /** 기기 전원/GPS 꺼짐 보고. type = "POWER_OFF" | "GPS_OFF" */
     suspend fun reportEvent(childId: String, type: String)
+
+    /** FCM 토큰 등록·해제. 서버가 아직 없으면 호출자가 runCatching으로 삼킨다. */
+    suspend fun registerPushToken(token: String)
+    suspend fun unregisterPushToken(token: String)
 }
 
 interface DashboardRepository {
@@ -126,8 +131,19 @@ interface LocationEventRepository {
 
 interface NotificationRepository {
     /** 명세 4.5 GET /notifications/{recipientId} — page/size 없이 배열 그대로 반환. */
-    suspend fun list(recipientId: String): List<AppNotification>
+    suspend fun list(recipientId: String, childId: String? = null): List<AppNotification>
     suspend fun markRead(notificationId: String)
+}
+
+/**
+ * 자녀 안전 사건의 서버 동기화 (docs/child-push-contract.md 4절 제안 계약).
+ *
+ * 자녀 앱이 [upload] 로 올리고 보호자 앱이 [list] 로 읽는다.
+ * 서버가 아직 구현하지 않아도 앱은 정상 동작해야 하므로, 실패는 호출자가 삼킨다.
+ */
+interface ChildAlertRepository {
+    suspend fun upload(childId: String, alerts: List<ChildAlertEvent>)
+    suspend fun list(childId: String): List<ChildAlertEvent>
 }
 
 interface BlocklistRepository {
@@ -151,7 +167,12 @@ interface ScreenshotRepository {
     ): Screenshot
 }
 
-/** 자녀 카메라로 찍은 사진을 부모 계정으로 올린다. */
+/**
+ * 자녀 카메라 촬영.
+ *
+ * 자녀 앱이 [upload] 로 올리고, 부모 앱이 [list] 로 갤러리를 보고
+ * [requestShot] 으로 「지금 찍어 달라」 요청을 보낸다(ScreenshotRepository 와 대칭).
+ */
 interface PhotoRepository {
     suspend fun upload(
         childId: String,
@@ -159,6 +180,11 @@ interface PhotoRepository {
         capturedAt: String,
         requestId: String?,
     ): ChildPhoto
+
+    suspend fun list(childId: String): List<ChildPhoto>
+
+    /** 부모 모드 전용. 서버가 자녀 기기로 CAMERA_REQUEST 푸시를 밀게 한다. */
+    suspend fun requestShot(childId: String)
 }
 
 /**

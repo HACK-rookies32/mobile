@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.hack.kidhack.background.alert.ParentAlertBus
 import com.hack.kidhack.background.command.ChildCommandBus
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.Role
@@ -26,6 +27,7 @@ fun KidhackNavHost() {
     val sessionRepository = koin.get<SessionRepository>()
     val sessionEvents = koin.get<SessionEvents>()
     val commandBus = koin.get<ChildCommandBus>()
+    val parentAlertBus = koin.get<ParentAlertBus>()
     val navController = rememberNavController()
     val colors = LocalKidhackColors.current
 
@@ -54,6 +56,20 @@ fun KidhackNavHost() {
                 }
                 else -> commandBus.consume()
             }
+        }
+    }
+
+    // 부모 안전 알림 푸시 탭 → 알림 탭. 탭 위에 쌓지 않고 부모 그래프 최상위로 연다.
+    LaunchedEffect(Unit) {
+        parentAlertBus.pending.collect {
+            if (sessionRepository.current()?.user?.role == Role.PARENT) {
+                navController.navigate(Route.ParentNotifications.path) {
+                    popUpTo(Route.ParentGraph.path) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = false
+                }
+            }
+            parentAlertBus.consume()
         }
     }
 

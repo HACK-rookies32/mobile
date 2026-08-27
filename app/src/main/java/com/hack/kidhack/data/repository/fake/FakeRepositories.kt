@@ -12,7 +12,10 @@ import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AllowanceType
 import com.hack.kidhack.domain.model.AppControlItem
+import com.hack.kidhack.data.local.BlocklistStore
 import com.hack.kidhack.domain.model.AppNotification
+import com.hack.kidhack.domain.model.ChildAlertEvent
+import com.hack.kidhack.domain.model.childAlertTypeToParent
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
@@ -36,6 +39,7 @@ import com.hack.kidhack.domain.model.PointBalance
 import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
 import com.hack.kidhack.domain.model.RemoteCommand
+import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
@@ -59,6 +63,7 @@ import com.hack.kidhack.domain.repository.LocationEventRepository
 import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
+import com.hack.kidhack.domain.repository.ChildAlertRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
@@ -125,10 +130,19 @@ class FakeAuthRepository(
         return session
     }
 
+    /**
+     * 목업 로그인.
+     *
+     * 예전에는 아이디가 정확히 `minjun` 일 때만 자녀로 들어갔다. 그래서 로그인 화면에서
+     * 「자녀」를 골라도 다른 아이디를 넣으면 부모 계정으로 로그인됐다.
+     * 실서버가 role 을 보고 판단하듯, 목업은 화면에서 고른 역할을 그대로 따른다.
+     */
     override suspend fun login(loginId: String, password: String, preferredRole: Role?): Session {
-        val session = FakeData.sessionFor(
-            if (loginId == "minjun") FakeData.childUser else FakeData.parent,
-        )
+        delay(300)
+        val role = preferredRole
+            ?: if (loginId.equals(FakeData.childUser.loginId, ignoreCase = true)) Role.CHILD else Role.PARENT
+        val user = if (role == Role.CHILD) FakeData.childUser else FakeData.parent
+        val session = FakeData.sessionFor(user.copy(loginId = loginId.ifBlank { user.loginId }))
         sessionRepository.save(session)
         return session
     }
@@ -223,7 +237,6 @@ class FakeLocationRepository : LocationRepository {
             segmentEnd = stamp,
             updatedAt = stamp,
         )
-        // 최신순이라 맨 앞에 넣는다.
         historyMap.getOrPut(childId) { FakeData.locationSegments.toMutableList() }.add(0, point)
         return point
     }
@@ -235,11 +248,12 @@ class FakeLocationRepository : LocationRepository {
         realtimeMap[childId] = enabled
         return enabled
     }
-
 }
 
 class FakeDeviceRepository : DeviceRepository {
     override suspend fun reportEvent(childId: String, type: String) {}
+    override suspend fun registerPushToken(token: String) = Unit
+    override suspend fun unregisterPushToken(token: String) = Unit
 }
 
 class FakeDashboardRepository(
@@ -274,31 +288,73 @@ class FakeLocationEventRepository : LocationEventRepository {
     override suspend fun events(childId: String): List<LocationEvent> = FakeData.locationEvents
 }
 
-class FakeNotificationRepository : NotificationRepository {
-    // recipientId 는 무시하고 더미 목록을 반환한다(비페이징).
-    override suspend fun list(recipientId: String): List<AppNotification> = listOf(
-        AppNotification("n1", "LOCATION_EXIT", "민준이가 '학교' 구역을 벗어났습니다.", "14:20", false),
-        AppNotification("n2", "HARMFUL_SITE", "부적절한 사이트 접속 시도가 차단되었습니다.", "12:05", true),
-        AppNotification("n3", "PAYMENT_APPROVED", "GS25 역삼점에서 3,000원 결제되었습니다.", "11:30", true),
-    )
-    override suspend fun markRead(notificationId: String) {}
+class FakeChildAlertRepository(private val feed: MockNotificationFeed) : ChildAlertRepository {
+    override suspend fun upload(childId: String, alerts: List<ChildAlertEvent>) {
+        alerts.forEach { alert ->
+            val parentType = childAlertTypeToParent(alert.type) ?: return@forEach
+            feed.add(
+                type = parentType,
+                title = alert.title,
+                body = alert.body.ifBlank { alert.title },
+                dedupeKey = alert.id,
+                childId = FakeData.loggedInChildProfileId,
+            )
+        }
+    }
+
+    override suspend fun list(childId: String): List<ChildAlertEvent> = emptyList()
 }
 
-class FakeBlocklistRepository : BlocklistRepository {
-    private val black = mutableListOf("욕설", "폭력", "성인")
-    private val white = mutableListOf("https://edu.example.com", "https://library.org")
-    override suspend fun get(childId: String): List<BlocklistItem> =
-        black.mapIndexed { i, kw -> BlocklistItem("b$i", "BLACK", kw) } +
-            white.mapIndexed { i, kw -> BlocklistItem("w$i", "WHITE", kw) }
-    override suspend fun add(childId: String, listType: String, keyword: String) {
-        if (listType == "BLACK") black.add(keyword) else white.add(keyword)
+class FakeNotificationRepository(private val feed: MockNotificationFeed) : NotificationRepository {
+    override suspend fun list(recipientId: String, childId: String?): List<AppNotification> =
+        (feed.all() + SAMPLES)
+            .filter { childId == null || it.childId == null || it.childId == childId }
+
+    override suspend fun markRead(notificationId: String) {}
+
+    private companion object {
+        val SAMPLES = listOf(
+            AppNotification("n1", "LOCATION", "민준이가 '학교' 구역을 벗어났습니다.", "14:20", false, FakeData.minjun.id),
+            AppNotification("n2", "HARMFUL", "지아의 부적절한 사이트 접속 시도가 차단되었습니다.", "12:05", true, FakeData.jia.id),
+        )
     }
-    override suspend fun remove(childId: String, itemId: String) {}
-    override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) {}
+}
+/**
+ * 목업 블랙/화이트리스트.
+ *
+ * 예전에는 목록을 메모리에만 들고 있어서 앱을 다시 켜면 부모가 바꾼 차단 설정이 통째로
+ * 초기값으로 돌아갔고, `remove` 가 빈 함수라 카테고리 토글을 꺼도 아무 일도 일어나지 않았다.
+ *
+ * id 는 인덱스가 아니라 **키워드 그 자체**다. 인덱스로 만들면 목록이 바뀔 때마다 id 가 밀려서
+ * `remove(itemId)` 가 엉뚱한 항목을 지운다. 실구현체도 같은 규칙을 쓴다.
+ */
+class FakeBlocklistRepository(
+    private val store: BlocklistStore,
+    private val feed: MockNotificationFeed,
+) : BlocklistRepository {
+    override suspend fun get(childId: String): List<BlocklistItem> =
+        store.blacklist().map { BlocklistItem(it, "BLACK", it) } +
+            store.whitelist().map { BlocklistItem(it, "WHITE", it) }
+    override suspend fun add(childId: String, listType: String, keyword: String) {
+        store.add(listType, keyword)
+    }
+    override suspend fun remove(childId: String, itemId: String) {
+        store.remove(itemId)
+    }
+    override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) {
+        feed.add(
+            type = "HARMFUL",
+            title = "유해 사이트 접속 차단",
+            body = matchedText + " 이(가) 포함된 사이트 접속 시도가 차단되었어요.",
+            dedupeKey = "HARMFUL-" + matchedText,
+            childId = FakeData.loggedInChildProfileId,
+        )
+    }
 }
 
 class FakeScreenshotRepository(
     private val store: CapturedShotStore,
+    private val commandRepository: CommandRepository,
 ) : ScreenshotRepository {
     override fun paged(childId: String): Flow<PagingData<Screenshot>> = Pager(PagingConfig(20)) {
         PageResponsePagingSource { page, size ->
@@ -311,7 +367,20 @@ class FakeScreenshotRepository(
 
     override suspend fun list(childId: String) = store.list()
 
-    override suspend fun requestCapture(childId: String) = Unit
+    /**
+     * 실서버라면 202 후 서버가 자녀 소켓으로 명령을 민다. 목업은 같은 프로세스의
+     * 명령 채널로 직접 밀어서, 자녀 계정으로 전환했을 때 요청 푸시가 뜨게 한다.
+     */
+    override suspend fun requestCapture(childId: String) {
+        (commandRepository as? FakeCommandRepository)?.emit(
+            RemoteCommand(
+                requestId = "mock-cap-" + System.currentTimeMillis(),
+                type = RemoteCommandType.SCREEN_CAPTURE,
+                childId = childId,
+                requestedBy = FakeData.parent.name,
+            ),
+        )
+    }
 
     override suspend fun upload(
         childId: String,
@@ -533,8 +602,16 @@ class FakePointRepository : PointRepository {
     }
 }
 
+/**
+ * 목업 카메라 촬영 저장소.
+ *
+ * 예전에는 촬영본을 캡처 저장소([CapturedShotStore])에 섞어 넣어 부모 「화면 캡처」
+ * 목록에 끼워 보여 줬다. 부모 「카메라 촬영」 화면이 생겼으니 전용 피드로 분리한다.
+ * 피드는 계정 전환에도 지워지지 않아 목업 서버 역할을 한다.
+ */
 class FakePhotoRepository(
-    private val store: CapturedShotStore,
+    private val feed: MockPhotoFeed,
+    private val commandRepository: CommandRepository,
 ) : PhotoRepository {
     override suspend fun upload(
         childId: String,
@@ -543,9 +620,20 @@ class FakePhotoRepository(
         requestId: String?,
     ): ChildPhoto {
         delay(300)
-        // 부모 화면(캡처 내역)에서도 보이도록 같은 저장소에 넣는다.
-        val saved = store.add(source = file, description = "카메라 촬영", trigger = "CAMERA")
-        return ChildPhoto(id = saved.id, capturedAt = saved.capturedAt, imageUrl = saved.imageUrl)
+        return feed.add(file, requestId)
+    }
+
+    override suspend fun list(childId: String): List<ChildPhoto> = feed.list()
+
+    override suspend fun requestShot(childId: String) {
+        (commandRepository as? FakeCommandRepository)?.emit(
+            RemoteCommand(
+                requestId = "mock-cam-" + System.currentTimeMillis(),
+                type = RemoteCommandType.CAMERA_SHOT,
+                childId = childId,
+                requestedBy = FakeData.parent.name,
+            ),
+        )
     }
 }
 
@@ -589,7 +677,7 @@ class FakeSubscriptionRepository : SubscriptionRepository {
     override suspend fun cancel() { sub = null }
 }
 
-class FakeAppUsageRepository : AppUsageRepository {
+class FakeAppUsageRepository(private val feed: MockNotificationFeed) : AppUsageRepository {
     override suspend fun list(
         childId: String,
         groupBy: String,
@@ -600,7 +688,20 @@ class FakeAppUsageRepository : AppUsageRepository {
         "DAY" -> FakeData.usagesByDay
         else -> FakeData.usages.map { AppUsageStat(it.appName, it.durationSec) }
     }
-    override suspend fun report(childId: String, usages: List<AppUsage>) {}
+    override suspend fun report(childId: String, usages: List<AppUsage>) {
+        val totalMinutes = usages.sumOf { it.durationSec } / 60
+        if (totalMinutes < DAILY_LIMIT_MINUTES) return
+        feed.addOncePerDay(
+            type = "APP_USAGE",
+            title = "앱 사용 시간 한도 도달",
+            body = "오늘 사용 시간이 " + DAILY_LIMIT_MINUTES / 60 + "시간 한도에 도달했어요.",
+            childId = childId,
+        )
+    }
+
+    private companion object {
+        const val DAILY_LIMIT_MINUTES = 180
+    }
 }
 
 class FakeAppControlRepository : AppControlRepository {

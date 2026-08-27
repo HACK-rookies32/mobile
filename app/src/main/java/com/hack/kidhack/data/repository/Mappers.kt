@@ -18,6 +18,7 @@ import com.hack.kidhack.data.remote.dto.InstalledAppDto
 import com.hack.kidhack.data.remote.dto.LocationEventDto
 import com.hack.kidhack.data.remote.dto.LocationTrackResponse
 import com.hack.kidhack.data.remote.dto.DashboardResponse
+import com.hack.kidhack.data.remote.dto.ChildAlertDto
 import com.hack.kidhack.data.remote.dto.NotificationDto
 import com.hack.kidhack.data.remote.dto.NotificationSettingsDto
 import com.hack.kidhack.data.remote.dto.PairingCodeDto
@@ -40,6 +41,7 @@ import com.hack.kidhack.data.remote.dto.WalletDto
 import com.hack.kidhack.data.remote.dto.WalletTransactionDto
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.ChildDashboard
+import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.Card
@@ -83,11 +85,27 @@ fun UserDto.toDomain(): User {
         id = id,
         loginId = resolvedLogin,
         name = resolvedName,
-        role = runCatching { Role.valueOf(role.orEmpty()) }.getOrDefault(Role.PARENT),
+        role = role.toRoleOrNull() ?: Role.PARENT,
         phone = phoneNumber?.takeIf { it.isNotBlank() } ?: phone.orEmpty(),
         email = email,
         profileImageUrl = profileImageUrl,
     )
+}
+
+/**
+ * 서버가 role 을 어떤 표기로 주든 받아들인다.
+ *
+ * `Role.valueOf` 만 쓰면 스프링 시큐리티의 `ROLE_CHILD` 나 소문자 `child` 가 예외로 떨어지고,
+ * 그때마다 조용히 PARENT 로 처리돼 **자녀 계정이 부모로 로그인되는** 문제가 생겼다.
+ * 판별할 수 없으면 마음대로 정하지 말고 null 을 돌려준다. 무엇으로 대체할지는 호출자가 정한다.
+ */
+fun String?.toRoleOrNull(): Role? {
+    val raw = this?.trim()?.uppercase()?.removePrefix("ROLE_")?.takeIf { it.isNotBlank() } ?: return null
+    return when (raw) {
+        "PARENT", "GUARDIAN" -> Role.PARENT
+        "CHILD", "KID" -> Role.CHILD
+        else -> Role.entries.firstOrNull { it.name == raw }
+    }
 }
 
 fun LoginResponse.toSession(user: User): Session = Session(
@@ -146,12 +164,17 @@ fun DashboardResponse.toDomain(): ChildDashboard = ChildDashboard(
     places = places.map { it.toDomain() },
 )
 
+fun ChildAlertDto.toDomain(): ChildAlertEvent = ChildAlertEvent(id, type, title, body, occurredAt)
+
+fun ChildAlertEvent.toDto(): ChildAlertDto = ChildAlertDto(id, type, title, body, occurredAt)
+
 fun NotificationDto.toDomain(): AppNotification = AppNotification(
     id = id,
     type = type,
     message = message,
     createdAt = createdAt,
     read = read,
+    childId = childId?.takeIf { it.isNotBlank() },
 )
 
 fun NotificationSettingsDto.toDomain(): NotificationSettings = NotificationSettings(
@@ -207,7 +230,7 @@ fun ChatRoomDto.toDomain(): ChatRoom = ChatRoom(
 fun ChatMessageDto.toDomain(): ChatMessage = ChatMessage(
     id = id,
     roomId = roomId,
-    fromRole = runCatching { Role.valueOf(fromRole) }.getOrDefault(Role.PARENT),
+    fromRole = fromRole.toRoleOrNull() ?: Role.PARENT,
     text = text,
     sentAt = sentAt,
 )

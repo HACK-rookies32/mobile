@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.location.LocationManager
 import android.os.Build
+import com.hack.kidhack.background.ChildAlertUploadWorker
+import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +27,7 @@ class GpsStatusMonitor(
     private val context: Context,
     private val deviceRepository: DeviceRepository,
     private val sessionRepository: SessionRepository,
+    private val alertStore: ChildAlertStore,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var lastEnabled: Boolean? = null
@@ -59,6 +62,11 @@ class GpsStatusMonitor(
         lastEnabled = null
     }
 
+    private companion object {
+        /** 설정 화면에서 토글을 오가도 30분에 한 번만 남긴다. */
+        const val GPS_ALERT_DEDUPE_MS = 30 * 60 * 1000L
+    }
+
     private fun currentEnabled(): Boolean {
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         return manager.isProviderEnabled(LocationManager.GPS_PROVIDER)
@@ -73,6 +81,16 @@ class GpsStatusMonitor(
             runCatching {
                 val childId = sessionRepository.current()?.user?.id ?: return@launch
                 deviceRepository.reportEvent(childId, "GPS_OFF")
+            }
+            if (!enabled) {
+                // 자녀 홈 「최근 알림」에도 남기고, 보호자가 곧 받아 보도록 바로 올린다.
+                alertStore.record(
+                    type = ChildAlertStore.TYPE_GPS_OFF,
+                    title = "GPS가 꺼졌어요",
+                    body = "위치 전송이 멈췄어요. 위치 서비스를 다시 켜 주세요.",
+                    dedupeWindowMs = GPS_ALERT_DEDUPE_MS,
+                )
+                ChildAlertUploadWorker.enqueueNow(context)
             }
         }
     }

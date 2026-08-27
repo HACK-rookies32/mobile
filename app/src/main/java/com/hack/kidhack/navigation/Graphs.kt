@@ -30,6 +30,7 @@ import com.hack.kidhack.feature.auth.forgot.ForgotScreen
 import com.hack.kidhack.feature.auth.login.LoginScreen
 import com.hack.kidhack.feature.auth.register.RegisterScreen
 import com.hack.kidhack.feature.child.camera.ChildCameraScreen
+import com.hack.kidhack.feature.child.ChildPairingScreen
 import com.hack.kidhack.feature.child.chat.ChildChatScreen
 import com.hack.kidhack.feature.child.home.ChildHomeScreen
 import com.hack.kidhack.feature.child.mypage.ChildMypageScreen
@@ -58,6 +59,7 @@ import com.hack.kidhack.feature.parent.ParentNoticeScreen
 import com.hack.kidhack.feature.parent.ParentNotificationsScreen
 import com.hack.kidhack.feature.parent.ParentPairingScreen
 import com.hack.kidhack.feature.parent.ParentPayScreen
+import com.hack.kidhack.feature.parent.ParentCameraRequestScreen
 import com.hack.kidhack.feature.parent.ParentScreenshotScreen
 
 fun NavGraphBuilder.authGraph(
@@ -105,6 +107,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 onOpenNotifications = { navController.navigate(Route.ParentNotifications.path) },
                 onOpenAppControl = { navController.navigate(Route.ParentAppControl.path) },
                 onOpenScreenshot = { navController.navigate(Route.ParentScreenshot.path) },
+                onOpenCamera = { navController.navigate(Route.ParentCameraRequest.path) },
                 onOpenProfile = { navController.navigate(Route.ParentChildProfile.path) },
                 onOpenHarmful = { navController.navigate(Route.ParentHarmful.path) },
                 onOpenPairing = { navController.navigate(Route.ParentPairing.path) },
@@ -118,6 +121,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
         composable(Route.ParentEditProfile.path) { ParentShell(navController) { ParentEditProfileScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentAppControl.path) { ParentShell(navController) { ParentAppControlScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentScreenshot.path) { ParentShell(navController) { ParentScreenshotScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentCameraRequest.path) { ParentShell(navController) { ParentCameraRequestScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentChildProfile.path) { ParentShell(navController) { ParentChildProfileScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentHarmful.path) { ParentShell(navController) { ParentHarmfulScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentPairing.path) {
@@ -218,6 +222,7 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
         childTab(Route.ChildMypage.path, navController) {
             ChildMypageScreen(
                 onServices = { navController.navigateChildTab(Route.ChildServices.path) },
+                onLinkParent = { navController.navigate(Route.ChildPairing.path) },
                 onScreenshot = { navController.navigate(Route.ChildScreenshot.path) },
                 onCamera = { navController.navigateChildGallery() },
                 onPay = { navController.navigate(Route.ChildPay.path) },
@@ -227,6 +232,11 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
         composable(Route.ChildScreenshot.path) {
             ChildShell(navController) {
                 ChildScreenshotScreen(onBack = { navController.popBackStack() })
+            }
+        }
+        composable(Route.ChildPairing.path) {
+            ChildShell(navController) {
+                ChildPairingScreen(onBack = { navController.popBackStack() })
             }
         }
         composable(Route.ChildPay.path) {

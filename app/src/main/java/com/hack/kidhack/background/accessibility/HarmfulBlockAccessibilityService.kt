@@ -11,6 +11,8 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
 import android.widget.Toast
 import com.hack.kidhack.R
+import com.hack.kidhack.background.ChildAlertUploadWorker
+import com.hack.kidhack.core.common.HarmfulKeywordMatcher
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.repository.BlocklistRepository
@@ -113,6 +115,8 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
             runCatching {
                 blocklistRepository.reportHarmfulAccess(matched, Instant.now().toString())
             }
+            // 보호자가 다음 폴링에서 바로 받도록 방금 남긴 기록을 즉시 올린다.
+            ChildAlertUploadWorker.enqueueNow(applicationContext)
         }
     }
 
@@ -210,12 +214,18 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
         private const val MAX_NODE_DEPTH = 12
         private const val MAX_TEXT_LENGTH = 4_000
 
+        /**
+         * 판정 순서는 블랙리스트 적중 → 화이트리스트 예외다.
+         *
+         * 단순 `contains` 로 보면 영단어 키워드가 오탐을 낸다(`meth` → `method`).
+         * 매칭 규칙은 [HarmfulKeywordMatcher] 가 갖고 있다.
+         */
         fun shouldBlock(text: String, items: List<BlocklistItem>): String? {
             val black = items.filter { it.listType.equals("BLACK", ignoreCase = true) }
             val white = items.filter { it.listType.equals("WHITE", ignoreCase = true) }
-            val hit = black.firstOrNull { it.keyword.isNotBlank() && text.contains(it.keyword, ignoreCase = true) }
+            val hit = black.firstOrNull { HarmfulKeywordMatcher.matches(text, it.keyword) }
                 ?: return null
-            if (white.any { it.keyword.isNotBlank() && text.contains(it.keyword, ignoreCase = true) }) {
+            if (white.any { HarmfulKeywordMatcher.matches(text, it.keyword) }) {
                 return null
             }
             return hit.keyword
