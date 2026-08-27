@@ -32,7 +32,7 @@ import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
 import com.hack.kidhack.data.remote.dto.FindIdResponse
-import com.hack.kidhack.data.remote.dto.GpsStatusRequest
+import com.hack.kidhack.data.remote.dto.DeviceEventRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
 import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
@@ -168,9 +168,12 @@ interface LocationApi {
         @Query("enabled") enabled: Boolean,
     ): ApiEnvelope<RealtimeToggleResponse>
 
-    /** 위치 6종 API와 무관한 기기 상태 보고. 명세에 /device/event가 생기면 이관 예정. */
-    @POST("devices/gps-status")
-    suspend fun gpsStatus(@Body body: GpsStatusRequest): ApiEnvelope<Unit>
+}
+
+interface DeviceApi {
+    /** 기기 전원/GPS 꺼짐 보고. type = "POWER_OFF" | "GPS_OFF" (명세 4.16). */
+    @POST("device/event")
+    suspend fun reportEvent(@Body body: DeviceEventRequest): ApiEnvelope<Unit>
 }
 
 interface PlaceApi {

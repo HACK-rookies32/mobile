@@ -54,6 +54,7 @@ import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
 import com.hack.kidhack.domain.repository.LocationEventRepository
+import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
@@ -232,7 +233,10 @@ class FakeLocationRepository : LocationRepository {
         return enabled
     }
 
-    override suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String) {}
+}
+
+class FakeDeviceRepository : DeviceRepository {
+    override suspend fun reportEvent(childId: String, type: String) {}
 }
 
 class FakePlaceRepository : PlaceRepository {

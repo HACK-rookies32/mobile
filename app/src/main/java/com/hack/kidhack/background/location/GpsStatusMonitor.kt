@@ -6,23 +6,25 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.location.LocationManager
 import android.os.Build
-import com.hack.kidhack.domain.repository.LocationRepository
+import com.hack.kidhack.domain.repository.DeviceRepository
+import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import java.time.Instant
 
 /**
- * Observes GPS provider enabled state and reports `POST /devices/gps-status`.
+ * Observes GPS provider enabled state and reports `POST /device/event (type=GPS_OFF)`.
  *
  * A normal app cannot force GPS on (GAP-12 / REQ-M-10). This monitor never
  * writes secure settings, never uses DeviceAdmin, and only reports the OS
- * provider flag so the server can notify the parent.
+ * provider flag so the server can notify the parent. GPS 재활성화(ON) 이벤트는
+ * 명세 type enum에 없어 전송하지 않는다.
  */
 class GpsStatusMonitor(
     private val context: Context,
-    private val locationRepository: LocationRepository,
+    private val deviceRepository: DeviceRepository,
+    private val sessionRepository: SessionRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var lastEnabled: Boolean? = null
@@ -30,7 +32,9 @@ class GpsStatusMonitor(
 
     fun start() {
         if (receiver != null) return
-        report(currentEnabled())
+        // 최초 상태가 이미 꺼져 있을 때만 보고한다. 켜져 있는 초기 상태는 이벤트가 아니다.
+        val initial = currentEnabled()
+        if (!initial) report(initial) else lastEnabled = initial
         val filter = IntentFilter().apply {
             addAction(LocationManager.PROVIDERS_CHANGED_ACTION)
             addAction(LocationManager.MODE_CHANGED_ACTION)
@@ -63,9 +67,12 @@ class GpsStatusMonitor(
     private fun report(enabled: Boolean) {
         if (lastEnabled == enabled) return
         lastEnabled = enabled
+        // GPS가 다시 켜진 경우(true)는 대응 이벤트 type이 없어 상태만 갱신하고 끝낸다.
+        if (enabled) return
         scope.launch {
             runCatching {
-                locationRepository.reportGpsStatus(enabled, Instant.now().toString())
+                val childId = sessionRepository.current()?.user?.id ?: return@launch
+                deviceRepository.reportEvent(childId, "GPS_OFF")
             }
         }
     }

@@ -16,6 +16,6 @@ val backgroundModule = module {
     single { AppUsageCollector(androidContext(), get(), get()) }
     single { ScreenTimeWatcher(get()) }
     single { ChildCommandNotifier(androidContext()) }
-    single { GpsStatusMonitor(androidContext(), get()) }
+    single { GpsStatusMonitor(androidContext(), get(), get()) }
     single { ChildPlatformController(androidContext(), get(), get(), get()) }
 }

@@ -99,9 +99,11 @@ interface LocationRepository {
 
     /** 실시간 추적 토글. 서버가 확정한 상태를 돌려준다. */
     suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean
+}
 
-    /** 위치 트래킹 6종과 별개인 기기 GPS 상태 보고(POST /devices/gps-status). */
-    suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String)
+interface DeviceRepository {
+    /** 기기 전원/GPS 꺼짐 보고. type = "POWER_OFF" | "GPS_OFF" */
+    suspend fun reportEvent(childId: String, type: String)
 }
 
 interface PlaceRepository {

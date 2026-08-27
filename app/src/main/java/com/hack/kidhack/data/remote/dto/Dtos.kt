@@ -166,7 +166,10 @@ data class RealtimeToggleResponse(
 )
 
 @Serializable
-data class GpsStatusRequest(val gpsEnabled: Boolean, val reportedAt: String)
+data class DeviceEventRequest(
+    val childId: Long,
+    val type: String, // "POWER_OFF" | "GPS_OFF"
+)
 
 /** POST /location/places 요청. `type` = GEOFENCE | DESTINATION. */
 @Serializable

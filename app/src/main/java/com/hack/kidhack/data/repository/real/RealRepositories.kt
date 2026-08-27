@@ -15,6 +15,7 @@ import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.InquiryApi
+import com.hack.kidhack.data.remote.api.DeviceApi
 import com.hack.kidhack.data.remote.api.LocationApi
 import com.hack.kidhack.data.remote.api.LocationEventApi
 import com.hack.kidhack.data.remote.api.NotificationApi
@@ -44,7 +45,7 @@ import com.hack.kidhack.data.remote.dto.CommentRequest
 import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
-import com.hack.kidhack.data.remote.dto.GpsStatusRequest
+import com.hack.kidhack.data.remote.dto.DeviceEventRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
 import com.hack.kidhack.data.remote.dto.LocationTrackRequest
 import com.hack.kidhack.data.remote.dto.LoginRequest
@@ -111,6 +112,7 @@ import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
 import com.hack.kidhack.domain.repository.LocationEventRepository
+import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
@@ -288,8 +290,11 @@ class RealLocationRepository(private val api: LocationApi) : LocationRepository 
         api.history(childId).unwrap().map { it.toDomain() }
     override suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean =
         api.toggleRealtime(childId, enabled).unwrap().realtimeEnabled
-    override suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String) {
-        api.gpsStatus(GpsStatusRequest(gpsEnabled, reportedAt)).unwrapOrNull()
+}
+
+class RealDeviceRepository(private val api: DeviceApi) : DeviceRepository {
+    override suspend fun reportEvent(childId: String, type: String) {
+        api.reportEvent(DeviceEventRequest(childId.toServerId(), type)).unwrapOrNull()
     }
 }
 
