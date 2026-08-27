@@ -86,7 +86,7 @@ class ChildServicesViewModel(
             // 동선은 최신순이라 첫 항목이 마지막으로 확인된 위치다.
             val location = runCatching { locationRepository.history(childId).firstOrNull() }
             val usage = usageCollector.todayUsage()
-            val notifications = runCatching { notificationRepository.list(null) }
+            val notifications = runCatching { notificationRepository.list(childId) }
             // 현재 위치 좌표(문자열 → Double). 장소 조회는 실패해도 위치 표시엔 지장 없다.
             val currentLat = location.getOrNull()?.lat?.toDoubleOrNull()
             val currentLng = location.getOrNull()?.lng?.toDoubleOrNull()

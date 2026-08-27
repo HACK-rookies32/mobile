@@ -66,8 +66,7 @@ data class LocationEvent(
 data class AppNotification(
     val id: String,
     val type: String,
-    val title: String,
-    val body: String,
+    val message: String,
     val createdAt: String,
     val read: Boolean,
 )

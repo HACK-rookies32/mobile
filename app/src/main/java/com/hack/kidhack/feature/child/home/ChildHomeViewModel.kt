@@ -98,7 +98,7 @@ class ChildHomeViewModel(
             _state.update { it.copy(loading = true, error = null) }
 
             val user = sessionRepository.current()?.user
-            val notifications = runCatching { notificationRepository.list(null) }
+            val notifications = runCatching { notificationRepository.list(sessionRepository.current()?.user?.id.orEmpty()) }
 
             // 스크린타임은 서비스 현황 탭의 앱 사용 모니터링 합계와 반드시 같아야 하므로
             // 같은 수집기를 쓴다.
@@ -184,7 +184,7 @@ class ChildHomeViewModel(
         val isHarmful = upper.contains("HARMFUL") || upper.contains("BLOCK")
         val isScreenTime = upper.contains("SCREEN_TIME") || upper.contains("LIMIT")
         return HomeAlertRow(
-            message = title.ifBlank { body },
+            message = message,
             time = formatTimeLabel(createdAt),
             emoji = when {
                 isCameraRequest -> "📷"

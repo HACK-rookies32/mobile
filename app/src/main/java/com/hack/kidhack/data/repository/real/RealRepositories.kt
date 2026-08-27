@@ -317,13 +317,12 @@ class RealLocationEventRepository(private val api: LocationEventApi) : LocationE
 }
 
 class RealNotificationRepository(private val api: NotificationApi) : NotificationRepository {
-    override fun paged(type: String?): Flow<PagingData<AppNotification>> =
-        Pager(PagingConfig(pageSize = 20)) {
-            PageResponsePagingSource { page, size -> api.list(type, page, size).unwrap() }
-        }.flow.map { paging -> paging.map { it.toDomain() } }
+    override suspend fun list(recipientId: String): List<AppNotification> =
+        api.list(recipientId).unwrap().map { it.toDomain() }
 
-    override suspend fun list(type: String?): List<AppNotification> =
-        api.list(type, 0, 50).unwrap().content.map { it.toDomain() }
+    override suspend fun markRead(notificationId: String) {
+        api.markRead(notificationId).unwrapOrNull()
+    }
 }
 
 class RealBlocklistRepository(private val api: BlocklistApi) : BlocklistRepository {
@@ -346,10 +345,10 @@ class RealBlocklistRepository(private val api: BlocklistApi) : BlocklistReposito
 class RealScreenshotRepository(private val api: ScreenshotApi) : ScreenshotRepository {
     override fun paged(childId: String): Flow<PagingData<Screenshot>> =
         Pager(PagingConfig(20)) {
-            PageResponsePagingSource { page, size -> api.list(childId, page, size).unwrap() }
+            PageResponsePagingSource { page, size -> api.list(childId, page = page, size = size).unwrap() }
         }.flow.map { paging -> paging.map { it.toDomain() } }
     override suspend fun list(childId: String): List<Screenshot> =
-        api.list(childId, 0, 50).unwrap().content.map { it.toDomain() }
+        api.list(childId, page = 0, size = 50).unwrap().content.map { it.toDomain() }
     override suspend fun requestCapture(childId: String) {
         api.requestCapture(childId).unwrapOrNull()
     }
@@ -368,11 +367,11 @@ class RealScreenshotRepository(private val api: ScreenshotApi) : ScreenshotRepos
 }
 
 class RealCommunityRepository(private val api: CommunityApi) : CommunityRepository {
-    override fun pagedPosts(): Flow<PagingData<Post>> =
+    override fun pagedPosts(keyword: String?): Flow<PagingData<Post>> =
         Pager(PagingConfig(20)) {
-            PageResponsePagingSource { page, size -> api.posts(page, size).unwrap() }
+            PageResponsePagingSource { page, size -> api.posts(keyword = keyword, page = page, size = size).unwrap() }
         }.flow.map { paging -> paging.map { it.toDomain() } }
-    override suspend fun posts(): List<Post> = api.posts(0, 50).unwrap().content.map { it.toDomain() }
+    override suspend fun posts(): List<Post> = api.posts(page = 0, size = 50).unwrap().content.map { it.toDomain() }
     override suspend fun post(postId: String): Post = api.post(postId).unwrap().toDomain()
     override suspend fun create(
         title: String,

@@ -191,12 +191,8 @@ interface LocationEventApi {
 }
 
 interface NotificationApi {
-    @GET("notifications")
-    suspend fun list(
-        @Query("type") type: String? = null,
-        @Query("page") page: Int = 0,
-        @Query("size") size: Int = 20,
-    ): ApiEnvelope<PageResponse<NotificationDto>>
+    @GET("notifications/{recipientId}")
+    suspend fun list(@Path("recipientId") recipientId: String): ApiEnvelope<List<NotificationDto>>
 
     @PATCH("notifications/{notificationId}")
     suspend fun markRead(@Path("notificationId") notificationId: String): ApiEnvelope<Unit>
@@ -226,6 +222,8 @@ interface ScreenshotApi {
     @GET("children/{childId}/screenshots")
     suspend fun list(
         @Path("childId") childId: String,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
         @Query("page") page: Int = 0,
         @Query("size") size: Int = 20,
     ): ApiEnvelope<PageResponse<ScreenshotDto>>
@@ -246,6 +244,7 @@ interface ScreenshotApi {
 interface CommunityApi {
     @GET("community/posts")
     suspend fun posts(
+        @Query("keyword") keyword: String? = null,
         @Query("page") page: Int = 0,
         @Query("size") size: Int = 20,
     ): ApiEnvelope<PageResponse<PostDto>>

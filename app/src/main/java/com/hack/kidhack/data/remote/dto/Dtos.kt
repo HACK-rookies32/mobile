@@ -1,6 +1,7 @@
 package com.hack.kidhack.data.remote.dto
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -202,11 +203,11 @@ data class LocationEventDto(
 @Serializable
 data class NotificationDto(
     val id: String,
+    val recipientId: String,
     val type: String,
-    val title: String,
-    val body: String,
-    val createdAt: String,
+    val message: String,
     val read: Boolean = false,
+    val createdAt: String,
 )
 
 @Serializable
@@ -240,12 +241,13 @@ data class CommentDto(
 
 @Serializable
 data class PostDto(
-    val id: String,
+    @SerialName("postId") val id: String,
     val title: String,
-    val author: String,
-    val commentCount: Int = 0,
+    @SerialName("authorNickname") val author: String,
+    @SerialName("createdAt") val createdAtLabel: String,
     val likeCount: Int = 0,
-    val createdAtLabel: String = "",
+    // TODO: 명세서 목록/상세 응답에 commentCount 없음 — 서버 미제공 시 0 기본값 유지
+    val commentCount: Int = 0,
     val liked: Boolean = false,
     val imageUrls: List<String> = emptyList(),
     val links: List<String> = emptyList(),

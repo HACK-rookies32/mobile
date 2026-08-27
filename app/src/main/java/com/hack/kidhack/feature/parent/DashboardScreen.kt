@@ -51,6 +51,7 @@ import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
+import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -76,6 +77,7 @@ class DashboardViewModel(
     private val appUsageRepository: AppUsageRepository,
     private val notificationRepository: NotificationRepository,
     private val locationRepository: LocationRepository,
+    private val sessionRepository: SessionRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DashboardUiState())
@@ -121,7 +123,7 @@ class DashboardViewModel(
                 ?: childRepository.child(childId)
             // TODO: Backend Integration - API 엔드포인트에 따라 파라미터(날짜, 타입 등) 조정 필요
             val usages = appUsageRepository.list(childId, "APP")
-            val notes = notificationRepository.list(null)
+            val notes = notificationRepository.list(sessionRepository.current()?.user?.id.orEmpty())
             // 동선은 최신순이라 첫 항목이 마지막으로 확인된 위치다.
             val loc = runCatching { locationRepository.history(childId).firstOrNull() }.getOrNull()
             _state.update {
@@ -356,7 +358,7 @@ fun ParentDashboardScreen(
                                 Text(icon.first, fontSize = 18.sp)
                                 Spacer(Modifier.size(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(n.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 12.sp, color = colors.text)
+                                    Text(n.message, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 12.sp, color = colors.text)
                                     Text(n.createdAt, fontFamily = KidhackFontFamily, fontWeight = FontSemibold, fontSize = 12.sp, color = colors.muted)
                                 }
                             }

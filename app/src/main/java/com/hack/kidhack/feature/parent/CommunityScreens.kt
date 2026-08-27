@@ -14,9 +14,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -24,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -51,6 +54,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.paging.LoadState
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -67,6 +75,7 @@ import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Post
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.UserRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,28 +84,12 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 
-data class CommunityListUiState(
-    val posts: List<Post> = emptyList(),
-    val loading: Boolean = true,
-    val error: String? = null,
-)
-
 class CommunityListViewModel(
     private val communityRepository: CommunityRepository,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(CommunityListUiState())
-    val state: StateFlow<CommunityListUiState> = _state.asStateFlow()
-
-    init { load() }
-
-    fun load() {
-        viewModelScope.launch {
-            _state.update { it.copy(loading = true, error = null) }
-            runCatching { communityRepository.posts() }
-                .onSuccess { posts -> _state.update { it.copy(loading = false, posts = posts) } }
-                .onFailure { t -> _state.update { it.copy(loading = false, error = t.message) } }
-        }
-    }
+    // 게시글 목록은 Paging3 로 노출한다(loading/error 는 화면의 loadState 에서 파생).
+    val posts: Flow<PagingData<Post>> =
+        communityRepository.pagedPosts().cachedIn(viewModelScope)
 }
 
 enum class ReportReason { SPAM, ABUSE, ADULT, FALSE_INFO, ETC }
@@ -287,8 +280,8 @@ fun ParentCommunityScreen(
     onWrite: () -> Unit = {},
     viewModel: CommunityListViewModel = koinViewModel(),
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
+    val posts = viewModel.posts.collectAsLazyPagingItems()
 
     ParentScreenScaffold(
         header = {
@@ -303,23 +296,68 @@ fun ParentCommunityScreen(
                 )
             }
         },
+        scrollable = false,
+        contentPadding = PaddingValues(0.dp),
     ) {
-        ParentLoadingOrError(state.loading, state.error, viewModel::load)
-        state.posts.forEach { post ->
-            KidCard(Modifier.clickable { onOpenPost(post.id) }) {
-                Text(post.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(post.author, fontFamily = KidhackFontFamily, fontWeight = FontSemibold, fontSize = 12.sp, color = colors.text)
-                    Text(post.createdAtLabel, color = colors.muted, fontSize = 12.sp)
-                    Spacer(Modifier.weight(1f))
-                    Text(stringResource(R.string.parent_community_comments, post.commentCount), color = colors.muted, fontSize = 12.sp)
-                    Text(stringResource(R.string.parent_community_likes, post.likeCount), color = colors.muted, fontSize = 12.sp)
+        // 글쓰기 버튼은 목록 위에 고정 — 스크롤해도 항상 보인다.
+        KidButton(
+            stringResource(R.string.parent_community_write),
+            onWrite,
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
+        )
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // 첫 로딩 / 에러 (기존 ParentLoadingOrError 스타일 유지)
+            val refresh = posts.loadState.refresh
+            when {
+                refresh is LoadState.Loading && posts.itemCount == 0 ->
+                    item { ParentLoadingOrError(true, null) }
+                refresh is LoadState.Error ->
+                    item { ParentLoadingOrError(false, refresh.error.message ?: "", onRetry = { posts.retry() }) }
+            }
+
+            items(
+                count = posts.itemCount,
+                key = posts.itemKey { it.id },
+            ) { index ->
+                posts[index]?.let { post ->
+                    KidCard(Modifier.clickable { onOpenPost(post.id) }) {
+                        Text(post.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(post.author, fontFamily = KidhackFontFamily, fontWeight = FontSemibold, fontSize = 12.sp, color = colors.text)
+                            Text(post.createdAtLabel, color = colors.muted, fontSize = 12.sp)
+                            Spacer(Modifier.weight(1f))
+                            Text(stringResource(R.string.parent_community_comments, post.commentCount), color = colors.muted, fontSize = 12.sp)
+                            Text(stringResource(R.string.parent_community_likes, post.likeCount), color = colors.muted, fontSize = 12.sp)
+                        }
+                    }
                 }
             }
+
+            // 다음 페이지 로딩/에러(맨 아래)
+            when (posts.loadState.append) {
+                is LoadState.Loading ->
+                    item {
+                        Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(Modifier.size(20.dp), color = colors.brand, strokeWidth = 2.dp)
+                        }
+                    }
+                is LoadState.Error ->
+                    item {
+                        Column(Modifier.fillMaxWidth().padding(8.dp)) {
+                            Text("더 불러오지 못했어요", color = colors.danger, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 13.sp)
+                            KidButton(stringResource(R.string.parent_retry), { posts.retry() }, Modifier.fillMaxWidth())
+                        }
+                    }
+                else -> Unit
+            }
+
+            item { Spacer(Modifier.height(8.dp)) }
         }
-        KidButton(stringResource(R.string.parent_community_write), onWrite, Modifier.fillMaxWidth())
-        Spacer(Modifier.height(8.dp))
     }
 }
 

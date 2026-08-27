@@ -137,8 +137,7 @@ fun LocationEventDto.toDomain(): LocationEvent = LocationEvent(
 fun NotificationDto.toDomain(): AppNotification = AppNotification(
     id = id,
     type = type,
-    title = title,
-    body = body,
+    message = message,
     createdAt = createdAt,
     read = read,
 )

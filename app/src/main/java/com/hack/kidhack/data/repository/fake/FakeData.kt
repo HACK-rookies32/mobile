@@ -139,7 +139,27 @@ object FakeData {
         ),
         Post("p2", "스마트폰 처음 사준 시기가 언제예요?", "두아이아빠", 15, 37, "5시간 전"),
         Post("p3", "루키즈 앱 쓰고 마음이 편해졌어요 후기", "워킹맘", 5, 18, "어제"),
-    )
+    ) + (4..48).map { i ->
+        // pageSize(20)보다 확실히 많게 하려고 기존 더미 패턴을 순환 생성한다.
+        val titles = listOf(
+            "아이 게임 시간 어떻게 관리하세요?",
+            "학원 끝나고 바로 집에 오는지 확인하는 팁",
+            "유해 사이트 차단 설정 공유합니다",
+            "용돈 관리 앱이랑 같이 쓰니 편하네요",
+            "위치 알림 덕분에 안심돼요",
+            "우리 아이 스마트폰 첫 개통 후기",
+        )
+        val authors = listOf("행복한엄마", "두아이아빠", "워킹맘", "도전맘", "민준아빠", "하늘맘")
+        val labels = listOf("방금", "1시간 전", "3시간 전", "어제", "2일 전", "지난주")
+        Post(
+            id = "p$i",
+            title = titles[i % titles.size],
+            author = authors[i % authors.size],
+            commentCount = i % 5,
+            likeCount = (i * 3) % 60,
+            createdAtLabel = labels[i % labels.size],
+        )
+    }
 
     val payments = listOf(
         Payment("pay1", "민준 용돈 송금", -10_000, "08.20", "out"),

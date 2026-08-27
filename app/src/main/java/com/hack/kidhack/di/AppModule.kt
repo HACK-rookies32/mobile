@@ -295,11 +295,11 @@ val appModule = module {
     viewModel { RegisterViewModel(get(), get(), get(), androidContext()) }
     viewModel { ForgotViewModel(get()) }
 
-    viewModel { DashboardViewModel(get(), get(), get(), get(), get()) }
+    viewModel { DashboardViewModel(get(), get(), get(), get(), get(), get()) }
     viewModel { LocationViewModel(get(), get(), get(), get(), get()) }
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
     viewModel { ParentChatViewModel(get(), get(), get()) }
-    viewModel { NotificationsViewModel(get(), get()) }
+    viewModel { NotificationsViewModel(get(), get(), get()) }
     viewModel { MypageViewModel(get(), get(), get(), get(), get()) }
     viewModel { EditProfileViewModel(get()) }
     viewModel { AppControlViewModel(get(), get(), get()) }

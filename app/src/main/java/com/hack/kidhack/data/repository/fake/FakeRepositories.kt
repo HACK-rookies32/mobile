@@ -253,15 +253,13 @@ class FakeLocationEventRepository : LocationEventRepository {
 }
 
 class FakeNotificationRepository : NotificationRepository {
-    override fun paged(type: String?): Flow<PagingData<AppNotification>> = Pager(PagingConfig(20)) {
-        PageResponsePagingSource { page, size ->
-            PageResponse(list(type), page, size, 2, 1)
-        }
-    }.flow
-    override suspend fun list(type: String?): List<AppNotification> = listOf(
-        AppNotification("n1", "LOCATION", "안전 구역 이탈", "민준이가 '학교' 구역을 벗어났습니다.", "14:20", false),
-        AppNotification("n2", "HARMFUL", "유해 사이트 접속 차단", "부적절한 사이트 접속 시도가 차단되었습니다.", "12:05", true),
-    ).filter { type == null || it.type == type }
+    // recipientId 는 무시하고 더미 목록을 반환한다(비페이징).
+    override suspend fun list(recipientId: String): List<AppNotification> = listOf(
+        AppNotification("n1", "LOCATION_EXIT", "민준이가 '학교' 구역을 벗어났습니다.", "14:20", false),
+        AppNotification("n2", "HARMFUL_SITE", "부적절한 사이트 접속 시도가 차단되었습니다.", "12:05", true),
+        AppNotification("n3", "PAYMENT_APPROVED", "GS25 역삼점에서 3,000원 결제되었습니다.", "11:30", true),
+    )
+    override suspend fun markRead(notificationId: String) {}
 }
 
 class FakeBlocklistRepository : BlocklistRepository {
@@ -282,8 +280,10 @@ class FakeScreenshotRepository(
 ) : ScreenshotRepository {
     override fun paged(childId: String): Flow<PagingData<Screenshot>> = Pager(PagingConfig(20)) {
         PageResponsePagingSource { page, size ->
-            val items = store.list()
-            PageResponse(items, page, size, items.size.toLong(), 1)
+            val all = store.list()
+            val totalPages = kotlin.math.ceil(all.size / size.toDouble()).toInt().coerceAtLeast(1)
+            val slice = all.drop(page * size).take(size)
+            PageResponse(slice, page, size, all.size.toLong(), totalPages)
         }
     }.flow
 
@@ -305,9 +305,13 @@ class FakeScreenshotRepository(
 
 class FakeCommunityRepository : CommunityRepository {
     private val items = FakeData.posts.toMutableList()
-    override fun pagedPosts(): Flow<PagingData<Post>> = Pager(PagingConfig(20)) {
+    override fun pagedPosts(keyword: String?): Flow<PagingData<Post>> = Pager(PagingConfig(20)) {
         PageResponsePagingSource { page, size ->
-            PageResponse(items.toList(), page, size, items.size.toLong(), 1)
+            val all = if (keyword.isNullOrBlank()) items.toList()
+                else items.filter { it.title.contains(keyword, ignoreCase = true) }
+            val totalPages = kotlin.math.ceil(all.size / size.toDouble()).toInt().coerceAtLeast(1)
+            val slice = all.drop(page * size).take(size)
+            PageResponse(slice, page, size, all.size.toLong(), totalPages)
         }
     }.flow
     override suspend fun posts() = items.toList()

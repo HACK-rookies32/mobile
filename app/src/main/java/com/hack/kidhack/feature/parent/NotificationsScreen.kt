@@ -34,6 +34,7 @@ import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.repository.NotificationRepository
+import com.hack.kidhack.domain.repository.SessionRepository
 import com.hack.kidhack.domain.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,6 +51,7 @@ data class NotificationsUiState(
 )
 
 class NotificationsViewModel(
+    private val sessionRepository: SessionRepository,
     private val userRepository: UserRepository,
     private val notificationRepository: NotificationRepository,
 ) : ViewModel() {
@@ -64,7 +66,9 @@ class NotificationsViewModel(
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
                 val s = userRepository.notificationSettings()
-                val n = notificationRepository.list(null)
+                // 명세 4.5: /notifications/{recipientId} — 수신자 = 현재 로그인 사용자.
+                val recipientId = sessionRepository.current()?.user?.id.orEmpty()
+                val n = notificationRepository.list(recipientId)
                 s to n
             }.onSuccess { (s, n) ->
                 _state.update { it.copy(loading = false, settings = s, notifications = n) }
@@ -77,18 +81,18 @@ class NotificationsViewModel(
     fun patch(update: (NotificationSettings) -> NotificationSettings) {
         val oldSettings = _state.value.settings
         val next = update(oldSettings)
-        
+
         // Optimistic update
         _state.update { it.copy(settings = next) }
 
         viewModelScope.launch {
             runCatching { userRepository.patchNotificationSettings(next) }
-                .onSuccess { s -> 
-                    _state.update { it.copy(settings = s, error = null) } 
+                .onSuccess { s ->
+                    _state.update { it.copy(settings = s, error = null) }
                 }
-                .onFailure { t -> 
+                .onFailure { t ->
                     // Rollback on failure
-                    _state.update { it.copy(settings = oldSettings, error = t.message) } 
+                    _state.update { it.copy(settings = oldSettings, error = t.message) }
                 }
         }
     }
@@ -97,17 +101,18 @@ class NotificationsViewModel(
 @Composable
 fun ParentNotificationsScreen(
     onBack: (() -> Unit)? = null,
-    viewModel: NotificationsViewModel = koinViewModel()
+    viewModel: NotificationsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val s = state.settings
     val colors = LocalKidhackColors.current
 
+    // 알림 목록은 명세상 비페이징(배열 그대로) — 일반 스크롤 Column 으로 전부 렌더.
     ParentScreenScaffold(
         header = { ParentHeaderBar(stringResource(R.string.parent_notifications_title), onBack = onBack) },
     ) {
         ParentLoadingOrError(state.loading && state.notifications.isEmpty(), state.error, viewModel::load)
-        
+
         // 알림 설정 영역
         KidCard {
             Text(
@@ -141,7 +146,7 @@ fun ParentNotificationsScreen(
             fontWeight = FontBold,
             fontSize = 16.sp,
             color = colors.text,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
         )
 
         if (!state.loading && state.notifications.isEmpty()) {
@@ -150,54 +155,54 @@ fun ParentNotificationsScreen(
             }
         }
 
-        state.notifications.forEach { n ->
-            KidCard {
-                val icon = when (n.type) {
-                    "HARMFUL" -> "🚫" to colors.danger
-                    "ARRIVAL" -> "📍" to colors.safe
-                    "GPS_OFF" -> "📵" to colors.danger
-                    "LOCATION" -> "📍" to colors.info
-                    else -> "🔔" to colors.brand
-                }
-                Row(verticalAlignment = Alignment.Top) {
-                    Text(icon.first, fontSize = 20.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = n.title,
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontBold,
-                            fontSize = 14.sp,
-                            color = colors.text
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = n.body,
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontSemibold,
-                            fontSize = 13.sp,
-                            color = colors.muted
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = n.createdAt,
-                            fontSize = 11.sp,
-                            color = colors.muted.copy(alpha = 0.7f)
-                        )
-                    }
-                    if (!n.read) {
-                        Box(
-                            Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(colors.brand)
-                        )
-                    }
-                }
+        state.notifications.forEach { n -> NotificationCard(n) }
+
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun NotificationCard(n: AppNotification) {
+    val colors = LocalKidhackColors.current
+    KidCard {
+        // 명세 type enum 기준 아이콘 매핑.
+        val icon = when (n.type) {
+            "LOCATION_ENTER" -> "📍"
+            "LOCATION_ARRIVED" -> "🏫"
+            "LOCATION_EXIT" -> "🚶"
+            "DEVICE_POWER_OFF" -> "📵"
+            "HARMFUL_SITE" -> "🚫"
+            "PAYMENT_APPROVED" -> "💳"
+            "PAYMENT_CANCELED" -> "↩️"
+            else -> "🔔"
+        }
+        Row(verticalAlignment = Alignment.Top) {
+            Text(icon, fontSize = 20.sp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = n.message,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontSemibold,
+                    fontSize = 14.sp,
+                    color = colors.text,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = n.createdAt,
+                    fontSize = 11.sp,
+                    color = colors.muted.copy(alpha = 0.7f),
+                )
+            }
+            if (!n.read) {
+                Box(
+                    Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(colors.brand),
+                )
             }
         }
-        
-        Spacer(Modifier.height(16.dp))
     }
 }
 

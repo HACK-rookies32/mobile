@@ -117,8 +117,9 @@ interface LocationEventRepository {
 }
 
 interface NotificationRepository {
-    fun paged(type: String?): Flow<PagingData<AppNotification>>
-    suspend fun list(type: String?): List<AppNotification>
+    /** 명세 4.5 GET /notifications/{recipientId} — page/size 없이 배열 그대로 반환. */
+    suspend fun list(recipientId: String): List<AppNotification>
+    suspend fun markRead(notificationId: String)
 }
 
 interface BlocklistRepository {
@@ -176,7 +177,7 @@ interface CommandRepository {
 }
 
 interface CommunityRepository {
-    fun pagedPosts(): Flow<PagingData<Post>>
+    fun pagedPosts(keyword: String? = null): Flow<PagingData<Post>>
     suspend fun posts(): List<Post>
     suspend fun post(postId: String): Post
     suspend fun create(
