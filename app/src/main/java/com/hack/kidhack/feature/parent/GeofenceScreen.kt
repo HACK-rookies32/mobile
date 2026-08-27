@@ -171,7 +171,13 @@ class GeofenceViewModel(
             runCatching {
                 val id = selectedChildRepository.current() ?: return@runCatching
                 placeRepository.delete(id, geofenceId)
-            }.onSuccess { refresh() }
+            }.onSuccess {
+                _state.update { it.copy(error = null) }
+                refresh()
+            }.onFailure { t ->
+                // 명세: 400 INVALID_PARAMETER - "본인 자녀의 장소만 삭제할 수 있습니다." 등
+                _state.update { it.copy(error = t.message) }
+            }
         }
     }
 }
