@@ -15,12 +15,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.Color as AndroidColor
 import android.view.MotionEvent
+import androidx.core.graphics.createBitmap
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,13 +36,12 @@ import com.google.maps.android.compose.Circle
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.GoogleMapComposable
 import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberMarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -181,7 +180,7 @@ private fun rememberPlaceLabelIcon(text: String): BitmapDescriptor {
         val metrics = textPaint.fontMetrics
         val width = (textPaint.measureText(text) + padH * 2).toInt().coerceAtLeast(1)
         val height = ((metrics.descent - metrics.ascent) + padV * 2).toInt().coerceAtLeast(1)
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(width, height)
         val canvas = Canvas(bitmap)
         val radius = 6f * density
         val background = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = PLACE_BLUE.toArgb() }
@@ -204,7 +203,7 @@ private fun LocationMapContent(
     if (childPos != null) {
         // 아이 실시간 위치는 빨강, 등록 장소는 파랑으로 구분한다.
         Marker(
-            state = MarkerState(position = childPos),
+            state = rememberMarkerState(key = "child_${childPos.latitude}_${childPos.longitude}", position = childPos),
             title = childTitle,
             icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
         )
@@ -222,13 +221,13 @@ private fun LocationMapContent(
                 fillColor = PLACE_BLUE.copy(alpha = 0.15f),
             )
             Marker(
-                state = MarkerState(position = center),
+                state = rememberMarkerState(key = place.id, position = center),
                 title = place.name,
                 icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
             )
             // 이름은 탭해야 뜨는 InfoWindow 대신 항상 보이도록 별도 마커로 그린다.
             Marker(
-                state = MarkerState(position = center),
+                state = rememberMarkerState(key = "${place.id}_label", position = center),
                 title = place.name,
                 icon = rememberPlaceLabelIcon(place.name),
                 anchor = Offset(0.5f, -0.2f),
