@@ -61,6 +61,7 @@ import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
+import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -79,6 +80,7 @@ data class DashboardUiState(
     val allNotifications: List<AppNotification> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
+    val parentName: String = "부모",
 ) {
     /**
      * 지금 고른 자녀의 알림.
@@ -100,6 +102,7 @@ class DashboardViewModel(
     private val dashboardRepository: DashboardRepository,
     private val alertSync: ParentAlertSync,
     private val childWatcher: ParentChildWatcher,
+    private val sessionRepository: SessionRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DashboardUiState())
@@ -142,7 +145,14 @@ class DashboardViewModel(
 
     fun refresh() {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, error = null) }
+            _state.update {
+                it.copy(
+                    loading = true,
+                    error = null,
+                    parentName = sessionRepository.current()?.user?.name?.trim()
+                        ?.takeIf { name -> name.isNotBlank() } ?: "부모",
+                )
+            }
             runCatching {
                 // TODO: Backend Integration - Real API 연결 시 childRepository의 실구현체(RealChildRepository)를 사용하도록 di/AppModule.kt 수정
                 val children = childRepository.children()
@@ -234,7 +244,7 @@ fun ParentDashboardScreen(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        stringResource(R.string.parent_hello),
+                        stringResource(R.string.parent_hello, state.parentName),
                         color = Color.White.copy(alpha = 0.7f),
                         fontFamily = KidhackFontFamily,
                         fontWeight = FontBold,

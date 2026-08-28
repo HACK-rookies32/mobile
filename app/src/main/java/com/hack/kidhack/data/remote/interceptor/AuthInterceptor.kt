@@ -16,7 +16,8 @@ class AuthInterceptor(
             path.contains("/auth/find-id") ||
             path.contains("/auth/reset-password")
         if (skipAuth) return chain.proceed(original)
-        val token = sessionRepository.accessToken() ?: return chain.proceed(original)
+        val token = sessionRepository.accessToken()?.takeIf { it.isNotBlank() }
+            ?: return chain.proceed(original)
         val authed = original.newBuilder()
             .header("Authorization", "Bearer $token")
             .build()

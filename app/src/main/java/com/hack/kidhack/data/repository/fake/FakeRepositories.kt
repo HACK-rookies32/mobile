@@ -110,7 +110,8 @@ class FakeAuthRepository(
     ): Session {
         delay(300)
         require(loginId.isNotBlank() && password.isNotBlank()) { "아이디와 비밀번호를 입력해 주세요" }
-        require(username.isNotBlank()) { "실명을 입력해 주세요" }
+        require(username.isNotBlank()) { "이름을 입력해 주세요" }
+        require(!nickname.isNullOrBlank()) { "닉네임을 입력해 주세요" }
         require(phoneNumber.isNotBlank()) { "휴대폰 번호를 입력해 주세요" }
         require(birthDate.matches(Regex("""\d{4}-\d{2}-\d{2}"""))) { "생년월일은 yyyy-MM-dd 형식이어야 해요" }
         if (role != Role.CHILD) {
@@ -129,6 +130,7 @@ class FakeAuthRepository(
             loginId = loginId,
             name = username,
             role = role,
+            nickname = nickname,
             phone = phoneNumber,
             email = email,
             profileImageUrl = profileImageUrl,
