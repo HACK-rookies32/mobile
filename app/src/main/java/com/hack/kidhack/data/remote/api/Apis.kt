@@ -503,9 +503,6 @@ interface PaymentChargeApi {
         @Query("size") size: Int = 20
     ): ApiEnvelope<PageResponse<ChargePrepareResponse>>
 
-    @GET("payments/charges/{chargeId}")
-    suspend fun get(@Path("chargeId") chargeId: String): ApiEnvelope<ChargePrepareResponse>
-
     @POST("payments/charges/{chargeId}/cancel")
     suspend fun cancel(@Path("chargeId") chargeId: String, @Body body: ChargeCancelRequest): ApiEnvelope<Unit>
 }
