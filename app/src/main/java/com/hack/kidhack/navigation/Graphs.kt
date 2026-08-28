@@ -35,6 +35,8 @@ import com.hack.kidhack.feature.child.chat.ChildChatScreen
 import com.hack.kidhack.feature.child.home.ChildHomeScreen
 import com.hack.kidhack.feature.child.mypage.ChildMypageScreen
 import com.hack.kidhack.feature.child.mypage.ChildProfileEditScreen
+import com.hack.kidhack.feature.child.mypage.ChildTermsScreen
+import com.hack.kidhack.feature.child.mypage.ChildNoticeScreen
 import com.hack.kidhack.feature.child.onboarding.ChildOnboardingScreen
 import com.hack.kidhack.feature.child.pay.ChildPayScreen
 import com.hack.kidhack.feature.child.onboarding.ChildStartRoute
@@ -230,6 +232,8 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
                 onCamera = { navController.navigateChildGallery() },
                 onPay = { navController.navigate(Route.ChildPay.path) },
                 onEditProfile = { navController.navigate(Route.ChildProfileEdit.path) },
+                onTerms = { navController.navigate(Route.ChildTerms.path) },
+                onNotice = { navController.navigate(Route.ChildNotice.path) },
             )
         }
         composable(Route.ChildScreenshot.path) {
@@ -250,6 +254,16 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
         composable(Route.ChildProfileEdit.path) {
             ChildShell(navController) {
                 ChildProfileEditScreen(onBack = { navController.popBackStack() })
+            }
+        }
+        composable(Route.ChildTerms.path) {
+            ChildShell(navController) {
+                ChildTermsScreen(onBack = { navController.popBackStack() })
+            }
+        }
+        composable(Route.ChildNotice.path) {
+            ChildShell(navController) {
+                ChildNoticeScreen(onBack = { navController.popBackStack() })
             }
         }
     }

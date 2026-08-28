@@ -45,6 +45,8 @@ fun ChildMypageScreen(
     onCamera: () -> Unit = {},
     onPay: () -> Unit = {},
     onEditProfile: () -> Unit = {},
+    onTerms: () -> Unit = {},
+    onNotice: () -> Unit = {},
     viewModel: ChildMypageViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -225,8 +227,8 @@ fun ChildMypageScreen(
                 fontWeight = FontBold,
                 fontSize = 12.sp,
             )
-            ListRow(title = stringResource(R.string.child_mypage_notice), onClick = comingSoon)
-            ListRow(title = stringResource(R.string.child_mypage_help), onClick = comingSoon)
+            ListRow(title = stringResource(R.string.child_mypage_notice), onClick = onNotice)
+            ListRow(title = stringResource(R.string.child_mypage_terms), onClick = onTerms)
             ListRow(title = stringResource(R.string.child_mypage_version), onClick = null)
             Row(
                 modifier = Modifier

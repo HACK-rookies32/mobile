@@ -110,8 +110,6 @@
     <string name="parent_mypage_saved">저장했어요</string>
 
     <string name="parent_terms_title">이용약관</string>
-    <string name="parent_terms_appendix">부칙</string>
-    <string name="parent_terms_effective">이 약관은 2026년 8월 28일부터 적용됩니다.</string>
 
     <string name="parent_editprofile_title">내 정보 수정</string>
     <string name="parent_editprofile_change_photo">프로필 사진 변경</string>
@@ -237,7 +235,6 @@
     <string name="parent_community_report_done_ok">확인</string>
 
     <string name="parent_notice_title">공지사항</string>
-    <string name="parent_notice_badge">필독</string>
 
     <string name="parent_contact_title">관리자 문의</string>
     <string name="parent_contact_chat">1:1 채팅 문의</string>

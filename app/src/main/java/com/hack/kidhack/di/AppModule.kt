@@ -147,7 +147,7 @@ import com.hack.kidhack.feature.parent.GeofenceViewModel
 import com.hack.kidhack.feature.parent.HarmfulViewModel
 import com.hack.kidhack.feature.parent.LocationViewModel
 import com.hack.kidhack.feature.parent.MypageViewModel
-import com.hack.kidhack.feature.parent.NoticeViewModel
+import com.hack.kidhack.feature.common.NoticeViewModel
 import com.hack.kidhack.feature.parent.NotificationsViewModel
 import com.hack.kidhack.feature.parent.PairingViewModel
 import com.hack.kidhack.feature.parent.ParentChatViewModel

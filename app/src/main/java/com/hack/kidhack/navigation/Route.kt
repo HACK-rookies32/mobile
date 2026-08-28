@@ -53,6 +53,8 @@ sealed class Route(val path: String) {
     data object ChildPay : Route("child/pay")
     data object ChildProfileEdit : Route("child/profile/edit")
     data object ChildPairing : Route("child/pairing")
+    data object ChildTerms : Route("child/terms")
+    data object ChildNotice : Route("child/notice")
 }
 
 data class TabItem(
