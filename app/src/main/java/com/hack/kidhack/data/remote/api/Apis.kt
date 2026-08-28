@@ -59,13 +59,10 @@ import com.hack.kidhack.data.remote.dto.PostDto
 import com.hack.kidhack.data.remote.dto.RealtimeToggleResponse
 import com.hack.kidhack.data.remote.dto.RefreshRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
-import com.hack.kidhack.data.remote.dto.RemoteCommandDto
 import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SignupRequest
-import com.hack.kidhack.data.remote.dto.SubscribeRequest
-import com.hack.kidhack.data.remote.dto.SubscriptionDto
 import com.hack.kidhack.data.remote.dto.UsePointRequest
 import com.hack.kidhack.data.remote.dto.TransferRequest
 import com.hack.kidhack.data.remote.dto.TransferResponse
@@ -375,17 +372,6 @@ interface PointApi {
     suspend fun use(@Body body: UsePointRequest): ApiEnvelope<Unit>
 }
 
-interface SubscriptionApi {
-    @POST("subscriptions")
-    suspend fun subscribe(@Body body: SubscribeRequest): ApiEnvelope<SubscriptionDto>
-
-    @GET("subscriptions/me")
-    suspend fun me(): ApiEnvelope<SubscriptionDto>
-
-    @DELETE("subscriptions/me")
-    suspend fun cancel(): ApiEnvelope<Unit>
-}
-
 interface AppUsageApi {
     @POST("monitoring/usage")
     suspend fun report(@Body body: AppUsageReportRequest): ApiEnvelope<Int>
@@ -400,15 +386,14 @@ interface AppUsageApi {
 }
 
 /**
- * 부모 요청 폴링/응답 (신규 제안 계약, GAP-11).
+ * 부모 요청 처리 결과 응답 (신규 제안 계약, GAP-11).
  *
- * WebSocket 이 끊겨 있는 동안의 백업 경로다. 서버가 아직 이 경로를 제공하지 않으면
- * 목 모드(FakeCommandRepository)로 동작하고, 실서버에서는 404 를 무시하고 폴링만 건너뛴다.
+ * 소켓이 꺼진 상태로 FCM 이 도착하면 `socket.ack` 이 no-op 이므로, 결과를 서버로
+ * 되돌릴 경로는 이 REST ack 뿐이다. 서버가 아직 제공하지 않으면 404 를 무시한다.
+ *
+ * 폴링(`GET .../commands/pending`)은 서버에 대응 경로가 없어 제거했다(2026-08-28).
  */
 interface CommandApi {
-    @GET("children/{childId}/commands/pending")
-    suspend fun pending(@Path("childId") childId: String): ApiEnvelope<List<RemoteCommandDto>>
-
     @POST("children/{childId}/commands/{requestId}/ack")
     suspend fun ack(
         @Path("childId") childId: String,
@@ -517,9 +502,6 @@ interface PaymentChargeApi {
         @Query("page") page: Int = 0,
         @Query("size") size: Int = 20
     ): ApiEnvelope<PageResponse<ChargePrepareResponse>>
-
-    @GET("payments/charges/{chargeId}")
-    suspend fun get(@Path("chargeId") chargeId: String): ApiEnvelope<ChargePrepareResponse>
 
     @POST("payments/charges/{chargeId}/cancel")
     suspend fun cancel(@Path("chargeId") chargeId: String, @Body body: ChargeCancelRequest): ApiEnvelope<Unit>

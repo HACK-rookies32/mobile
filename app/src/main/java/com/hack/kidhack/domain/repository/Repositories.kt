@@ -31,7 +31,6 @@ import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
-import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
@@ -190,8 +189,9 @@ interface PhotoRepository {
 /**
  * 부모 → 자녀 원격 요청 수신 채널.
  *
- * Firebase(FCM)를 쓰지 않으므로 실시간 경로는 WebSocket, 백업 경로는 주기 폴링이다.
- * [observe] 는 소켓 이벤트, [pending] 은 폴링에 쓴다.
+ * 수신 경로는 WebSocket([observe]) 과 FCM 두 가지다. 폴링 백업 경로는
+ * 서버에 대응 엔드포인트가 없어 걷어냈다(2026-08-28).
+ * [ack] 은 두 경로 모두에서 처리 결과를 서버로 되돌릴 때 쓴다.
  */
 interface CommandRepository {
     fun observe(): Flow<RemoteCommand>
@@ -199,14 +199,13 @@ interface CommandRepository {
     /**
      * 실시간 요청 채널(WebSocket)이 붙어 있는지.
      *
-     * 끊겨 있으면 부모 요청이 15분 폴링으로만 들어오므로 화면에 그대로 알려 준다.
+     * 끊겨 있으면 부모 요청이 FCM 으로만 들어오므로 화면에 그대로 알려 준다.
      */
     val connected: Flow<Boolean>
 
     /** 상주 소켓을 내린다. 자녀 세션이 끝날 때(로그아웃/역할 변경) 호출한다. */
     fun disconnect()
 
-    suspend fun pending(childId: String): List<RemoteCommand>
     suspend fun ack(childId: String, requestId: String, status: String, message: String? = null)
 }
 
@@ -274,12 +273,6 @@ interface PointRepository {
     suspend fun balance(): PointBalance
     suspend fun history(): List<PointHistory>
     suspend fun use(productId: Int, point: Int)
-}
-
-interface SubscriptionRepository {
-    suspend fun me(): Subscription?
-    suspend fun subscribe(planId: Int, method: String): Subscription
-    suspend fun cancel()
 }
 
 interface AppUsageRepository {

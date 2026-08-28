@@ -27,9 +27,7 @@ import com.hack.kidhack.data.remote.dto.PlaceResponse
 import com.hack.kidhack.data.remote.dto.PointBalanceDto
 import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
-import com.hack.kidhack.data.remote.dto.RemoteCommandDto
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
-import com.hack.kidhack.data.remote.dto.SubscriptionDto
 import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UserDto
@@ -64,12 +62,10 @@ import com.hack.kidhack.domain.model.PlaceType
 import com.hack.kidhack.domain.model.PointBalance
 import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
-import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
-import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.model.Wallet
@@ -271,19 +267,9 @@ fun PointBalanceDto.toDomain(): PointBalance = PointBalance(balance)
 
 fun PointHistoryDto.toDomain(): PointHistory = PointHistory(id, description, point, dateLabel)
 
-fun SubscriptionDto.toDomain(): Subscription = Subscription(planId, status, method)
-
 fun AppUsageStatDto.toDomain(): AppUsageStat = AppUsageStat(key, durationSec)
 
 fun PairingCodeDto.toDomain(): PairingCode = PairingCode(pairingCode, expiresIn)
-
-fun RemoteCommandDto.toDomain(): RemoteCommand = RemoteCommand(
-    requestId = requestId,
-    type = type.toRemoteCommandType(),
-    childId = childId,
-    requestedBy = requestedBy,
-    requestedAt = requestedAt,
-)
 
 /** 서버/소켓이 쓸 법한 이름들을 넉넉하게 받아 준다. 모르는 값은 UNKNOWN 으로 떨어뜨린다. */
 fun String?.toRemoteCommandType(): RemoteCommandType = when (this?.uppercase()) {

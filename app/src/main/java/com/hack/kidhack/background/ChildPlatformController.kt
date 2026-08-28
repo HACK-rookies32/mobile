@@ -2,7 +2,6 @@ package com.hack.kidhack.background
 
 import android.content.Context
 import com.hack.kidhack.background.capture.ScreenCaptureWorker
-import com.hack.kidhack.background.command.ChildCommandPollWorker
 import com.hack.kidhack.background.command.ChildCommandService
 import com.hack.kidhack.background.location.GpsStatusMonitor
 import com.hack.kidhack.background.location.LocationTrackingService
@@ -62,9 +61,8 @@ class ChildPlatformController(
         gpsStatusMonitor.start()
         AppUsageWorker.enqueuePeriodic(context)
         ScreenCaptureWorker.enqueuePeriodic(context)
-        // FCM 대체 경로: 상주 WebSocket(실시간) + 15분 폴링(백업)
+        // FCM 대체 경로: 상주 WebSocket
         ChildCommandService.start(context)
-        ChildCommandPollWorker.enqueuePeriodic(context)
         // 소켓이 없던 동안 쌓인 안전 사건(유해 차단 등)을 보호자 쪽으로 밀어 올린다.
         ChildAlertUploadWorker.enqueuePeriodic(context)
         ChildAlertUploadWorker.enqueueNow(context)
@@ -82,7 +80,6 @@ class ChildPlatformController(
         AppUsageWorker.cancel(context)
         ScreenCaptureWorker.cancel(context)
         ChildCommandService.stop(context)
-        ChildCommandPollWorker.cancel(context)
         ChildAlertUploadWorker.cancel(context)
     }
 }

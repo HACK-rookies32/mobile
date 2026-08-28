@@ -1,14 +1,17 @@
 # 자녀 앱 푸시 계약 (Firebase 미사용)
 
 GAP-11 「캡처 요청 202 푸시 페이로드 미정의」에 대한 **Android 측 제안 계약**이다.
-FCM 을 쓰지 않고 **상주 WebSocket(실시간) + REST 폴링(백업)** 으로 부모 → 자녀 요청을 전달한다.
+**상주 WebSocket(실시간)** 으로 부모 → 자녀 요청을 전달하고, 처리 결과는 REST ack 으로 회신한다.
+
+> **[2026-08-28] REST 폴링 백업 경로 제거.** 서버에 대응 엔드포인트가 없었고,
+> 백엔드가 FCM 사용을 결정하면서 존재 이유가 사라졌다. 자세한 내용은 2장.
 
 백엔드가 키 이름을 바꾸고 싶다면 아래 4개 파일만 고치면 된다.
 
 | 계약 | 파일 |
 |---|---|
 | WebSocket 프레임 | `data/ws/ChildCommandFrame.kt` |
-| REST DTO | `data/remote/dto/Dtos.kt` (`RemoteCommandDto`, `RemoteCommandAckRequest`) |
+| REST DTO | `data/remote/dto/Dtos.kt` (`RemoteCommandAckRequest`) |
 | REST 경로 | `data/remote/api/Apis.kt` (`CommandApi`, `PhotoApi`) |
 | 타입 문자열 매핑 | `data/repository/Mappers.kt` (`String.toRemoteCommandType`) |
 
@@ -44,18 +47,25 @@ FCM 을 쓰지 않고 **상주 WebSocket(실시간) + REST 폴링(백업)** 으�
 
 ---
 
-## 2. REST (백업 경로 · 신규)
+## 2. REST ack (신규)
 
-소켓이 끊겨 있던 동안 쌓인 요청을 15분마다 긁어온다.
-**아직 서버에 없어도 앱은 정상 동작한다** — 실패 시 빈 목록으로 처리하고 소켓 경로만 쓴다.
+> **[2026-08-28] 폴링 백업 경로 제거.** `GET /children/{childId}/commands/pending` 은
+> 서버에 대응 엔드포인트가 없고, 백엔드가 FCM 사용을 결정하면서 존재 이유가 사라져 걷어냈다.
+> 수신 경로는 **WebSocket(1장) + FCM** 두 가지다. 폴링 워커(`ChildCommandPollWorker`)와
+> 수신 DTO(`RemoteCommandDto`)도 함께 삭제했다.
+
+처리 결과만 REST 로 되돌린다. **아직 서버에 없어도 앱은 정상 동작한다** — 실패 시 무시한다.
 
 ```
-GET  /children/{childId}/commands/pending
-     → { "success": true, "data": [ { "requestId", "type", "childId", "requestedBy", "requestedAt" } ] }
-
 POST /children/{childId}/commands/{requestId}/ack
      body: { "status": "DONE", "message": null }
 ```
+
+`status`: `RECEIVED` | `DONE` | `DENIED` | `FAILED`
+
+소켓으로도 같은 ACK 프레임을 보내므로 서버는 **멱등 처리**해야 한다.
+다만 FCM 이 소켓 꺼진 상태로 도착하면 소켓 ACK 은 나가지 않으므로,
+**이 REST 경로가 유일한 회신 수단이 된다** — FCM 을 주 경로로 켤 때 함께 구현이 필요하다.
 
 ## 3. 루키즈페이 용돈 지갑 (신규 · GAP-05)
 

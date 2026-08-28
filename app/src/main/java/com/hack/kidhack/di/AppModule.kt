@@ -42,7 +42,6 @@ import com.hack.kidhack.data.remote.api.PhotoApi
 import com.hack.kidhack.data.remote.api.PaymentChargeApi
 import com.hack.kidhack.data.remote.api.PointApi
 import com.hack.kidhack.data.remote.api.ScreenshotApi
-import com.hack.kidhack.data.remote.api.SubscriptionApi
 import com.hack.kidhack.data.remote.api.UserApi
 import com.hack.kidhack.data.remote.api.WalletApi
 import com.hack.kidhack.data.remote.interceptor.AuthInterceptor
@@ -73,7 +72,6 @@ import com.hack.kidhack.data.repository.fake.FakePaymentRepository
 import com.hack.kidhack.data.repository.fake.FakePhotoRepository
 import com.hack.kidhack.data.repository.fake.FakePointRepository
 import com.hack.kidhack.data.repository.fake.FakeScreenshotRepository
-import com.hack.kidhack.data.repository.fake.FakeSubscriptionRepository
 import com.hack.kidhack.data.repository.fake.FakeUserRepository
 import com.hack.kidhack.data.repository.real.RealAllowanceRepository
 import com.hack.kidhack.data.repository.fake.FakeWalletRepository
@@ -99,7 +97,6 @@ import com.hack.kidhack.data.repository.real.RealPaymentRepository
 import com.hack.kidhack.data.repository.real.RealPhotoRepository
 import com.hack.kidhack.data.repository.real.RealPointRepository
 import com.hack.kidhack.data.repository.real.RealScreenshotRepository
-import com.hack.kidhack.data.repository.real.RealSubscriptionRepository
 import com.hack.kidhack.data.repository.real.RealUserRepository
 import com.hack.kidhack.data.repository.real.RealWalletRepository
 import com.hack.kidhack.data.ws.ChatWebSocketClient
@@ -131,7 +128,6 @@ import com.hack.kidhack.domain.repository.ScreenshotRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
 import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
-import com.hack.kidhack.domain.repository.SubscriptionRepository
 import com.hack.kidhack.domain.repository.UserRepository
 import com.hack.kidhack.domain.repository.WalletRepository
 import com.hack.kidhack.feature.auth.forgot.ForgotViewModel
@@ -151,7 +147,7 @@ import com.hack.kidhack.feature.parent.GeofenceViewModel
 import com.hack.kidhack.feature.parent.HarmfulViewModel
 import com.hack.kidhack.feature.parent.LocationViewModel
 import com.hack.kidhack.feature.parent.MypageViewModel
-import com.hack.kidhack.feature.parent.NoticeViewModel
+import com.hack.kidhack.feature.common.NoticeViewModel
 import com.hack.kidhack.feature.parent.NotificationsViewModel
 import com.hack.kidhack.feature.parent.PairingViewModel
 import com.hack.kidhack.feature.parent.ParentChatViewModel
@@ -251,7 +247,6 @@ val appModule = module {
     single { get<Retrofit>().create(ChatApi::class.java) }
     single { get<Retrofit>().create(PaymentApi::class.java) }
     single { get<Retrofit>().create(PointApi::class.java) }
-    single { get<Retrofit>().create(SubscriptionApi::class.java) }
     single { get<Retrofit>().create(AppUsageApi::class.java) }
     single { get<Retrofit>().create(AllowanceApi::class.java) }
     single { get<Retrofit>().create(CommandApi::class.java) }
@@ -308,9 +303,6 @@ val appModule = module {
     }
     single<PaymentRepository> { if (useMock) FakePaymentRepository() else RealPaymentRepository(get()) }
     single<PointRepository> { if (useMock) FakePointRepository() else RealPointRepository(get()) }
-    single<SubscriptionRepository> {
-        if (useMock) FakeSubscriptionRepository() else RealSubscriptionRepository(get())
-    }
     single<AppUsageRepository> { if (useMock) FakeAppUsageRepository(get()) else RealAppUsageRepository(get()) }
     single<AppControlRepository> {
         if (useMock) FakeAppControlRepository() else RealAppControlRepository(get())
@@ -344,7 +336,7 @@ val appModule = module {
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
     viewModel { ParentChatViewModel(get(), get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get(), get(), get()) }
-    viewModel { MypageViewModel(get(), get(), get(), get(), get()) }
+    viewModel { MypageViewModel(get(), get(), get(), get()) }
     viewModel { EditProfileViewModel(get()) }
     viewModel { AppControlViewModel(get(), get(), get()) }
     viewModel { ScreenshotViewModel(get(), get(), get()) }
