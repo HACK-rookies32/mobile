@@ -9,16 +9,8 @@ import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.local.BlocklistStore
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.data.local.HarmfulSettingsStore
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
 import com.hack.kidhack.data.local.PushTokenStore
 import com.hack.kidhack.data.local.ParentWatchStore
->>>>>>> 28ecca4 (알림 기능 수정 2차)
-=======
-import com.hack.kidhack.data.local.PushTokenStore
-import com.hack.kidhack.data.local.ParentWatchStore
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.data.local.ParentAlertStore
 import com.hack.kidhack.data.local.ChildPhotoStore
 import com.hack.kidhack.data.local.ProfileScopeStore
@@ -35,10 +27,6 @@ import com.hack.kidhack.data.remote.api.CardApi
 import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.ChildAlertApi
-<<<<<<< HEAD
-import com.hack.kidhack.data.remote.api.DeviceApi
-=======
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.DashboardApi
@@ -198,15 +186,6 @@ val appModule = module {
     single<SelectedChildRepository> { SelectedChildRepositoryImpl(androidContext()) }
     single<ChildOnboardingStore> { ChildOnboardingStoreImpl(androidContext()) }
     single { ChatMessageStore(androidContext()) }
-<<<<<<< HEAD
-<<<<<<< HEAD
-    single { ChildAlertStore(androidContext()) }
-    single { ParentAlertStore(androidContext()) }
-    single { HarmfulSettingsStore(androidContext()) }
-    single { BlocklistStore(androidContext()) }
-=======
-=======
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     single { ChildAlertStore(androidContext(), get()) }
     single { ParentAlertStore(androidContext(), get()) }
     single { HarmfulSettingsStore(androidContext()) }
@@ -215,10 +194,6 @@ val appModule = module {
     single { BlocklistStore(androidContext()) }
     single { MockNotificationFeed(androidContext()) }
     single { MockPhotoFeed(androidContext()) }
-<<<<<<< HEAD
->>>>>>> 28ecca4 (알림 기능 수정 2차)
-=======
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     single { ChildPhotoStore(androidContext()) }
     single { CapturedShotStore(androidContext()) }
     single { ProfileScopeStore(androidContext()) }
@@ -281,10 +256,6 @@ val appModule = module {
     single { get<Retrofit>().create(AllowanceApi::class.java) }
     single { get<Retrofit>().create(CommandApi::class.java) }
     single { get<Retrofit>().create(ChildAlertApi::class.java) }
-<<<<<<< HEAD
-    single { get<Retrofit>().create(DeviceApi::class.java) }
-=======
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     single { get<Retrofit>().create(PhotoApi::class.java) }
     single { get<Retrofit>().create(AppControlApi::class.java) }
     single { get<Retrofit>().create(InquiryApi::class.java) }
@@ -302,17 +273,6 @@ val appModule = module {
     single<UserRepository> { if (useMock) FakeUserRepository(get()) else RealUserRepository(get()) }
     single<PairingRepository> { if (useMock) FakePairingRepository() else RealPairingRepository(get()) }
     single<ChildRepository> { if (useMock) FakeChildRepository() else RealChildRepository(get()) }
-<<<<<<< HEAD
-    single<LocationRepository> { if (useMock) FakeLocationRepository(get()) else RealLocationRepository(get()) }
-    single<GeofenceRepository> { if (useMock) FakeGeofenceRepository() else RealGeofenceRepository(get()) }
-    single<NotificationRepository> {
-        if (useMock) FakeNotificationRepository(get()) else RealNotificationRepository(get())
-    }
-<<<<<<< HEAD
-    single<BlocklistRepository> { if (useMock) FakeBlocklistRepository(get()) else RealBlocklistRepository(get()) }
-=======
-    single<DeviceRepository> { if (useMock) FakeDeviceRepository() else RealDeviceRepository(get()) }
-=======
     single<LocationRepository> { if (useMock) FakeLocationRepository() else RealLocationRepository(get()) }
     single<DeviceRepository> { if (useMock) FakeDeviceRepository() else RealDeviceRepository(get()) }
     single<DashboardRepository> { if (useMock) FakeDashboardRepository(get(), get(), get()) else RealDashboardRepository(get()) }
@@ -323,15 +283,10 @@ val appModule = module {
     single<NotificationRepository> {
         if (useMock) FakeNotificationRepository(get()) else RealNotificationRepository(get())
     }
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     single<ChildAlertRepository> {
         if (useMock) FakeChildAlertRepository(get()) else RealChildAlertRepository(get())
     }
     single<BlocklistRepository> { if (useMock) FakeBlocklistRepository(get(), get()) else RealBlocklistRepository(get()) }
-<<<<<<< HEAD
->>>>>>> 28ecca4 (알림 기능 수정 2차)
-=======
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     single<ScreenshotRepository> {
         if (useMock) FakeScreenshotRepository(get(), get()) else RealScreenshotRepository(get())
     }
@@ -383,18 +338,11 @@ val appModule = module {
     viewModel { RegisterViewModel(get(), get(), get(), androidContext()) }
     viewModel { ForgotViewModel(get()) }
 
-<<<<<<< HEAD
-    viewModel { DashboardViewModel(get(), get(), get(), get(), get(), get()) }
-    viewModel { LocationViewModel(get(), get(), get()) }
-    viewModel { GeofenceViewModel(get(), get(), get(), get()) }
-    viewModel { ParentChatViewModel(get(), get(), get()) }
-=======
     viewModel { DashboardViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { AppUsageDetailViewModel(get(), get(), get()) }
     viewModel { LocationViewModel(get(), get(), get(), get(), get()) }
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
     viewModel { ParentChatViewModel(get(), get(), get(), get()) }
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     viewModel { NotificationsViewModel(get(), get(), get(), get()) }
     viewModel { MypageViewModel(get(), get(), get(), get(), get()) }
     viewModel { EditProfileViewModel(get()) }

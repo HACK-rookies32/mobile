@@ -19,13 +19,8 @@ import com.hack.kidhack.data.remote.api.InquiryApi
 import com.hack.kidhack.data.remote.api.DashboardApi
 import com.hack.kidhack.data.remote.api.DeviceApi
 import com.hack.kidhack.data.remote.api.LocationApi
-<<<<<<< HEAD
-import com.hack.kidhack.data.remote.api.ChildAlertApi
-import com.hack.kidhack.data.remote.api.DeviceApi
-=======
 import com.hack.kidhack.data.remote.api.LocationEventApi
 import com.hack.kidhack.data.remote.api.ChildAlertApi
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
 import com.hack.kidhack.data.remote.api.PhotoApi
@@ -130,10 +125,6 @@ import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.ChildAlertRepository
-<<<<<<< HEAD
-import com.hack.kidhack.domain.repository.DeviceRepository
-=======
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
@@ -267,10 +258,7 @@ class RealAuthRepository(
                 loginId = me.loginId.ifBlank { placeholder.loginId },
                 name = me.name.ifBlank { placeholder.name },
                 role = loginRole ?: meDto.role.toRoleOrNull() ?: preferredRole ?: Role.PARENT,
-<<<<<<< HEAD
-=======
                 parentId = me.parentId ?: placeholder.parentId,
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
             )
             Session(access, refresh, merged).also { sessionRepository.save(it) }
         } catch (t: Throwable) {
@@ -369,20 +357,6 @@ class RealPlaceRepository(private val api: PlaceApi) : PlaceRepository {
     }
 }
 
-<<<<<<< HEAD
-class RealDeviceRepository(private val api: DeviceApi) : DeviceRepository {
-    override suspend fun registerPushToken(token: String) {
-        api.registerPushToken(PushTokenRequest(token)).unwrapOrNull()
-    }
-
-    override suspend fun unregisterPushToken(token: String) {
-        api.unregisterPushToken(PushTokenRequest(token)).unwrapOrNull()
-    }
-}
-
-<<<<<<< HEAD
-=======
-=======
 class RealLocationEventRepository(private val api: LocationEventApi) : LocationEventRepository {
     override suspend fun events(childId: String): List<LocationEvent> =
         api.events(childId).unwrap().map { it.toDomain() }
@@ -397,7 +371,6 @@ class RealNotificationRepository(private val api: NotificationApi) : Notificatio
     }
 }
 
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 class RealChildAlertRepository(private val api: ChildAlertApi) : ChildAlertRepository {
     override suspend fun upload(childId: String, alerts: List<ChildAlertEvent>) {
         api.upload(childId, alerts.map { it.toDto() }).unwrapOrNull()
@@ -406,21 +379,6 @@ class RealChildAlertRepository(private val api: ChildAlertApi) : ChildAlertRepos
     override suspend fun list(childId: String): List<ChildAlertEvent> =
         api.list(childId).unwrap().map { it.toDomain() }
 }
-<<<<<<< HEAD
-
-class RealNotificationRepository(private val api: NotificationApi) : NotificationRepository {
-    override fun paged(type: String?, childId: String?): Flow<PagingData<AppNotification>> =
-        Pager(PagingConfig(pageSize = 20)) {
-            PageResponsePagingSource { page, size -> api.list(type, childId, page, size).unwrap() }
-        }.flow.map { paging -> paging.map { it.toDomain() } }
-
-    override suspend fun list(type: String?, childId: String?): List<AppNotification> =
-        api.list(type, childId, 0, 50).unwrap().content.map { it.toDomain() }
-}
-
->>>>>>> 28ecca4 (알림 기능 수정 2차)
-=======
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 /**
  * GAP-04: `GET /children/{childId}/blocklist` 가 문자열 배열만 주므로 응답에 itemId 가 없다.
  *

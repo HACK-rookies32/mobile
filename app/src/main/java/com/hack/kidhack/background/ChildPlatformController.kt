@@ -68,10 +68,6 @@ class ChildPlatformController(
         // 소켓이 없던 동안 쌓인 안전 사건(유해 차단 등)을 보호자 쪽으로 밀어 올린다.
         ChildAlertUploadWorker.enqueuePeriodic(context)
         ChildAlertUploadWorker.enqueueNow(context)
-<<<<<<< HEAD
-        scope.launch { runCatching { geofenceRegistrar.sync() } }
-=======
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     }
 
     private fun stop() {
@@ -88,9 +84,5 @@ class ChildPlatformController(
         ChildCommandService.stop(context)
         ChildCommandPollWorker.cancel(context)
         ChildAlertUploadWorker.cancel(context)
-<<<<<<< HEAD
-        geofenceRegistrar.clear()
-=======
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     }
 }

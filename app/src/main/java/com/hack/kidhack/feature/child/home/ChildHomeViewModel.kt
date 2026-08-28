@@ -154,11 +154,7 @@ class ChildHomeViewModel(
                     ),
                     alerts = (localAlerts + notifications.getOrDefault(emptyList()))
                         // 기기에 남긴 기록과 서버가 돌려준 같은 사건이 나란히 뜨지 않게 한다.
-<<<<<<< HEAD
-                        .distinctBy { it.title }
-=======
                         .distinctBy { it.message }
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
                         .take(MAX_ALERTS)
                         .map { alert -> alert.toRow() },
                     error = if (usage.usages.isEmpty() && notifications.isFailure) {

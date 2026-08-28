@@ -129,27 +129,10 @@ interface LocationEventRepository {
     suspend fun events(childId: String): List<LocationEvent>
 }
 
-/**
- * 기기 등록. 지금은 FCM 토큰뿐이다.
- *
- * 서버가 엔드포인트를 아직 안 만들었으면 실패를 삼킨다(호출자가 runCatching 으로 감싼다).
- */
-interface DeviceRepository {
-    suspend fun registerPushToken(token: String)
-    suspend fun unregisterPushToken(token: String)
-}
-
 interface NotificationRepository {
-<<<<<<< HEAD
-    fun paged(type: String?, childId: String? = null): Flow<PagingData<AppNotification>>
-
-    /** [childId] 를 주면 그 자녀의 알림만 요청한다. 서버가 무시하면 전체가 온다. */
-    suspend fun list(type: String?, childId: String? = null): List<AppNotification>
-=======
     /** 명세 4.5 GET /notifications/{recipientId} — page/size 없이 배열 그대로 반환. */
     suspend fun list(recipientId: String, childId: String? = null): List<AppNotification>
     suspend fun markRead(notificationId: String)
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 }
 
 /**

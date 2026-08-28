@@ -2,11 +2,8 @@ package com.hack.kidhack.data.local
 
 import com.hack.kidhack.core.common.KidhackJson
 import com.hack.kidhack.domain.model.AppNotification
-<<<<<<< HEAD
-=======
 import com.hack.kidhack.domain.model.body
 import com.hack.kidhack.domain.model.title
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.domain.repository.SessionRepository
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
@@ -68,12 +65,6 @@ class ParentAlertStore(
      */
     val alerts: StateFlow<List<AppNotification>> = _alerts.asStateFlow()
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    private val file = File(context.filesDir, "parent_alerts.json")
-=======
-=======
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     private val dir = context.filesDir
     private val legacyFile = File(dir, "parent_alerts.json")
 
@@ -83,10 +74,6 @@ class ParentAlertStore(
     @Volatile
     private var cachedFile: File = legacyFile
 
-<<<<<<< HEAD
->>>>>>> 28ecca4 (알림 기능 수정 2차)
-=======
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     private val mutex = Mutex()
     private val json = KidhackJson.instance
     private val serializer = ListSerializer(Entry.serializer())
@@ -223,12 +210,7 @@ class ParentAlertStore(
     private fun Entry.toDomain(): AppNotification = AppNotification(
         id = id,
         type = type,
-<<<<<<< HEAD
-        title = title,
-        body = body,
-=======
         message = listOf(title, body).filter { it.isNotBlank() }.joinToString("\n"),
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
         createdAt = createdAt.ifBlank { timeLabel(receivedAtMillis) },
         read = read,
         childId = childId,

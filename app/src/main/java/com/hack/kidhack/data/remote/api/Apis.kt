@@ -33,13 +33,8 @@ import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
 import com.hack.kidhack.data.remote.dto.FindIdResponse
-<<<<<<< HEAD
-import com.hack.kidhack.data.remote.dto.GeofenceDto
-import com.hack.kidhack.data.remote.dto.GpsStatusRequest
-=======
 import com.hack.kidhack.data.remote.dto.DashboardResponse
 import com.hack.kidhack.data.remote.dto.DeviceEventRequest
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.data.remote.dto.PushTokenRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
 import com.hack.kidhack.data.remote.dto.InquiryDto
@@ -180,25 +175,10 @@ interface LocationApi {
 
 }
 
-<<<<<<< HEAD
-/** FCM 토큰 등록·해제 (신규 제안 계약). */
-interface DeviceApi {
-    @POST("devices/push-token")
-    suspend fun registerPushToken(@Body body: PushTokenRequest): ApiEnvelope<Unit>
-
-    @HTTP(method = "DELETE", path = "devices/push-token", hasBody = true)
-    suspend fun unregisterPushToken(@Body body: PushTokenRequest): ApiEnvelope<Unit>
-}
-
-interface GeofenceApi {
-    @GET("children/{childId}/geofences")
-    suspend fun list(@Path("childId") childId: String): ApiEnvelope<List<GeofenceDto>>
-=======
 interface DeviceApi {
     /** 기기 전원/GPS 꺼짐 보고. type = "POWER_OFF" | "GPS_OFF" (명세 4.16). */
     @POST("device/event")
     suspend fun reportEvent(@Body body: DeviceEventRequest): ApiEnvelope<Unit>
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 
     /** FCM 토큰 등록·해제 (신규 제안 계약). */
     @POST("devices/push-token")
@@ -235,18 +215,9 @@ interface NotificationApi {
     /** 명세 4.5. childId는 서버가 지원하면 자녀별로 걸러 받는다. */
     @GET("notifications/{recipientId}")
     suspend fun list(
-<<<<<<< HEAD
-        @Query("type") type: String? = null,
-        /** 서버가 지원하면 자녀별로 걸러 받는다. null 이면 쿼리에서 빠지므로 기존 동작 그대로다. */
-        @Query("childId") childId: String? = null,
-        @Query("page") page: Int = 0,
-        @Query("size") size: Int = 20,
-    ): ApiEnvelope<PageResponse<NotificationDto>>
-=======
         @Path("recipientId") recipientId: String,
         @Query("childId") childId: String? = null,
     ): ApiEnvelope<List<NotificationDto>>
->>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 
     @PATCH("notifications/{notificationId}")
     suspend fun markRead(@Path("notificationId") notificationId: String): ApiEnvelope<Unit>
