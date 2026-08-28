@@ -100,8 +100,12 @@ class MockNotificationFeed(context: Context) {
                 AppNotification(
                     id = it.id,
                     type = it.type,
+<<<<<<< HEAD
                     title = it.title,
                     body = it.body,
+=======
+                    message = listOf(it.title, it.body).filter { s -> s.isNotBlank() }.joinToString("\n"),
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
                     createdAt = TIME_FORMAT.format(Date(it.atMillis)),
                     read = false,
                     childId = it.childId,

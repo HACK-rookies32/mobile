@@ -110,8 +110,8 @@ class ChildAlertStore(
                 AppNotification(
                     id = it.id,
                     type = it.type,
-                    title = it.title,
-                    body = it.body,
+                    // 내부 저장은 title/body 로 유지하되 도메인 모델은 message 단일 필드로 합친다.
+                    message = listOf(it.title, it.body).filter { s -> s.isNotBlank() }.joinToString("\n"),
                     createdAt = relativeLabel(it.atMillis),
                     read = false,
                 )

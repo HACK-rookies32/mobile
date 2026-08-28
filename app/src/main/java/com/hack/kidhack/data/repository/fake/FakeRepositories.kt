@@ -4,9 +4,11 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.hack.kidhack.data.local.CapturedShotStore
+import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.remote.PageResponse
 import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.paging.PageResponsePagingSource
+import com.hack.kidhack.data.ws.ChatWebSocketClient
 import com.hack.kidhack.domain.model.Allowance
 import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
@@ -17,17 +19,20 @@ import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.childAlertTypeToParent
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildPhoto
+import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryAnswer
+import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -55,15 +60,21 @@ import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
-import com.hack.kidhack.domain.repository.GeofenceRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
+import com.hack.kidhack.domain.repository.LocationEventRepository
+import com.hack.kidhack.domain.repository.DashboardRepository
+import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.ChildAlertRepository
+<<<<<<< HEAD
 import com.hack.kidhack.domain.repository.DeviceRepository
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
 import com.hack.kidhack.domain.repository.PhotoRepository
+import com.hack.kidhack.domain.repository.PlaceRepository
 import com.hack.kidhack.domain.repository.PointRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
 import com.hack.kidhack.domain.repository.SessionEvents
@@ -85,6 +96,8 @@ import java.util.Locale
 class FakeAuthRepository(
     private val sessionRepository: SessionRepository,
     private val sessionEvents: SessionEvents,
+    private val chatMessageStore: ChatMessageStore,
+    private val chatWebSocketClient: ChatWebSocketClient,
 ) : AuthRepository {
     override suspend fun signup(
         loginId: String,
@@ -101,7 +114,8 @@ class FakeAuthRepository(
     ): Session {
         delay(300)
         require(loginId.isNotBlank() && password.isNotBlank()) { "아이디와 비밀번호를 입력해 주세요" }
-        require(username.isNotBlank()) { "실명을 입력해 주세요" }
+        require(username.isNotBlank()) { "이름을 입력해 주세요" }
+        require(!nickname.isNullOrBlank()) { "닉네임을 입력해 주세요" }
         require(phoneNumber.isNotBlank()) { "휴대폰 번호를 입력해 주세요" }
         require(birthDate.matches(Regex("""\d{4}-\d{2}-\d{2}"""))) { "생년월일은 yyyy-MM-dd 형식이어야 해요" }
         if (role != Role.CHILD) {
@@ -110,15 +124,22 @@ class FakeAuthRepository(
         if (role == Role.CHILD) {
             require(parentId != null && parentId > 0) { "연결할 부모님 회원 번호를 입력해 주세요" }
         }
+        // 채팅 등 API가 member id를 Long으로 쓰므로 목업도 숫자 id를 쓴다.
+        val numericId = when (role) {
+            Role.CHILD -> if (loginId.equals("minjun", ignoreCase = true)) "101" else "102"
+            Role.PARENT -> "1"
+        }
         val user = User(
-            id = "user-$loginId",
+            id = numericId,
             loginId = loginId,
             name = username,
             role = role,
+            nickname = nickname,
             phone = phoneNumber,
             email = email,
             profileImageUrl = profileImageUrl,
-         )
+            parentId = parentId.takeIf { role == Role.CHILD },
+        )
 
         val session = FakeData.sessionFor(user)
         sessionRepository.save(session)
@@ -144,6 +165,8 @@ class FakeAuthRepository(
 
     override suspend fun logout() {
         sessionRepository.clear()
+        chatMessageStore.clear()
+        chatWebSocketClient.reset()
         sessionEvents.emitLogout()
     }
 
@@ -220,6 +243,7 @@ class FakeChildRepository : ChildRepository {
 
 class FakeLocationRepository(private val feed: MockNotificationFeed) : LocationRepository {
     private val historyMap = mutableMapOf<String, MutableList<LocationPoint>>()
+<<<<<<< HEAD
     override suspend fun current(childId: String): LocationPoint =
         FakeData.locationFor(childId)
     override suspend fun history(childId: String): List<LocationPoint> = historyMap[childId] ?: listOf(
@@ -236,25 +260,68 @@ class FakeLocationRepository(private val feed: MockNotificationFeed) : LocationR
             body = "위치를 확인할 수 없어요. 자녀에게 위치 서비스를 켜 달라고 알려 주세요.",
             childId = FakeData.loggedInChildProfileId,
         )
+=======
+    private val realtimeMap = mutableMapOf<String, Boolean>()
+
+    override suspend fun track(childId: String, latitude: String, longitude: String): LocationPoint {
+        val stamp = "2026-08-25T17:10:00"
+        val point = LocationPoint(
+            lat = latitude,
+            lng = longitude,
+            recordedAt = stamp,
+            segmentStart = "2026-08-25T17:05:00",
+            segmentEnd = stamp,
+            updatedAt = stamp,
+        )
+        historyMap.getOrPut(childId) { FakeData.locationSegments.toMutableList() }.add(0, point)
+        return point
+    }
+
+    override suspend fun history(childId: String): List<LocationPoint> =
+        historyMap[childId] ?: FakeData.locationSegments
+
+    override suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean {
+        realtimeMap[childId] = enabled
+        return enabled
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     }
 }
 
-class FakeGeofenceRepository : GeofenceRepository {
-    private val items = mutableListOf(
-        Geofence("g1", "학교", "37.5665", "126.9780", 200, true),
-        Geofence("g2", "집", "37.5410", "127.0270", 100, true),
+class FakeDeviceRepository : DeviceRepository {
+    override suspend fun reportEvent(childId: String, type: String) {}
+    override suspend fun registerPushToken(token: String) = Unit
+    override suspend fun unregisterPushToken(token: String) = Unit
+}
+
+class FakeDashboardRepository(
+    private val locationRepository: LocationRepository,
+    private val notificationRepository: NotificationRepository,
+    private val placeRepository: PlaceRepository,
+) : DashboardRepository {
+    override suspend fun get(childId: String): ChildDashboard = ChildDashboard(
+        childId = childId,
+        currentLocation = locationRepository.history(childId).firstOrNull(),
+        realtimeEnabled = false,
+        recentNotifications = notificationRepository.list(childId).take(3),
+        blockRulePatterns = emptyList(),
+        places = placeRepository.list(childId),
     )
+}
+
+class FakePlaceRepository : PlaceRepository {
+    private val items = FakeData.places.toMutableList()
     override suspend fun list(childId: String): List<Geofence> = items.toList()
-    override suspend fun create(childId: String, geofence: Geofence): Geofence {
-        val created = geofence.copy(id = "g-${items.size + 1}")
+    override suspend fun create(childId: String, place: Geofence): Geofence {
+        val created = place.copy(id = "${items.size + 1}")
         items.add(created)
         return created
     }
-    override suspend fun delete(childId: String, geofenceId: String) {
-        items.removeAll { it.id == geofenceId }
+    override suspend fun delete(childId: String, placeId: String) {
+        items.removeAll { it.id == placeId }
     }
 }
 
+<<<<<<< HEAD
 /**
  * 목업 자녀 사건 동기화.
  *
@@ -316,6 +383,43 @@ class FakeNotificationRepository(private val feed: MockNotificationFeed) : Notif
 }
 
 >>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
+class FakeLocationEventRepository : LocationEventRepository {
+    override suspend fun events(childId: String): List<LocationEvent> = FakeData.locationEvents
+}
+
+class FakeChildAlertRepository(private val feed: MockNotificationFeed) : ChildAlertRepository {
+    override suspend fun upload(childId: String, alerts: List<ChildAlertEvent>) {
+        alerts.forEach { alert ->
+            val parentType = childAlertTypeToParent(alert.type) ?: return@forEach
+            feed.add(
+                type = parentType,
+                title = alert.title,
+                body = alert.body.ifBlank { alert.title },
+                dedupeKey = alert.id,
+                childId = FakeData.loggedInChildProfileId,
+            )
+        }
+    }
+
+    override suspend fun list(childId: String): List<ChildAlertEvent> = emptyList()
+}
+
+class FakeNotificationRepository(private val feed: MockNotificationFeed) : NotificationRepository {
+    override suspend fun list(recipientId: String, childId: String?): List<AppNotification> =
+        (feed.all() + SAMPLES)
+            .filter { childId == null || it.childId == null || it.childId == childId }
+
+    override suspend fun markRead(notificationId: String) {}
+
+    private companion object {
+        val SAMPLES = listOf(
+            AppNotification("n1", "LOCATION", "민준이가 '학교' 구역을 벗어났습니다.", "14:20", false, FakeData.minjun.id),
+            AppNotification("n2", "HARMFUL", "지아의 부적절한 사이트 접속 시도가 차단되었습니다.", "12:05", true, FakeData.jia.id),
+        )
+    }
+}
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 /**
  * 목업 블랙/화이트리스트.
  *
@@ -326,13 +430,19 @@ class FakeNotificationRepository(private val feed: MockNotificationFeed) : Notif
  * `remove(itemId)` 가 엉뚱한 항목을 지운다. 실구현체도 같은 규칙을 쓴다.
  */
 <<<<<<< HEAD
+<<<<<<< HEAD
 class FakeBlocklistRepository(private val store: BlocklistStore) : BlocklistRepository {
 =======
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 class FakeBlocklistRepository(
     private val store: BlocklistStore,
     private val feed: MockNotificationFeed,
 ) : BlocklistRepository {
+<<<<<<< HEAD
 >>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     override suspend fun get(childId: String): List<BlocklistItem> =
         store.blacklist().map { BlocklistItem(it, "BLACK", it) } +
             store.whitelist().map { BlocklistItem(it, "WHITE", it) }
@@ -341,6 +451,7 @@ class FakeBlocklistRepository(
     }
     override suspend fun remove(childId: String, itemId: String) {
         store.remove(itemId)
+<<<<<<< HEAD
 <<<<<<< HEAD
     }
     override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) {}
@@ -360,6 +471,18 @@ class FakeBlocklistRepository(
         )
     }
 >>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
+    }
+    override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) {
+        feed.add(
+            type = "HARMFUL",
+            title = "유해 사이트 접속 차단",
+            body = matchedText + " 이(가) 포함된 사이트 접속 시도가 차단되었어요.",
+            dedupeKey = "HARMFUL-" + matchedText,
+            childId = FakeData.loggedInChildProfileId,
+        )
+    }
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 }
 
 class FakeScreenshotRepository(
@@ -368,8 +491,10 @@ class FakeScreenshotRepository(
 ) : ScreenshotRepository {
     override fun paged(childId: String): Flow<PagingData<Screenshot>> = Pager(PagingConfig(20)) {
         PageResponsePagingSource { page, size ->
-            val items = store.list()
-            PageResponse(items, page, size, items.size.toLong(), 1)
+            val all = store.list()
+            val totalPages = kotlin.math.ceil(all.size / size.toDouble()).toInt().coerceAtLeast(1)
+            val slice = all.drop(page * size).take(size)
+            PageResponse(slice, page, size, all.size.toLong(), totalPages)
         }
     }.flow
 
@@ -404,9 +529,13 @@ class FakeScreenshotRepository(
 
 class FakeCommunityRepository : CommunityRepository {
     private val items = FakeData.posts.toMutableList()
-    override fun pagedPosts(): Flow<PagingData<Post>> = Pager(PagingConfig(20)) {
+    override fun pagedPosts(keyword: String?): Flow<PagingData<Post>> = Pager(PagingConfig(20)) {
         PageResponsePagingSource { page, size ->
-            PageResponse(items.toList(), page, size, items.size.toLong(), 1)
+            val all = if (keyword.isNullOrBlank()) items.toList()
+                else items.filter { it.title.contains(keyword, ignoreCase = true) }
+            val totalPages = kotlin.math.ceil(all.size / size.toDouble()).toInt().coerceAtLeast(1)
+            val slice = all.drop(page * size).take(size)
+            PageResponse(slice, page, size, all.size.toLong(), totalPages)
         }
     }.flow
     override suspend fun posts() = items.toList()
@@ -511,7 +640,7 @@ class FakeWalletRepository : WalletRepository {
     override suspend fun getMyWallet(): Wallet = Wallet("w-parent", balance, "방금")
     override suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction> = listOf(
         WalletTransaction("tx1", "CHARGE", 50000, 50000, null, "08.15"),
-        WalletTransaction("tx2", "TRANSFER_OUT", -5000, 45000, "child-minjun", "08.20")
+        WalletTransaction("tx2", "TRANSFER_OUT", -5000, 45000, "101", "08.20")
     )
     override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult {
         balance -= amount
@@ -559,10 +688,33 @@ class FakeChatRepository(
     )
     private val incoming = MutableSharedFlow<ChatMessage>(extraBufferCapacity = 64)
 
+    override suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom {
+        return when (childId) {
+            102L -> ChatRoom(
+                id = "room-jia",
+                title = "이지아",
+                lastMessage = "아직 대화가 없어요",
+                lastAt = "",
+                online = false,
+                parentId = parentId,
+                childId = childId,
+            )
+            else -> ChatRoom(
+                id = "room-minjun",
+                title = "김민준",
+                lastMessage = "학원 끝나요",
+                lastAt = "14:32",
+                online = true,
+                parentId = parentId,
+                childId = childId,
+            )
+        }
+    }
+
     /** 방 제목은 보는 쪽 기준으로 바뀐다 — 부모는 자녀 이름을, 자녀는 보호자 이름을 본다. */
     override suspend fun rooms(): List<ChatRoom> = listOf(
-        ChatRoom("room-minjun", "김민준", "학원 끝나요", "14:32", true),
-        ChatRoom("room-jia", "이지아", "아직 대화가 없어요", "", false),
+        ChatRoom("room-minjun", "김민준", "학원 끝나요", "14:32", true, parentId = 1L, childId = 101L),
+        ChatRoom("room-jia", "이지아", "아직 대화가 없어요", "", false, parentId = 1L, childId = 102L),
     )
 
     override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> =
@@ -682,10 +834,24 @@ class FakeSubscriptionRepository : SubscriptionRepository {
 }
 
 class FakeAppUsageRepository(private val feed: MockNotificationFeed) : AppUsageRepository {
+<<<<<<< HEAD
     override suspend fun list(childId: String, groupBy: String): List<AppUsage> =
         FakeData.usagesFor(childId)
     override suspend fun report(childId: String, usages: List<AppUsage>) {
         // 한도는 자녀 앱의 ScreenTimeWatcher 와 같은 값을 쓴다(GAP-12: 서버에 한도 필드가 없다).
+=======
+    override suspend fun list(
+        childId: String,
+        groupBy: String,
+        from: String?,
+        to: String?,
+    ): List<AppUsageStat> = when (groupBy) {
+        "HOUR" -> FakeData.usagesByHour
+        "DAY" -> FakeData.usagesByDay
+        else -> FakeData.usages.map { AppUsageStat(it.appName, it.durationSec) }
+    }
+    override suspend fun report(childId: String, usages: List<AppUsage>) {
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
         val totalMinutes = usages.sumOf { it.durationSec } / 60
         if (totalMinutes < DAILY_LIMIT_MINUTES) return
         feed.addOncePerDay(
@@ -749,8 +915,8 @@ class FakeAppControlRepository : AppControlRepository {
  * Koin `single` 이라 한 프로세스 안에서 부모 계정과 자녀 계정이 **같은 지갑**을 본다.
  * 덕분에 서버 없이도 「부모로 로그인 → 용돈 보내기 → 자녀로 로그인 → QR 결제」가 그대로 재현된다.
  *
- * 목 데이터의 부모용 childId(`child-minjun`)와 자녀 세션의 userId(`user-child`)가 서로 달라서
- * childId 로 지갑을 나누면 두 역할이 다른 잔액을 보게 된다. 그래서 여기서는 **지갑 하나만** 쓴다.
+ * 목 데이터의 부모용 childId와 자녀 세션 userId를 동일하게 `101`로 맞춰
+ * 두 역할이 같은 용돈 지갑을 보게 한다.
  * 실서버 구현([RealAllowanceRepository])은 childId 별로 정상 분리된다.
  */
 class FakeAllowanceRepository : AllowanceRepository {

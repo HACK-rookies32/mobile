@@ -55,7 +55,12 @@ class ParentAlertSync(
         if (sessionRepository.current()?.user?.role != Role.PARENT) {
             return@withLock Result(emptyList())
         }
+<<<<<<< HEAD
         val remote = runCatching { notificationRepository.list(null) }
+=======
+        val recipientId = sessionRepository.current()?.user?.id ?: return@withLock Result(emptyList())
+        val remote = runCatching { notificationRepository.list(recipientId) }
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
         remote.getOrNull()?.let { list ->
             val fresh = store.merge(list)
             if (fresh.isNotEmpty()) {
@@ -82,12 +87,15 @@ class ParentAlertSync(
      *  (그 경우에도 보관함에는 남는다).
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     suspend fun emitLocal(type: String, title: String, body: String): Boolean {
         val id = "local-" + type + "-" + System.currentTimeMillis()
         val alert = store.record(id = id, type = type, title = title, body = body) ?: return false
         val settings = runCatching { userRepository.notificationSettings() }.getOrNull()
         val pushed = notifier.notifyAll(listOf(alert), settings)
 =======
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     suspend fun emitLocal(
         type: String,
         title: String,
@@ -124,7 +132,10 @@ class ParentAlertSync(
         val settings = runCatching { userRepository.notificationSettings() }.getOrNull()
         val pushed = notifier.notifyAll(listOf(alert), settings)
         store.markNotified(listOf(alert.id))
+<<<<<<< HEAD
 >>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
         refreshUnread()
         return pushed.isNotEmpty()
     }

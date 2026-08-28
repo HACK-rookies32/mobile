@@ -72,8 +72,11 @@ class NotificationsViewModel(
     fun load() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null, notice = null) }
+<<<<<<< HEAD
             // 알림 목록은 로컬 보관함이 원본이라 서버가 실패해도 비지 않는다.
             // 실패를 화면에 알리는 건 수신 설정 쪽뿐이다.
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
             val alerts = alertSync.sync().alerts
             runCatching { userRepository.notificationSettings() }
                 .onSuccess { s ->
@@ -82,8 +85,11 @@ class NotificationsViewModel(
                 .onFailure { t ->
                     _state.update { it.copy(loading = false, notifications = alerts, error = t.message) }
                 }
+<<<<<<< HEAD
             // 목록을 본 시점에 읽음 처리한다. 화면에 찍힌 미확인 점은 이번 조회 결과라
             // 그대로 남고, 대시보드의 「알림 N건」은 다음 새로고침에 0 이 된다.
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
             alertSync.markAllRead()
         }
     }
@@ -98,10 +104,13 @@ class NotificationsViewModel(
     fun sendTestAlert(label: String, type: String, title: String, body: String) {
         viewModelScope.launch {
 <<<<<<< HEAD
+<<<<<<< HEAD
             val pushed = alertSync.emitLocal(type, title, body)
 =======
             // 대시보드가 고른 자녀 기준으로 알림을 거르므로, 테스트 알림도 그 자녀 앞으로
             // 발생시켜야 「자녀를 바꾸면 목록이 바뀐다」를 확인할 수 있다.
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
             val child = runCatching {
                 val children = childRepository.children()
                 val id = selectedChildRepository.resolveId(children)
@@ -113,17 +122,24 @@ class NotificationsViewModel(
                 body = child?.let { it.name + " · " + body } ?: body,
                 childId = child?.id,
             )
+<<<<<<< HEAD
 >>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
             val alerts = alertSync.cached()
             _state.update {
                 it.copy(
                     notifications = alerts,
                     notice = if (pushed) {
 <<<<<<< HEAD
+<<<<<<< HEAD
                         label + " 알림을 보냈어요. 상단바를 확인해 주세요."
 =======
                         label + " 알림을 " + (child?.name ?: "전체") + " 앞으로 보냈어요. 상단바를 확인해 주세요."
 >>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
+                        label + " 알림을 " + (child?.name ?: "전체") + " 앞으로 보냈어요. 상단바를 확인해 주세요."
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
                     } else {
                         label + " 알림을 기록했어요. 수신 설정이나 알림 권한이 꺼져 있어 푸시는 뜨지 않았어요."
                     },
@@ -135,18 +151,18 @@ class NotificationsViewModel(
     fun patch(update: (NotificationSettings) -> NotificationSettings) {
         val oldSettings = _state.value.settings
         val next = update(oldSettings)
-        
+
         // Optimistic update
         _state.update { it.copy(settings = next) }
 
         viewModelScope.launch {
             runCatching { userRepository.patchNotificationSettings(next) }
-                .onSuccess { s -> 
-                    _state.update { it.copy(settings = s, error = null) } 
+                .onSuccess { s ->
+                    _state.update { it.copy(settings = s, error = null) }
                 }
-                .onFailure { t -> 
+                .onFailure { t ->
                     // Rollback on failure
-                    _state.update { it.copy(settings = oldSettings, error = t.message) } 
+                    _state.update { it.copy(settings = oldSettings, error = t.message) }
                 }
         }
     }
@@ -155,18 +171,19 @@ class NotificationsViewModel(
 @Composable
 fun ParentNotificationsScreen(
     onBack: (() -> Unit)? = null,
-    viewModel: NotificationsViewModel = koinViewModel()
+    viewModel: NotificationsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val s = state.settings
     val colors = LocalKidhackColors.current
     val context = LocalContext.current
 
+    // 알림 목록은 명세상 비페이징(배열 그대로) — 일반 스크롤 Column 으로 전부 렌더.
     ParentScreenScaffold(
         header = { ParentHeaderBar(stringResource(R.string.parent_notifications_title), onBack = onBack) },
     ) {
         ParentLoadingOrError(state.loading && state.notifications.isEmpty(), state.error, viewModel::load)
-        
+
         // 알림 설정 영역
         KidCard {
             Text(
@@ -213,7 +230,7 @@ fun ParentNotificationsScreen(
             fontWeight = FontBold,
             fontSize = 16.sp,
             color = colors.text,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
         )
 
         if (!state.loading && state.notifications.isEmpty()) {
@@ -222,54 +239,106 @@ fun ParentNotificationsScreen(
             }
         }
 
-        state.notifications.forEach { n ->
-            KidCard {
-                val icon = when (n.type) {
-                    "HARMFUL" -> "🚫" to colors.danger
-                    "ARRIVAL" -> "📍" to colors.safe
-                    "GPS_OFF" -> "📵" to colors.danger
-                    "LOCATION" -> "📍" to colors.info
-                    else -> "🔔" to colors.brand
-                }
-                Row(verticalAlignment = Alignment.Top) {
-                    Text(icon.first, fontSize = 20.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = n.title,
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontBold,
-                            fontSize = 14.sp,
-                            color = colors.text
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = n.body,
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontSemibold,
-                            fontSize = 13.sp,
-                            color = colors.muted
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = n.createdAt,
-                            fontSize = 11.sp,
-                            color = colors.muted.copy(alpha = 0.7f)
-                        )
-                    }
-                    if (!n.read) {
-                        Box(
-                            Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(colors.brand)
-                        )
-                    }
-                }
+        state.notifications.forEach { n -> NotificationCard(n) }
+
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun NotificationCard(n: AppNotification) {
+    val colors = LocalKidhackColors.current
+    KidCard {
+        // 명세 type enum 기준 아이콘 매핑.
+        val icon = when (n.type) {
+            "LOCATION_ENTER" -> "📍"
+            "LOCATION_ARRIVED" -> "🏫"
+            "LOCATION_EXIT" -> "🚶"
+            "DEVICE_POWER_OFF" -> "📵"
+            "HARMFUL_SITE" -> "🚫"
+            "PAYMENT_APPROVED" -> "💳"
+            "PAYMENT_CANCELED" -> "↩️"
+            else -> "🔔"
+        }
+        Row(verticalAlignment = Alignment.Top) {
+            Text(icon, fontSize = 20.sp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = n.message,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontSemibold,
+                    fontSize = 14.sp,
+                    color = colors.text,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = n.createdAt,
+                    fontSize = 11.sp,
+                    color = colors.muted.copy(alpha = 0.7f),
+                )
+            }
+            if (!n.read) {
+                Box(
+                    Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(colors.brand),
+                )
             }
         }
-        
-        Spacer(Modifier.height(16.dp))
+    }
+}
+
+/**
+ * 알림 종류별 테스트 샘플.
+ *
+ * [type] 은 서버가 내려 주는 값과 같은 문자열이라 아이콘 매핑과 수신 설정(알림 탭 토글)
+ * 필터를 그대로 탄다. 즉 버튼으로 띄운 알림은 실제 알림과 같은 경로를 지난다.
+ */
+private data class AlertSample(
+    val type: String,
+    val labelRes: Int,
+    val titleRes: Int,
+    val bodyRes: Int,
+)
+
+private val TestAlertSamples = listOf(
+    AlertSample("GPS_OFF", R.string.parent_notif_test_gps, R.string.parent_notif_test_gps_title, R.string.parent_notif_test_gps_body),
+    AlertSample("LOCATION", R.string.parent_notif_test_geofence, R.string.parent_notif_test_geofence_title, R.string.parent_notif_test_geofence_body),
+    AlertSample("HARMFUL", R.string.parent_notif_test_harmful, R.string.parent_notif_test_harmful_title, R.string.parent_notif_test_harmful_body),
+    AlertSample("APP_USAGE", R.string.parent_notif_test_usage, R.string.parent_notif_test_usage_title, R.string.parent_notif_test_usage_body),
+    AlertSample("NOTICE", R.string.parent_notif_test_notice, R.string.parent_notif_test_notice_title, R.string.parent_notif_test_notice_body),
+)
+
+@Composable
+private fun TestAlertCard(notice: String?, onSend: (AlertSample) -> Unit) {
+    val colors = LocalKidhackColors.current
+    KidCard {
+        Text(
+            stringResource(R.string.parent_notif_test_section),
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 14.sp,
+            color = colors.text,
+        )
+        Text(
+            stringResource(R.string.parent_notif_test_desc),
+            fontSize = 12.sp,
+            color = colors.muted,
+        )
+        TestAlertSamples.forEach { sample ->
+            KidButton(
+                text = stringResource(sample.labelRes),
+                onClick = { onSend(sample) },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                variant = KidButtonVariant.Secondary,
+            )
+        }
+        if (notice != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(notice, fontSize = 12.sp, color = colors.muted)
+        }
     }
 }
 

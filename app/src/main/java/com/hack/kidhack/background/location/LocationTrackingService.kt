@@ -17,20 +17,19 @@ import com.google.android.gms.location.Priority
 import com.hack.kidhack.R
 import com.hack.kidhack.background.ChildNotifications
 import com.hack.kidhack.core.permission.KidhackPermissions
-import com.hack.kidhack.domain.model.LocationPoint
+import com.hack.kidhack.domain.repository.LocationRepository
+import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
-import java.time.Instant
 
 class LocationTrackingService : Service() {
 
-    private val queue: LocationQueue by inject()
+    private val locationRepository: LocationRepository by inject()
+    private val sessionRepository: SessionRepository by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val client by lazy { LocationServices.getFusedLocationProviderClient(this) }
 
@@ -38,13 +37,11 @@ class LocationTrackingService : Service() {
         override fun onLocationResult(result: LocationResult) {
             val loc = result.lastLocation ?: return
             scope.launch {
-                queue.enqueue(
-                    LocationPoint(
-                        lat = loc.latitude.toString(),
-                        lng = loc.longitude.toString(),
-                        recordedAt = Instant.now().toString(),
-                    ),
-                )
+                val childId = sessionRepository.current()?.user?.id ?: return@launch
+                // 5분 세그먼트 묶음과 지오펜스/도착 판정은 서버가 한다. 여기선 좌표만 올린다.
+                runCatching {
+                    locationRepository.track(childId, loc.latitude.toString(), loc.longitude.toString())
+                }
             }
         }
     }
@@ -65,12 +62,6 @@ class LocationTrackingService : Service() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
         )
         startUpdates()
-        scope.launch {
-            while (isActive) {
-                delay(FIVE_MINUTES_MS)
-                LocationBatchWorker.enqueueNow(this@LocationTrackingService)
-            }
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
@@ -98,8 +89,6 @@ class LocationTrackingService : Service() {
     }
 
     companion object {
-        private const val FIVE_MINUTES_MS = 5 * 60 * 1000L
-
         fun start(context: Context) {
             ContextCompat.startForegroundService(
                 context,

@@ -4,9 +4,7 @@ import android.content.Context
 import com.hack.kidhack.background.capture.ScreenCaptureWorker
 import com.hack.kidhack.background.command.ChildCommandPollWorker
 import com.hack.kidhack.background.command.ChildCommandService
-import com.hack.kidhack.background.geofence.GeofenceRegistrar
 import com.hack.kidhack.background.location.GpsStatusMonitor
-import com.hack.kidhack.background.location.LocationBatchWorker
 import com.hack.kidhack.background.location.LocationTrackingService
 import com.hack.kidhack.background.usage.AppUsageWorker
 import com.hack.kidhack.core.permission.KidhackPermissions
@@ -31,7 +29,6 @@ class ChildPlatformController(
     private val sessionRepository: SessionRepository,
     private val onboardingStore: ChildOnboardingStore,
     private val gpsStatusMonitor: GpsStatusMonitor,
-    private val geofenceRegistrar: GeofenceRegistrar,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val reevaluateTick = MutableStateFlow(0)
@@ -62,8 +59,6 @@ class ChildPlatformController(
         if (running) return
         running = true
         LocationTrackingService.start(context)
-        LocationBatchWorker.enqueuePeriodic(context)
-        LocationBatchWorker.enqueueNow(context)
         gpsStatusMonitor.start()
         AppUsageWorker.enqueuePeriodic(context)
         ScreenCaptureWorker.enqueuePeriodic(context)
@@ -73,7 +68,10 @@ class ChildPlatformController(
         // 소켓이 없던 동안 쌓인 안전 사건(유해 차단 등)을 보호자 쪽으로 밀어 올린다.
         ChildAlertUploadWorker.enqueuePeriodic(context)
         ChildAlertUploadWorker.enqueueNow(context)
+<<<<<<< HEAD
         scope.launch { runCatching { geofenceRegistrar.sync() } }
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     }
 
     private fun stop() {
@@ -84,13 +82,15 @@ class ChildPlatformController(
         }
         running = false
         LocationTrackingService.stop(context)
-        LocationBatchWorker.cancel(context)
         gpsStatusMonitor.stop()
         AppUsageWorker.cancel(context)
         ScreenCaptureWorker.cancel(context)
         ChildCommandService.stop(context)
         ChildCommandPollWorker.cancel(context)
         ChildAlertUploadWorker.cancel(context)
+<<<<<<< HEAD
         geofenceRegistrar.clear()
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     }
 }

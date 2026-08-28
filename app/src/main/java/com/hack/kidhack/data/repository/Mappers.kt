@@ -4,7 +4,7 @@ import com.hack.kidhack.data.remote.dto.AllowanceDto
 import com.hack.kidhack.data.remote.dto.AllowanceEntryDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentDto
 import com.hack.kidhack.data.remote.dto.AppControlDto
-import com.hack.kidhack.data.remote.dto.AppUsageDto
+import com.hack.kidhack.data.remote.dto.AppUsageStatDto
 import com.hack.kidhack.data.remote.dto.CardDto
 import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
@@ -12,16 +12,22 @@ import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.CommentDto
-import com.hack.kidhack.data.remote.dto.GeofenceDto
 import com.hack.kidhack.data.remote.dto.InquiryAnswerDto
 import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
+<<<<<<< HEAD
 import com.hack.kidhack.data.remote.dto.LocationDto
+=======
+import com.hack.kidhack.data.remote.dto.LocationEventDto
+import com.hack.kidhack.data.remote.dto.LocationTrackResponse
+import com.hack.kidhack.data.remote.dto.DashboardResponse
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.data.remote.dto.ChildAlertDto
 import com.hack.kidhack.data.remote.dto.NotificationDto
 import com.hack.kidhack.data.remote.dto.NotificationSettingsDto
 import com.hack.kidhack.data.remote.dto.PairingCodeDto
 import com.hack.kidhack.data.remote.dto.PaymentDto
+import com.hack.kidhack.data.remote.dto.PlaceResponse
 import com.hack.kidhack.data.remote.dto.PointBalanceDto
 import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
@@ -38,8 +44,13 @@ import com.hack.kidhack.domain.model.AllowanceType
 import com.hack.kidhack.data.remote.dto.WalletDto
 import com.hack.kidhack.data.remote.dto.WalletTransactionDto
 import com.hack.kidhack.domain.model.AppNotification
+<<<<<<< HEAD
+=======
+import com.hack.kidhack.domain.model.ChildDashboard
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
@@ -50,10 +61,13 @@ import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryAnswer
+import com.hack.kidhack.domain.model.LocationEvent
+import com.hack.kidhack.domain.model.LocationEventType
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
 import com.hack.kidhack.domain.model.Payment
+import com.hack.kidhack.domain.model.PlaceType
 import com.hack.kidhack.domain.model.PointBalance
 import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
@@ -79,9 +93,14 @@ fun UserDto.toDomain(): User {
         loginId = resolvedLogin,
         name = resolvedName,
         role = role.toRoleOrNull() ?: Role.PARENT,
+<<<<<<< HEAD
+=======
+        nickname = nickname,
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
         phone = phoneNumber?.takeIf { it.isNotBlank() } ?: phone.orEmpty(),
         email = email,
         profileImageUrl = profileImageUrl,
+        parentId = parentId,
     )
 }
 
@@ -109,8 +128,13 @@ fun LoginResponse.toSession(user: User): Session = Session(
 
 fun ChildDto.toDomain(): ChildProfile = ChildProfile(
     id = id,
-    name = name,
-    alias = alias,
+    // Backend ChildSummaryResponse: username / nickname (no name/alias).
+    name = name?.takeIf { it.isNotBlank() }
+        ?: username?.takeIf { it.isNotBlank() }
+        ?: nickname?.takeIf { it.isNotBlank() }
+        ?: "자녀",
+    alias = alias?.takeIf { it.isNotBlank() }
+        ?: nickname?.takeIf { it.isNotBlank() },
     ageLabel = ageLabel,
     school = school,
     birthDate = birthDate,
@@ -119,24 +143,47 @@ fun ChildDto.toDomain(): ChildProfile = ChildProfile(
     online = online,
 )
 
-fun LocationDto.toDomain(): LocationPoint = LocationPoint(
-    lat = lat,
-    lng = lng,
-    recordedAt = recordedAt,
-    label = label,
+fun LocationTrackResponse.toDomain(): LocationPoint = LocationPoint(
+    lat = latitude,
+    lng = longitude,
+    recordedAt = updatedAt ?: segmentEnd ?: segmentStart.orEmpty(),
+    label = null,
+    segmentStart = segmentStart,
+    segmentEnd = segmentEnd,
+    updatedAt = updatedAt,
 )
 
-fun LocationPoint.toDto(): LocationDto = LocationDto(lat, lng, recordedAt, label)
-
-fun GeofenceDto.toDomain(): Geofence = Geofence(
-    id = id.orEmpty(),
+/** places 응답은 좌표가 숫자라 도메인 문자열로 옮긴다. */
+fun PlaceResponse.toDomain(): Geofence = Geofence(
+    id = id.toString(),
     name = name,
-    lat = lat,
-    lng = lng,
-    radius = radius,
-    notifyOnArrival = notifyOnArrival,
+    lat = latitude.toString(),
+    lng = longitude.toString(),
+    radius = radiusMeters.toInt(),
+    notifyOnArrival = true,
+    type = runCatching { PlaceType.valueOf(type) }.getOrDefault(PlaceType.GEOFENCE),
 )
 
+<<<<<<< HEAD
+=======
+fun LocationEventDto.toDomain(): LocationEvent = LocationEvent(
+    id = id.toString(),
+    placeId = placeId.toString(),
+    eventType = runCatching { LocationEventType.valueOf(eventType) }
+        .getOrDefault(LocationEventType.ENTER),
+    occurredAt = occurredAt,
+)
+
+fun DashboardResponse.toDomain(): ChildDashboard = ChildDashboard(
+    childId = childId.toString(),
+    currentLocation = currentLocation?.toDomain(),
+    realtimeEnabled = realtimeEnabled,
+    recentNotifications = recentNotifications.map { it.toDomain() },
+    blockRulePatterns = blockRules.map { it.pattern },
+    places = places.map { it.toDomain() },
+)
+
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 fun ChildAlertDto.toDomain(): ChildAlertEvent = ChildAlertEvent(id, type, title, body, occurredAt)
 
 fun ChildAlertEvent.toDto(): ChildAlertDto = ChildAlertDto(id, type, title, body, occurredAt)
@@ -144,8 +191,7 @@ fun ChildAlertEvent.toDto(): ChildAlertDto = ChildAlertDto(id, type, title, body
 fun NotificationDto.toDomain(): AppNotification = AppNotification(
     id = id,
     type = type,
-    title = title,
-    body = body,
+    message = message,
     createdAt = createdAt,
     read = read,
     childId = childId?.takeIf { it.isNotBlank() },
@@ -193,14 +239,17 @@ fun CommentDto.toDomain(): Comment = Comment(
     createdAt = createdAt
 )
 
-fun ChatRoomDto.toDomain(): ChatRoom = ChatRoom(
+fun ChatRoomDto.toDomain(titleOverride: String? = null): ChatRoom = ChatRoom(
     id = id,
-    title = title,
+    title = titleOverride?.takeIf { it.isNotBlank() } ?: title.ifBlank { "채팅" },
     lastMessage = lastMessage,
     lastAt = lastAt,
     online = online,
+    parentId = parentId,
+    childId = childId,
 )
 
+<<<<<<< HEAD
 fun ChatMessageDto.toDomain(): ChatMessage = ChatMessage(
     id = id,
     roomId = roomId,
@@ -208,6 +257,30 @@ fun ChatMessageDto.toDomain(): ChatMessage = ChatMessage(
     text = text,
     sentAt = sentAt,
 )
+=======
+fun ChatMessageDto.toDomain(myUserId: Long? = null, myRole: Role = Role.PARENT): ChatMessage {
+    val resolvedText = content?.takeIf { it.isNotBlank() } ?: text
+    val role = when {
+        fromRole.isNotBlank() -> fromRole.toRoleOrNull() ?: Role.PARENT
+        myUserId != null && senderId != null ->
+            if (senderId == myUserId) {
+                myRole
+            } else if (myRole == Role.PARENT) {
+                Role.CHILD
+            } else {
+                Role.PARENT
+            }
+        else -> Role.PARENT
+    }
+    return ChatMessage(
+        id = id,
+        roomId = roomId,
+        fromRole = role,
+        text = resolvedText,
+        sentAt = sentAt,
+    )
+}
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 
 fun PaymentDto.toDomain(): Payment = Payment(
     id = id,
@@ -223,7 +296,7 @@ fun PointHistoryDto.toDomain(): PointHistory = PointHistory(id, description, poi
 
 fun SubscriptionDto.toDomain(): Subscription = Subscription(planId, status, method)
 
-fun AppUsageDto.toDomain(): AppUsage = AppUsage(appName, durationSec, category)
+fun AppUsageStatDto.toDomain(): AppUsageStat = AppUsageStat(key, durationSec)
 
 fun PairingCodeDto.toDomain(): PairingCode = PairingCode(pairingCode, expiresIn)
 

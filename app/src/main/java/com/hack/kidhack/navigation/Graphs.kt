@@ -41,6 +41,7 @@ import com.hack.kidhack.feature.child.onboarding.ChildStartRoute
 import com.hack.kidhack.feature.child.screenshot.ChildScreenshotScreen
 import com.hack.kidhack.feature.child.services.ChildServicesScreen
 import com.hack.kidhack.feature.parent.ParentAppControlScreen
+import com.hack.kidhack.feature.parent.ParentAppUsageDetailScreen
 import com.hack.kidhack.feature.parent.ParentCardsScreen
 import com.hack.kidhack.feature.parent.ParentChatScreen
 import com.hack.kidhack.feature.parent.ParentChildProfileScreen
@@ -88,7 +89,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
         parentTab(Route.ParentDashboard.path, navController) {
             ParentDashboardScreen(
                 onOpenNotifications = { navController.navigate(Route.ParentNotifications.path) },
-                onOpenAppControl = { navController.navigate(Route.ParentAppControl.path) },
+                onOpenUsageDetail = { navController.navigate(Route.ParentAppUsageDetail.path) },
                 onOpenPairing = { navController.navigate(Route.ParentPairing.path) },
                 onOpenProfile = { navController.navigate(Route.ParentChildProfile.path) },
             )
@@ -169,6 +170,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
         }
         composable(Route.ParentCards.path) { ParentShell(navController) { ParentCardsScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentGeofence.path) { ParentShell(navController) { ParentGeofenceScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentAppUsageDetail.path) { ParentShell(navController) { ParentAppUsageDetailScreen(onBack = { navController.popBackStack() }) } }
     }
 }
 

@@ -7,6 +7,7 @@ import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.Card
@@ -14,9 +15,11 @@ import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildPhoto
+import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
+import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -91,16 +94,39 @@ interface ChildRepository {
 }
 
 interface LocationRepository {
-    suspend fun current(childId: String): LocationPoint
+    /** 자녀 앱에서 좌표 업로드. 저장된 세그먼트/포인트를 돌려준다. */
+    suspend fun track(childId: String, latitude: String, longitude: String): LocationPoint
+
+    /** 동선 세그먼트 최신순. 실시간 ON이면 첫 항목이 현재 위치. */
     suspend fun history(childId: String): List<LocationPoint>
-    suspend fun uploadBatch(points: List<LocationPoint>)
-    suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String)
+
+    /** 실시간 추적 토글. 서버가 확정한 상태를 돌려준다. */
+    suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean
 }
 
-interface GeofenceRepository {
+interface DeviceRepository {
+    /** 기기 전원/GPS 꺼짐 보고. type = "POWER_OFF" | "GPS_OFF" */
+    suspend fun reportEvent(childId: String, type: String)
+
+    /** FCM 토큰 등록·해제. 서버가 아직 없으면 호출자가 runCatching으로 삼킨다. */
+    suspend fun registerPushToken(token: String)
+    suspend fun unregisterPushToken(token: String)
+}
+
+interface DashboardRepository {
+    suspend fun get(childId: String): ChildDashboard
+}
+
+interface PlaceRepository {
     suspend fun list(childId: String): List<Geofence>
-    suspend fun create(childId: String, geofence: Geofence): Geofence
-    suspend fun delete(childId: String, geofenceId: String)
+    suspend fun create(childId: String, place: Geofence): Geofence
+
+    /** 백엔드에 신설 요청한 DELETE /location/places/{placeId} 선반영. */
+    suspend fun delete(childId: String, placeId: String)
+}
+
+interface LocationEventRepository {
+    suspend fun events(childId: String): List<LocationEvent>
 }
 
 /**
@@ -114,10 +140,16 @@ interface DeviceRepository {
 }
 
 interface NotificationRepository {
+<<<<<<< HEAD
     fun paged(type: String?, childId: String? = null): Flow<PagingData<AppNotification>>
 
     /** [childId] 를 주면 그 자녀의 알림만 요청한다. 서버가 무시하면 전체가 온다. */
     suspend fun list(type: String?, childId: String? = null): List<AppNotification>
+=======
+    /** 명세 4.5 GET /notifications/{recipientId} — page/size 없이 배열 그대로 반환. */
+    suspend fun list(recipientId: String, childId: String? = null): List<AppNotification>
+    suspend fun markRead(notificationId: String)
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 }
 
 /**
@@ -196,7 +228,7 @@ interface CommandRepository {
 }
 
 interface CommunityRepository {
-    fun pagedPosts(): Flow<PagingData<Post>>
+    fun pagedPosts(keyword: String? = null): Flow<PagingData<Post>>
     suspend fun posts(): List<Post>
     suspend fun post(postId: String): Post
     suspend fun create(
@@ -241,6 +273,8 @@ interface CardRepository {
 }
 
 interface ChatRepository {
+    /** 부모–자녀 1:1 방. 없으면 서버가 생성한다. */
+    suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom
     suspend fun rooms(): List<ChatRoom>
     suspend fun messages(roomId: String, before: String? = null, size: Int = 30): List<ChatMessage>
     fun observeMessages(roomId: String): Flow<ChatMessage>
@@ -266,7 +300,12 @@ interface SubscriptionRepository {
 }
 
 interface AppUsageRepository {
-    suspend fun list(childId: String, groupBy: String): List<AppUsage>
+    suspend fun list(
+        childId: String,
+        groupBy: String = "DAY",
+        from: String? = null,
+        to: String? = null,
+    ): List<AppUsageStat>
     suspend fun report(childId: String, usages: List<AppUsage>)
 }
 

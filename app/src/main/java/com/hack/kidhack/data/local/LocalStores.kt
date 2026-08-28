@@ -38,6 +38,9 @@ private object Keys {
     val role = stringPreferencesKey("role")
     val phone = stringPreferencesKey("phone")
     val email = stringPreferencesKey("email")
+    val nickname = stringPreferencesKey("nickname")
+    val profileImageUrl = stringPreferencesKey("profile_image_url")
+    val parentId = stringPreferencesKey("parent_id")
     val childId = stringPreferencesKey("child_id")
     val childOnboardingDone = booleanPreferencesKey("childOnboardingDone")
 }
@@ -87,6 +90,21 @@ class SessionRepositoryImpl(
             prefs[Keys.role] = session.user.role.name
             prefs[Keys.phone] = session.user.phone
             if (session.user.email != null) prefs[Keys.email] = session.user.email else prefs.remove(Keys.email)
+            if (session.user.nickname != null) {
+                prefs[Keys.nickname] = session.user.nickname
+            } else {
+                prefs.remove(Keys.nickname)
+            }
+            if (session.user.profileImageUrl != null) {
+                prefs[Keys.profileImageUrl] = session.user.profileImageUrl
+            } else {
+                prefs.remove(Keys.profileImageUrl)
+            }
+            if (session.user.parentId != null) {
+                prefs[Keys.parentId] = session.user.parentId.toString()
+            } else {
+                prefs.remove(Keys.parentId)
+            }
         }
     }
 
@@ -127,8 +145,11 @@ class SessionRepositoryImpl(
                 loginId = this[Keys.loginId].orEmpty(),
                 name = this[Keys.name].orEmpty(),
                 role = role,
+                nickname = this[Keys.nickname],
                 phone = this[Keys.phone].orEmpty(),
                 email = this[Keys.email],
+                profileImageUrl = this[Keys.profileImageUrl],
+                parentId = this[Keys.parentId]?.toLongOrNull(),
             ),
         )
     }

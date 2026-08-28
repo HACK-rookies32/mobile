@@ -8,11 +8,13 @@ import com.hack.kidhack.background.usage.AppUsageCollector
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.data.repository.fake.FakeCommandRepository
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
+import com.hack.kidhack.domain.repository.PlaceRepository
 import com.hack.kidhack.domain.repository.SessionRepository
 import com.hack.kidhack.domain.repository.childId
 import com.hack.kidhack.feature.child.formatDurationSec
@@ -29,6 +31,9 @@ data class ChildServicesUiState(
     val locationUpdatedAt: String = "",
     val locationGranted: Boolean = false,
     val gpsEnabled: Boolean = false,
+    val currentLat: Double? = null,
+    val currentLng: Double? = null,
+    val places: List<Geofence> = emptyList(),
     val harmfulBlockEnabled: Boolean = false,
     val usageAccessGranted: Boolean = false,
     val usages: List<AppUsage> = emptyList(),
@@ -51,6 +56,7 @@ data class ChildServicesUiState(
 class ChildServicesViewModel(
     private val sessionRepository: SessionRepository,
     private val locationRepository: LocationRepository,
+    private val placeRepository: PlaceRepository,
     private val usageCollector: AppUsageCollector,
     private val notificationRepository: NotificationRepository,
     private val commandRepository: CommandRepository,
@@ -77,9 +83,14 @@ class ChildServicesViewModel(
             val childId = sessionRepository.childId()
 
             val device = deviceStatus.snapshot()
-            val location = runCatching { locationRepository.current(childId) }
+            // 동선은 최신순이라 첫 항목이 마지막으로 확인된 위치다.
+            val location = runCatching { locationRepository.history(childId).firstOrNull() }
             val usage = usageCollector.todayUsage()
-            val notifications = runCatching { notificationRepository.list(null) }
+            val notifications = runCatching { notificationRepository.list(childId) }
+            // 현재 위치 좌표(문자열 → Double). 장소 조회는 실패해도 위치 표시엔 지장 없다.
+            val currentLat = location.getOrNull()?.lat?.toDoubleOrNull()
+            val currentLng = location.getOrNull()?.lng?.toDoubleOrNull()
+            val places = runCatching { placeRepository.list(childId) }.getOrDefault(emptyList())
 
             val resolved = usage.usages
             // 이 기기에서 오늘 실제로 막은 횟수. 서버 알림은 도착이 늦거나 없을 수 있다.
@@ -100,6 +111,9 @@ class ChildServicesViewModel(
                     locationUpdatedAt = location.getOrNull()?.recordedAt?.let(::formatTimeLabel).orEmpty(),
                     locationGranted = device.locationGranted,
                     gpsEnabled = device.gpsEnabled,
+                    currentLat = currentLat,
+                    currentLng = currentLng,
+                    places = places,
                     harmfulBlockEnabled = device.harmfulBlockEnabled,
                     usageAccessGranted = device.usageAccessGranted,
                     usages = resolved,

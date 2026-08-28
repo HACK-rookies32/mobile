@@ -17,6 +17,8 @@ data class User(
     val phone: String = "",
     val email: String? = null,
     val profileImageUrl: String? = null,
+    /** 자녀 계정만. 연결된 부모 member id. */
+    val parentId: Long? = null,
 )
 
 data class ChildProfile(
@@ -36,9 +38,13 @@ data class LocationPoint(
     val lng: String,
     val recordedAt: String,
     val label: String? = null,
+    val segmentStart: String? = null,
+    val segmentEnd: String? = null,
+    val updatedAt: String? = null,
 )
 
-fun LocationPoint.toDto(): com.hack.kidhack.data.remote.dto.LocationDto = com.hack.kidhack.data.remote.dto.LocationDto(lat, lng, recordedAt, label)
+/** 지오펜스(진입/이탈) / 목적지(도착) 구분. */
+enum class PlaceType { GEOFENCE, DESTINATION }
 
 data class Geofence(
     val id: String,
@@ -47,13 +53,22 @@ data class Geofence(
     val lng: String,
     val radius: Int,
     val notifyOnArrival: Boolean,
+    val type: PlaceType = PlaceType.GEOFENCE,
+)
+
+enum class LocationEventType { ENTER, EXIT, ARRIVED }
+
+data class LocationEvent(
+    val id: String,
+    val placeId: String,
+    val eventType: LocationEventType,
+    val occurredAt: String,
 )
 
 data class AppNotification(
     val id: String,
     val type: String,
-    val title: String,
-    val body: String,
+    val message: String,
     val createdAt: String,
     val read: Boolean,
     /**
@@ -64,6 +79,26 @@ data class AppNotification(
      * 그런 알림은 숨기지 않고 모든 자녀에게 공통으로 보여 준다 — 감춰서 놓치는 것보다 낫다.
      */
     val childId: String? = null,
+<<<<<<< HEAD
+=======
+)
+
+/** ingyu 알림 경로가 쓰던 title/body. 서버 계약의 message를 첫 줄/나머지로 나눈다. */
+val AppNotification.title: String
+    get() = message.substringBefore('\n').ifBlank { message }
+
+val AppNotification.body: String
+    get() = message.substringAfter('\n', missingDelimiterValue = "")
+
+/** GET /children/{childId}/dashboard 통합 조회 결과. */
+data class ChildDashboard(
+    val childId: String,
+    val currentLocation: LocationPoint?,
+    val realtimeEnabled: Boolean,
+    val recentNotifications: List<AppNotification>,
+    val blockRulePatterns: List<String>,
+    val places: List<Geofence>,
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 )
 
 data class NotificationSettings(
@@ -131,6 +166,9 @@ data class ChatRoom(
     val lastMessage: String,
     val lastAt: String,
     val online: Boolean,
+    /** 서버 방 소유자. 계정 전환 시 잘못된 room 재사용 방지용. */
+    val parentId: Long? = null,
+    val childId: Long? = null,
 )
 
 data class ChatMessage(
@@ -172,6 +210,16 @@ data class AppUsage(
     val category: String? = null,
 )
 
+<<<<<<< HEAD
+=======
+/** 서버 GET /monitoring/usage 집계 결과. groupBy에 따라 key의 의미가 달라진다
+ *  (APP=앱 이름, HOUR="00"~"23", DAY="yyyy-MM-dd"). */
+data class AppUsageStat(
+    val key: String,
+    val durationSec: Int,
+)
+
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 /**
  * 자녀 기기에서 감지된 안전 사건.
  *

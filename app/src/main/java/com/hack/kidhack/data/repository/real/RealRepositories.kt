@@ -4,6 +4,7 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.remote.api.AllowanceApi
 import com.hack.kidhack.data.remote.api.AppControlApi
 import com.hack.kidhack.data.remote.api.AppUsageApi
@@ -14,14 +15,21 @@ import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
-import com.hack.kidhack.data.remote.api.GeofenceApi
 import com.hack.kidhack.data.remote.api.InquiryApi
+import com.hack.kidhack.data.remote.api.DashboardApi
+import com.hack.kidhack.data.remote.api.DeviceApi
 import com.hack.kidhack.data.remote.api.LocationApi
+<<<<<<< HEAD
 import com.hack.kidhack.data.remote.api.ChildAlertApi
 import com.hack.kidhack.data.remote.api.DeviceApi
+=======
+import com.hack.kidhack.data.remote.api.LocationEventApi
+import com.hack.kidhack.data.remote.api.ChildAlertApi
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
 import com.hack.kidhack.data.remote.api.PhotoApi
+import com.hack.kidhack.data.remote.api.PlaceApi
 import com.hack.kidhack.data.remote.api.PaymentApi
 import com.hack.kidhack.data.remote.api.PaymentChargeApi
 import com.hack.kidhack.data.remote.api.PointApi
@@ -32,7 +40,7 @@ import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
 import com.hack.kidhack.data.remote.api.WalletApi
 import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
-import com.hack.kidhack.data.remote.dto.AppUsageDto
+import com.hack.kidhack.data.remote.dto.AppUsageReportItemDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.CardRegisterRequest
@@ -43,15 +51,17 @@ import com.hack.kidhack.data.remote.dto.ChargePrepareRequest
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
+import com.hack.kidhack.data.remote.dto.CreateChatRoomRequest
 import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdRequest
-import com.hack.kidhack.data.remote.dto.GeofenceDto
-import com.hack.kidhack.data.remote.dto.GpsStatusRequest
+import com.hack.kidhack.data.remote.dto.DeviceEventRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
+import com.hack.kidhack.data.remote.dto.LocationTrackRequest
 import com.hack.kidhack.data.remote.dto.LoginRequest
 import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.PairingConnectRequest
+import com.hack.kidhack.data.remote.dto.PlaceRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
 import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
@@ -77,14 +87,17 @@ import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
+import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -111,15 +124,21 @@ import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
-import com.hack.kidhack.domain.repository.GeofenceRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
+import com.hack.kidhack.domain.repository.LocationEventRepository
+import com.hack.kidhack.domain.repository.DashboardRepository
+import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.ChildAlertRepository
+<<<<<<< HEAD
 import com.hack.kidhack.domain.repository.DeviceRepository
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
 import com.hack.kidhack.domain.repository.PhotoRepository
+import com.hack.kidhack.domain.repository.PlaceRepository
 import com.hack.kidhack.domain.repository.PointRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
 import com.hack.kidhack.domain.repository.SessionEvents
@@ -147,6 +166,8 @@ class RealAuthRepository(
     private val userApi: UserApi,
     private val sessionRepository: SessionRepository,
     private val sessionEvents: SessionEvents,
+    private val chatMessageStore: ChatMessageStore,
+    private val chatWebSocketClient: ChatWebSocketClient,
 ) : AuthRepository {
     override suspend fun signup(
         loginId: String,
@@ -198,6 +219,8 @@ class RealAuthRepository(
     override suspend fun logout() {
         runCatching { api.logout() }
         sessionRepository.clear()
+        chatMessageStore.clear()
+        chatWebSocketClient.reset()
         sessionEvents.emitLogout()
     }
 
@@ -232,6 +255,7 @@ class RealAuthRepository(
             phone = fromUser?.phone.orEmpty(),
             email = fromUser?.email,
             profileImageUrl = fromUser?.profileImageUrl,
+            parentId = fromUser?.parentId,
         )
         sessionRepository.save(Session(access, refresh, placeholder))
         return try {
@@ -243,6 +267,10 @@ class RealAuthRepository(
                 loginId = me.loginId.ifBlank { placeholder.loginId },
                 name = me.name.ifBlank { placeholder.name },
                 role = loginRole ?: meDto.role.toRoleOrNull() ?: preferredRole ?: Role.PARENT,
+<<<<<<< HEAD
+=======
+                parentId = me.parentId ?: placeholder.parentId,
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
             )
             Session(access, refresh, merged).also { sessionRepository.save(it) }
         } catch (t: Throwable) {
@@ -296,29 +324,52 @@ class RealChildRepository(private val api: ChildApi) : ChildRepository {
 }
 
 class RealLocationRepository(private val api: LocationApi) : LocationRepository {
-    override suspend fun current(childId: String): LocationPoint = api.current(childId).unwrap().toDomain()
+    override suspend fun track(childId: String, latitude: String, longitude: String): LocationPoint =
+        api.track(LocationTrackRequest(childId.toServerId(), latitude, longitude)).unwrap().toDomain()
     override suspend fun history(childId: String): List<LocationPoint> =
         api.history(childId).unwrap().map { it.toDomain() }
-    override suspend fun uploadBatch(points: List<LocationPoint>) {
-        api.batch(points.map { it.toDto() }).unwrapOrNull()
+    override suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean =
+        api.toggleRealtime(childId, enabled).unwrap().realtimeEnabled
+}
+
+class RealDeviceRepository(private val api: DeviceApi) : DeviceRepository {
+    override suspend fun reportEvent(childId: String, type: String) {
+        api.reportEvent(DeviceEventRequest(childId.toServerId(), type)).unwrapOrNull()
     }
-    override suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String) {
-        api.gpsStatus(GpsStatusRequest(gpsEnabled, reportedAt)).unwrapOrNull()
+
+    override suspend fun registerPushToken(token: String) {
+        api.registerPushToken(PushTokenRequest(token)).unwrapOrNull()
+    }
+
+    override suspend fun unregisterPushToken(token: String) {
+        api.unregisterPushToken(PushTokenRequest(token)).unwrapOrNull()
     }
 }
 
-class RealGeofenceRepository(private val api: GeofenceApi) : GeofenceRepository {
+class RealDashboardRepository(private val api: DashboardApi) : DashboardRepository {
+    override suspend fun get(childId: String): ChildDashboard =
+        api.get(childId).unwrap().toDomain()
+}
+
+class RealPlaceRepository(private val api: PlaceApi) : PlaceRepository {
     override suspend fun list(childId: String): List<Geofence> = api.list(childId).unwrap().map { it.toDomain() }
-    override suspend fun create(childId: String, geofence: Geofence): Geofence =
+    override suspend fun create(childId: String, place: Geofence): Geofence =
         api.create(
-            childId,
-            GeofenceDto(null, geofence.name, geofence.lat, geofence.lng, geofence.radius, geofence.notifyOnArrival),
+            PlaceRequest(
+                childId = childId.toServerId(),
+                name = place.name,
+                latitude = place.lat.toServerCoordinate("위도"),
+                longitude = place.lng.toServerCoordinate("경도"),
+                radiusMeters = place.radius.toDouble(),
+                type = place.type.name,
+            ),
         ).unwrap().toDomain()
-    override suspend fun delete(childId: String, geofenceId: String) {
-        api.delete(childId, geofenceId).unwrapOrNull()
+    override suspend fun delete(childId: String, placeId: String) {
+        api.delete(placeId).unwrapOrNull()
     }
 }
 
+<<<<<<< HEAD
 class RealDeviceRepository(private val api: DeviceApi) : DeviceRepository {
     override suspend fun registerPushToken(token: String) {
         api.registerPushToken(PushTokenRequest(token)).unwrapOrNull()
@@ -331,6 +382,22 @@ class RealDeviceRepository(private val api: DeviceApi) : DeviceRepository {
 
 <<<<<<< HEAD
 =======
+=======
+class RealLocationEventRepository(private val api: LocationEventApi) : LocationEventRepository {
+    override suspend fun events(childId: String): List<LocationEvent> =
+        api.events(childId).unwrap().map { it.toDomain() }
+}
+
+class RealNotificationRepository(private val api: NotificationApi) : NotificationRepository {
+    override suspend fun list(recipientId: String, childId: String?): List<AppNotification> =
+        api.list(recipientId, childId).unwrap().map { it.toDomain() }
+
+    override suspend fun markRead(notificationId: String) {
+        api.markRead(notificationId).unwrapOrNull()
+    }
+}
+
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 class RealChildAlertRepository(private val api: ChildAlertApi) : ChildAlertRepository {
     override suspend fun upload(childId: String, alerts: List<ChildAlertEvent>) {
         api.upload(childId, alerts.map { it.toDto() }).unwrapOrNull()
@@ -339,6 +406,7 @@ class RealChildAlertRepository(private val api: ChildAlertApi) : ChildAlertRepos
     override suspend fun list(childId: String): List<ChildAlertEvent> =
         api.list(childId).unwrap().map { it.toDomain() }
 }
+<<<<<<< HEAD
 
 class RealNotificationRepository(private val api: NotificationApi) : NotificationRepository {
     override fun paged(type: String?, childId: String?): Flow<PagingData<AppNotification>> =
@@ -351,6 +419,8 @@ class RealNotificationRepository(private val api: NotificationApi) : Notificatio
 }
 
 >>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 /**
  * GAP-04: `GET /children/{childId}/blocklist` 가 문자열 배열만 주므로 응답에 itemId 가 없다.
  *
@@ -379,10 +449,10 @@ class RealBlocklistRepository(private val api: BlocklistApi) : BlocklistReposito
 class RealScreenshotRepository(private val api: ScreenshotApi) : ScreenshotRepository {
     override fun paged(childId: String): Flow<PagingData<Screenshot>> =
         Pager(PagingConfig(20)) {
-            PageResponsePagingSource { page, size -> api.list(childId, page, size).unwrap() }
+            PageResponsePagingSource { page, size -> api.list(childId, page = page, size = size).unwrap() }
         }.flow.map { paging -> paging.map { it.toDomain() } }
     override suspend fun list(childId: String): List<Screenshot> =
-        api.list(childId, 0, 50).unwrap().content.map { it.toDomain() }
+        api.list(childId, page = 0, size = 50).unwrap().content.map { it.toDomain() }
     override suspend fun requestCapture(childId: String) {
         api.requestCapture(childId).unwrapOrNull()
     }
@@ -401,11 +471,11 @@ class RealScreenshotRepository(private val api: ScreenshotApi) : ScreenshotRepos
 }
 
 class RealCommunityRepository(private val api: CommunityApi) : CommunityRepository {
-    override fun pagedPosts(): Flow<PagingData<Post>> =
+    override fun pagedPosts(keyword: String?): Flow<PagingData<Post>> =
         Pager(PagingConfig(20)) {
-            PageResponsePagingSource { page, size -> api.posts(page, size).unwrap() }
+            PageResponsePagingSource { page, size -> api.posts(keyword = keyword, page = page, size = size).unwrap() }
         }.flow.map { paging -> paging.map { it.toDomain() } }
-    override suspend fun posts(): List<Post> = api.posts(0, 50).unwrap().content.map { it.toDomain() }
+    override suspend fun posts(): List<Post> = api.posts(page = 0, size = 50).unwrap().content.map { it.toDomain() }
     override suspend fun post(postId: String): Post = api.post(postId).unwrap().toDomain()
     override suspend fun create(
         title: String,
@@ -487,22 +557,39 @@ class RealChatRepository(
     private val ws: ChatWebSocketClient,
     private val sessionRepository: SessionRepository,
 ) : ChatRepository {
-    override suspend fun rooms(): List<ChatRoom> = api.rooms().unwrap().map { it.toDomain() }
+    override suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom =
+        api.createOrGetRoom(CreateChatRoomRequest(parentId, childId)).unwrap().toDomain()
 
-    override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> =
-        api.messages(roomId, before, size).unwrap().map { it.toDomain() }
+    override suspend fun rooms(): List<ChatRoom> =
+        // 백엔드에 방 목록 API 없음. ViewModel에서 children + getOrCreate 사용.
+        emptyList()
+
+    override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> {
+        val session = sessionRepository.current()
+        val myId = session?.user?.id?.toLongOrNull()
+        val myRole = session?.user?.role ?: Role.PARENT
+        return api.messages(roomId, before, size).unwrap().content.map {
+            it.toDomain(myUserId = myId, myRole = myRole)
+        }
+    }
 
     override fun observeMessages(roomId: String): Flow<ChatMessage> =
         ws.events
-            .onStart { ws.start() }
+            .onStart {
+                ws.subscribeRoom(roomId)
+                ws.start()
+            }
             .onCompletion { ws.stop() }
             .filterIsInstance<ChatWsEvent.Message>()
             .map { it.message }
             .filter { it.roomId == roomId }
 
     override suspend fun send(roomId: String, content: String): ChatMessage {
-        ws.send(roomId, content)
-        val role = sessionRepository.current()?.user?.role ?: Role.PARENT
+        val session = sessionRepository.current()
+        val role = session?.user?.role ?: Role.PARENT
+        val senderId = session?.user?.id?.toLongOrNull()
+            ?: error("로그인 정보가 없어요")
+        ws.send(roomId, senderId, content)
         val now = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
         return ChatMessage(
             id = "local-${System.currentTimeMillis()}",
@@ -514,7 +601,7 @@ class RealChatRepository(
     }
 
     override suspend fun markRead(roomId: String, lastMessageId: String?) {
-        ws.read(roomId, lastMessageId)
+        // 백엔드 미지원
     }
 }
 
@@ -542,12 +629,23 @@ class RealSubscriptionRepository(private val api: SubscriptionApi) : Subscriptio
 }
 
 class RealAppUsageRepository(private val api: AppUsageApi) : AppUsageRepository {
-    override suspend fun list(childId: String, groupBy: String): List<AppUsage> =
-        api.list(childId, groupBy).unwrap().map { it.toDomain() }
+    override suspend fun list(
+        childId: String,
+        groupBy: String,
+        from: String?,
+        to: String?,
+    ): List<AppUsageStat> =
+        api.list(childId, groupBy, from, to).unwrap().items.map { it.toDomain() }
+
     override suspend fun report(childId: String, usages: List<AppUsage>) {
+        val recordedAt = java.time.Instant.now().toString()
         api.report(
-            childId,
-            AppUsageReportRequest(usages.map { AppUsageDto(it.appName, it.durationSec, it.category) }),
+            AppUsageReportRequest(
+                childId = childId.toServerId(),
+                usages = usages.map {
+                    AppUsageReportItemDto(it.appName, it.durationSec, recordedAt)
+                },
+            ),
         ).unwrapOrNull()
     }
 }
@@ -622,6 +720,14 @@ class RealCommandRepository(
         runCatching { api.ack(childId, requestId, RemoteCommandAckRequest(status, message)).unwrapOrNull() }
     }
 }
+
+/** 위치 API body의 `childId`는 숫자다. 숫자가 아니면 엉뚱한 대상으로 보내지 말고 실패시킨다. */
+private fun String.toServerId(): Long =
+    toLongOrNull() ?: throw IllegalStateException("childId는 숫자 형식이어야 합니다: $this")
+
+/** 장소 좌표도 서버에서는 숫자다. (0.0, 0.0)으로 조용히 등록되는 것을 막는다. */
+private fun String.toServerCoordinate(label: String): Double =
+    toDoubleOrNull() ?: throw IllegalStateException("$label 값이 숫자 형식이어야 합니다: $this")
 
 private fun File.toImagePart(): MultipartBody.Part =
     MultipartBody.Part.createFormData("file", name, asRequestBody("image/jpeg".toMediaType()))

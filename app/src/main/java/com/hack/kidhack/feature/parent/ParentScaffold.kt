@@ -40,6 +40,9 @@ import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.repository.SelectedChildRepository
 import java.text.NumberFormat
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
@@ -144,6 +147,21 @@ internal fun formatMmSs(totalSec: Int): String {
     return "%d:%02d".format(m, s)
 }
 
+/** ISO/ STOMP sentAt → 채팅 말풍선용. 오늘이면 HH:mm, 아니면 yyyy.MM.dd HH:mm */
+internal fun formatChatSentAt(raw: String): String {
+    if (raw.isBlank()) return ""
+    if (raw.matches(Regex("""^\d{1,2}:\d{2}$"""))) return raw
+    val normalized = raw.replace(Regex("""\.\d+"""), "")
+    val dt = runCatching {
+        LocalDateTime.parse(normalized, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+    }.getOrElse { return raw }
+    return if (dt.toLocalDate() == LocalDate.now()) {
+        dt.format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
+    } else {
+        dt.format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm", Locale.getDefault()))
+    }
+}
+
 internal suspend fun SelectedChildRepository.resolveId(children: List<ChildProfile>): String? {
     val current = current()
     if (current != null && children.any { it.id == current }) return current
@@ -153,3 +171,26 @@ internal suspend fun SelectedChildRepository.resolveId(children: List<ChildProfi
 }
 
 internal fun ChildProfile.avatarEmoji(): String = "👦"
+
+/** 지도 위에 겹쳐 놓는 작은 버튼(전체화면 열기/닫기). */
+@Composable
+fun MapChipButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val colors = LocalKidhackColors.current
+    Text(
+        label,
+        modifier = modifier
+            .padding(8.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(colors.card)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        color = colors.text,
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBold,
+        fontSize = 12.sp,
+    )
+}
