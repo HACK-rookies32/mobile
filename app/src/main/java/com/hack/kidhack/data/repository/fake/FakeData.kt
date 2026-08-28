@@ -23,7 +23,6 @@ import com.hack.kidhack.domain.model.Post
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
-import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
 
 object FakeData {

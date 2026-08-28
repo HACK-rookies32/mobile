@@ -31,7 +31,8 @@ import java.util.concurrent.TimeUnit
  *
  * - [start] 하면 `wss://…/ws/commands` 에 붙고, 끊기면 지수 백오프로 재연결한다.
  * - OkHttp 가 30초마다 ping 프레임을 보내 유휴 NAT 타임아웃을 막는다.
- * - 소켓이 죽어 있는 동안 놓친 요청은 `ChildCommandPollWorker` 의 폴링이 메운다.
+ * - 소켓이 죽어 있는 동안 놓친 요청은 FCM 이 메운다. 폴링 백업 경로는
+ *   서버에 대응 엔드포인트가 없어 걷어냈다(2026-08-28).
  */
 class ChildCommandSocket(
     private val okHttpClient: OkHttpClient,

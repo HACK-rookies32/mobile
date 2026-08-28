@@ -46,12 +46,10 @@ import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.ChildProfile
-import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AuthRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
-import com.hack.kidhack.domain.repository.SubscriptionRepository
 import com.hack.kidhack.domain.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,7 +62,6 @@ enum class PasswordError { EMPTY, MISMATCH }
 
 data class MypageUiState(
     val user: User? = null,
-    val subscription: Subscription? = null,
     val children: List<ChildProfile> = emptyList(),
     val selectedChildId: String? = null,
     val loading: Boolean = true,
@@ -79,7 +76,6 @@ data class MypageUiState(
 
 class MypageViewModel(
     private val userRepository: UserRepository,
-    private val subscriptionRepository: SubscriptionRepository,
     private val authRepository: AuthRepository,
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
@@ -102,18 +98,16 @@ class MypageViewModel(
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
                 val user = userRepository.me()
-                val sub = runCatching { subscriptionRepository.me() }.getOrNull()
                 val children = childRepository.children()
                 val selectedId = selectedChildRepository.resolveId(children)
-                Triple(user, sub, children to selectedId)
-            }.onSuccess { (user, sub, childInfo) ->
+                Triple(user, children, selectedId)
+            }.onSuccess { (user, children, selectedId) ->
                 _state.update {
                     it.copy(
                         loading = false,
                         user = user,
-                        subscription = sub,
-                        children = childInfo.first,
-                        selectedChildId = childInfo.second,
+                        children = children,
+                        selectedChildId = selectedId,
                     )
                 }
             }.onFailure { t ->
@@ -203,7 +197,6 @@ fun ParentMypageScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
     val user = state.user
-    val premium = state.subscription?.status.equals("ACTIVE", ignoreCase = true)
 
     ParentScreenScaffold(
         header = {
@@ -222,17 +215,6 @@ fun ParentMypageScreen(
                         fontSize = 20.sp,
                     )
                     Text(user?.email ?: user?.loginId.orEmpty(), color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-                    Text(
-                        if (premium) stringResource(R.string.parent_mypage_premium) else stringResource(R.string.parent_mypage_basic),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(99.dp))
-                            .background(Color.White)
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                        color = colors.brand,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBlack,
-                        fontSize = 11.sp,
-                    )
                 }
             }
         },

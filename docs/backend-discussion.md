@@ -51,7 +51,8 @@
 | C-3 | 촬영본 조회 | P0 | `GET /children/{id}/photos` (페이지) — 부모 「카메라 촬영」 갤러리 |
 | C-4 | 업로드 | P0 | `POST /children/{id}/screenshots`, `POST /children/{id}/photos` (multipart). 이미 클라이언트 구현됨 |
 | C-5 | 완료 통지 | P1 | 업로드 완료 후 부모에게 FCM(선택). 없으면 부모 앱이 폴링(캡처 2분/카메라 5분)으로 확인 |
-| C-6 | 명령 pending 백업 | P1 | `GET /children/{id}/commands/pending`, `POST .../ack` (`child-push-contract.md` 2절). FCM 실패 시 백업 |
+| C-6 | ~~명령 pending 백업~~ | — | **철회(2026-08-28)** — `GET .../commands/pending` 폴링은 클라이언트에서 제거. 요청 없음 |
+| C-7 | 명령 처리 결과 회신 | P1 | `POST /children/{id}/commands/{requestId}/ack` (`child-push-contract.md` 2절). 소켓 ACK 과 **멱등** 처리 필요. FCM 이 소켓 꺼진 상태로 도착하면 이 경로가 유일한 회신 수단 |
 
 ---
 

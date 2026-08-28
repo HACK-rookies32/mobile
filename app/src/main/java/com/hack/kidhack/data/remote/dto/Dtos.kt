@@ -403,16 +403,6 @@ data class PointHistoryDto(
 data class UsePointRequest(val productId: Int, val point: Int)
 
 @Serializable
-data class SubscribeRequest(val planId: Int, val method: String)
-
-@Serializable
-data class SubscriptionDto(
-    val planId: Int,
-    val status: String,
-    val method: String? = null,
-)
-
-@Serializable
 data class AppUsageReportItemDto(
     val appName: String,
     val durationSec: Int,
@@ -440,20 +430,14 @@ data class AppUsageAggregateResponse(
 )
 
 /**
- * 부모가 보낸 원격 요청.
+ * 원격 요청 처리 결과.
  *
  * 명세 4.x 에 아직 없는 **신규 제안 계약**이다(GAP-11: 202 만 있고 페이로드 미정의).
- * 백엔드와 키 이름을 맞출 때 이 DTO 와 [RemoteCommandAckRequest] 만 고치면 된다.
+ * 백엔드와 키 이름을 맞출 때 이 DTO 를 고치면 된다.
+ *
+ * 수신 DTO(`RemoteCommandDto`)는 폴링 경로와 함께 제거했다(2026-08-28).
+ * 소켓 프레임은 `data/ws/ChildCommandFrame`, FCM 은 `background/push/PushMessage` 가 맡는다.
  */
-@Serializable
-data class RemoteCommandDto(
-    val requestId: String,
-    val type: String,
-    val childId: String = "",
-    val requestedBy: String? = null,
-    val requestedAt: String? = null,
-)
-
 @Serializable
 data class RemoteCommandAckRequest(
     val status: String,

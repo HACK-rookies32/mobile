@@ -183,7 +183,8 @@ FCM 은 대부분 몇 초 내 도착하지만 **보장되지 않는다**(도즈,
 |---|---|---|
 | FCM | **주** 경로 | 신규 |
 | `ParentAlertPollWorker` (15분) | 보호자 알림 백업 | 유지. 원하면 30분+로 완화 가능 |
-| `ChildCommandService`(WebSocket) + `ChildCommandPollWorker` | 자녀 명령 백업 | 유지. FCM 검증 후 상주 소켓은 은퇴 검토(안드로이드 15 dataSync 6시간 제한 회피) |
+| `ChildCommandService`(WebSocket) | 자녀 명령 백업 | 유지. FCM 검증 후 상주 소켓은 은퇴 검토(안드로이드 15 dataSync 6시간 제한 회피) |
+| ~~`ChildCommandPollWorker`(15분)~~ | ~~자녀 명령 백업~~ | **제거됨(2026-08-28)** — 서버에 `commands/pending` 엔드포인트 없음. REST ack 은 유지 |
 | `ChildAlertUploadWorker` | 자녀 사건 업로드 | 유지 — FCM 은 **수신**만, 업로드는 여전히 필요 |
 
 > **소켓 은퇴는 별도 결정.** FCM 이 자녀 명령을 안정적으로 나르는 게 검증되면

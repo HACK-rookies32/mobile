@@ -195,12 +195,6 @@ data class PointHistory(
     val dateLabel: String,
 )
 
-data class Subscription(
-    val planId: Int,
-    val status: String,
-    val method: String? = null,
-)
-
 data class AppUsage(
     val appName: String,
     val durationSec: Int,
