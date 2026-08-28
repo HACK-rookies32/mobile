@@ -29,7 +29,6 @@ import com.hack.kidhack.data.remote.api.PaymentApi
 import com.hack.kidhack.data.remote.api.PaymentChargeApi
 import com.hack.kidhack.data.remote.api.PointApi
 import com.hack.kidhack.data.remote.api.ScreenshotApi
-import com.hack.kidhack.data.remote.api.SubscriptionApi
 import com.hack.kidhack.data.remote.api.UserApi
 import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
@@ -61,7 +60,6 @@ import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
 import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.SignupRequest
-import com.hack.kidhack.data.remote.dto.SubscribeRequest
 import com.hack.kidhack.data.remote.dto.TransferRequest
 import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UsePointRequest
@@ -104,7 +102,6 @@ import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
-import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AllowanceRepository
@@ -134,7 +131,6 @@ import com.hack.kidhack.domain.repository.PointRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
 import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
-import com.hack.kidhack.domain.repository.SubscriptionRepository
 import com.hack.kidhack.domain.repository.UserRepository
 import com.hack.kidhack.domain.repository.WalletRepository
 import kotlinx.coroutines.flow.Flow
@@ -579,13 +575,6 @@ class RealPointRepository(private val api: PointApi) : PointRepository {
     }
 }
 
-class RealSubscriptionRepository(private val api: SubscriptionApi) : SubscriptionRepository {
-    override suspend fun me(): Subscription? = api.me().unwrapOrNull()?.toDomain()
-    override suspend fun subscribe(planId: Int, method: String): Subscription =
-        api.subscribe(SubscribeRequest(planId, method)).unwrap().toDomain()
-    override suspend fun cancel() { api.cancel().unwrapOrNull() }
-}
-
 class RealAppUsageRepository(private val api: AppUsageApi) : AppUsageRepository {
     override suspend fun list(
         childId: String,
@@ -652,10 +641,11 @@ class RealPhotoRepository(private val api: PhotoApi) : PhotoRepository {
 }
 
 /**
- * 실시간 경로는 [ChildCommandSocket], 백업 경로는 `GET .../commands/pending` 폴링.
+ * 수신 경로는 [ChildCommandSocket] (실시간) 과 FCM 두 가지다.
+ * 폴링 백업 경로는 서버에 대응 엔드포인트가 없어 걷어냈다(2026-08-28).
  *
- * 폴링 엔드포인트가 아직 서버에 없으면 [pending] 은 빈 목록으로 떨어지고
- * 소켓 경로만 살아 있게 된다(요청 자체가 유실되지는 않는다).
+ * [ack] 은 소켓과 REST 로 모두 보낸다. FCM 이 소켓 꺼진 상태로 도착하면
+ * `socket.ack` 이 no-op 이라 REST 쪽이 유일한 경로가 된다.
  */
 class RealCommandRepository(
     private val api: CommandApi,
@@ -668,10 +658,6 @@ class RealCommandRepository(
     override val connected: Flow<Boolean> = socket.connected
 
     override fun disconnect() = socket.stop()
-
-    override suspend fun pending(childId: String): List<RemoteCommand> =
-        runCatching { api.pending(childId).unwrap().map { it.toDomain() } }
-            .getOrDefault(emptyList())
 
     override suspend fun ack(childId: String, requestId: String, status: String, message: String?) {
         socket.ack(requestId, status, message)

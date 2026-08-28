@@ -45,7 +45,6 @@ import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
-import com.hack.kidhack.domain.model.Subscription
 import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AllowanceRepository
@@ -75,7 +74,6 @@ import com.hack.kidhack.domain.repository.PointRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
 import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
-import com.hack.kidhack.domain.repository.SubscriptionRepository
 import com.hack.kidhack.domain.repository.UserRepository
 import com.hack.kidhack.domain.repository.WalletRepository
 import kotlinx.coroutines.delay
@@ -682,7 +680,6 @@ class FakePhotoRepository(
  */
 class FakeCommandRepository : CommandRepository {
     private val stream = MutableSharedFlow<RemoteCommand>(extraBufferCapacity = 8)
-    private val queue = mutableListOf<RemoteCommand>()
 
     override fun observe(): Flow<RemoteCommand> = stream.asSharedFlow()
 
@@ -691,27 +688,11 @@ class FakeCommandRepository : CommandRepository {
 
     override fun disconnect() = Unit
 
-    override suspend fun pending(childId: String): List<RemoteCommand> {
-        val snapshot = queue.toList()
-        queue.clear()
-        return snapshot
-    }
-
     override suspend fun ack(childId: String, requestId: String, status: String, message: String?) = Unit
 
     fun emit(command: RemoteCommand) {
-        if (!stream.tryEmit(command)) queue.add(command)
+        stream.tryEmit(command)
     }
-}
-
-class FakeSubscriptionRepository : SubscriptionRepository {
-    private var sub: Subscription? = Subscription(1, "ACTIVE", "CARD")
-    override suspend fun me(): Subscription? = sub
-    override suspend fun subscribe(planId: Int, method: String): Subscription {
-        sub = Subscription(planId, "ACTIVE", method)
-        return sub!!
-    }
-    override suspend fun cancel() { sub = null }
 }
 
 class FakeAppUsageRepository(private val feed: MockNotificationFeed) : AppUsageRepository {

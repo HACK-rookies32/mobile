@@ -30,6 +30,7 @@ sealed class Route(val path: String) {
     data object ParentCards : Route("parent/cards")
     data object ParentGeofence : Route("parent/geofence")
     data object ParentAppUsageDetail : Route("parent/usage-detail")
+    data object ParentTerms : Route("parent/terms")
 
     data object ChildGraph : Route("child")
     data object ChildStart : Route("child/start")
@@ -52,6 +53,8 @@ sealed class Route(val path: String) {
     data object ChildPay : Route("child/pay")
     data object ChildProfileEdit : Route("child/profile/edit")
     data object ChildPairing : Route("child/pairing")
+    data object ChildTerms : Route("child/terms")
+    data object ChildNotice : Route("child/notice")
 }
 
 data class TabItem(

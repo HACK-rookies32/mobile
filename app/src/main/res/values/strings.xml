@@ -13,4 +13,11 @@
     <string name="child_capture_denied">화면 캡처를 취소했어요</string>
     <string name="harmful_block_accessibility_description">유해 사이트·키워드를 감지해 차단하고 보호자에게 알려 줍니다.</string>
     <string name="harmful_block_toast">유해 콘텐츠가 차단됐어요: %1$s</string>
+
+    <!-- 이용약관 부칙. 부모·자녀 화면이 같은 본문을 쓰므로 공용 파일에 둔다. -->
+    <string name="terms_appendix">부칙</string>
+    <string name="terms_effective">이 약관은 2026년 8월 28일부터 적용됩니다.</string>
+
+    <!-- 공지 목록. 부모·자녀 화면이 같은 본문을 쓴다. -->
+    <string name="notice_badge">필독</string>
 </resources>

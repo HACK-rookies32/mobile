@@ -176,7 +176,9 @@
     <string name="child_mypage_menu_gallery">카메라 갤러리</string>
     <string name="child_mypage_section_etc">기타</string>
     <string name="child_mypage_notice">공지사항</string>
-    <string name="child_mypage_help">도움말</string>
+    <string name="child_notice_title">공지사항</string>
+    <string name="child_mypage_terms">이용약관</string>
+    <string name="child_terms_title">이용약관</string>
     <string name="child_mypage_version">앱 버전 1.2.0</string>
     <string name="child_mypage_logout">로그아웃</string>
     <string name="child_mypage_coming_soon">준비 중이에요</string>
