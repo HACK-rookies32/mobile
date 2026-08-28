@@ -6,7 +6,12 @@ import com.hack.kidhack.BuildConfig
 import com.hack.kidhack.core.common.KidhackJson
 import com.hack.kidhack.data.local.CapturedShotStore
 import com.hack.kidhack.data.local.ChatMessageStore
+import com.hack.kidhack.data.local.BlocklistStore
 import com.hack.kidhack.data.local.ChildAlertStore
+import com.hack.kidhack.data.local.HarmfulSettingsStore
+import com.hack.kidhack.data.local.PushTokenStore
+import com.hack.kidhack.data.local.ParentWatchStore
+import com.hack.kidhack.data.local.ParentAlertStore
 import com.hack.kidhack.data.local.ChildPhotoStore
 import com.hack.kidhack.data.local.ProfileScopeStore
 import com.hack.kidhack.data.local.ChildOnboardingStoreImpl
@@ -21,13 +26,17 @@ import com.hack.kidhack.data.remote.api.BlocklistApi
 import com.hack.kidhack.data.remote.api.CardApi
 import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
+import com.hack.kidhack.data.remote.api.ChildAlertApi
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
-import com.hack.kidhack.data.remote.api.GeofenceApi
+import com.hack.kidhack.data.remote.api.DashboardApi
+import com.hack.kidhack.data.remote.api.DeviceApi
 import com.hack.kidhack.data.remote.api.InquiryApi
 import com.hack.kidhack.data.remote.api.LocationApi
+import com.hack.kidhack.data.remote.api.LocationEventApi
 import com.hack.kidhack.data.remote.api.NotificationApi
 import com.hack.kidhack.data.remote.api.PairingApi
+import com.hack.kidhack.data.remote.api.PlaceApi
 import com.hack.kidhack.data.remote.api.PaymentApi
 import com.hack.kidhack.data.remote.api.PhotoApi
 import com.hack.kidhack.data.remote.api.PaymentChargeApi
@@ -44,16 +53,22 @@ import com.hack.kidhack.data.repository.fake.FakeAppControlRepository
 import com.hack.kidhack.data.repository.fake.FakeAppUsageRepository
 import com.hack.kidhack.data.repository.fake.FakeAuthRepository
 import com.hack.kidhack.data.repository.fake.FakeBlocklistRepository
+import com.hack.kidhack.data.repository.fake.FakeChildAlertRepository
+import com.hack.kidhack.data.repository.fake.FakeDeviceRepository
+import com.hack.kidhack.data.repository.fake.MockNotificationFeed
+import com.hack.kidhack.data.repository.fake.MockPhotoFeed
 import com.hack.kidhack.data.repository.fake.FakeCardRepository
 import com.hack.kidhack.data.repository.fake.FakeChatRepository
 import com.hack.kidhack.data.repository.fake.FakeChildRepository
 import com.hack.kidhack.data.repository.fake.FakeCommandRepository
 import com.hack.kidhack.data.repository.fake.FakeCommunityRepository
-import com.hack.kidhack.data.repository.fake.FakeGeofenceRepository
 import com.hack.kidhack.data.repository.fake.FakeInquiryRepository
+import com.hack.kidhack.data.repository.fake.FakeLocationEventRepository
+import com.hack.kidhack.data.repository.fake.FakeDashboardRepository
 import com.hack.kidhack.data.repository.fake.FakeLocationRepository
 import com.hack.kidhack.data.repository.fake.FakeNotificationRepository
 import com.hack.kidhack.data.repository.fake.FakePairingRepository
+import com.hack.kidhack.data.repository.fake.FakePlaceRepository
 import com.hack.kidhack.data.repository.fake.FakePaymentRepository
 import com.hack.kidhack.data.repository.fake.FakePhotoRepository
 import com.hack.kidhack.data.repository.fake.FakePointRepository
@@ -66,16 +81,20 @@ import com.hack.kidhack.data.repository.real.RealAppControlRepository
 import com.hack.kidhack.data.repository.real.RealAppUsageRepository
 import com.hack.kidhack.data.repository.real.RealAuthRepository
 import com.hack.kidhack.data.repository.real.RealBlocklistRepository
+import com.hack.kidhack.data.repository.real.RealChildAlertRepository
+import com.hack.kidhack.data.repository.real.RealDeviceRepository
 import com.hack.kidhack.data.repository.real.RealCardRepository
 import com.hack.kidhack.data.repository.real.RealChatRepository
 import com.hack.kidhack.data.repository.real.RealChildRepository
 import com.hack.kidhack.data.repository.real.RealCommandRepository
 import com.hack.kidhack.data.repository.real.RealCommunityRepository
-import com.hack.kidhack.data.repository.real.RealGeofenceRepository
 import com.hack.kidhack.data.repository.real.RealInquiryRepository
+import com.hack.kidhack.data.repository.real.RealLocationEventRepository
+import com.hack.kidhack.data.repository.real.RealDashboardRepository
 import com.hack.kidhack.data.repository.real.RealLocationRepository
 import com.hack.kidhack.data.repository.real.RealNotificationRepository
 import com.hack.kidhack.data.repository.real.RealPairingRepository
+import com.hack.kidhack.data.repository.real.RealPlaceRepository
 import com.hack.kidhack.data.repository.real.RealPaymentRepository
 import com.hack.kidhack.data.repository.real.RealPhotoRepository
 import com.hack.kidhack.data.repository.real.RealPointRepository
@@ -90,17 +109,21 @@ import com.hack.kidhack.domain.repository.AppControlRepository
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.AuthRepository
 import com.hack.kidhack.domain.repository.BlocklistRepository
+import com.hack.kidhack.domain.repository.ChildAlertRepository
+import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.CardRepository
 import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildOnboardingStore
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
-import com.hack.kidhack.domain.repository.GeofenceRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
+import com.hack.kidhack.domain.repository.LocationEventRepository
+import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
+import com.hack.kidhack.domain.repository.PlaceRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
 import com.hack.kidhack.domain.repository.PhotoRepository
 import com.hack.kidhack.domain.repository.PointRepository
@@ -122,6 +145,7 @@ import com.hack.kidhack.feature.parent.CommunityListViewModel
 import com.hack.kidhack.feature.parent.CommunityWriteViewModel
 import com.hack.kidhack.feature.parent.ContactViewModel
 import com.hack.kidhack.feature.parent.EditProfileViewModel
+import com.hack.kidhack.feature.parent.AppUsageDetailViewModel
 import com.hack.kidhack.feature.parent.DashboardViewModel
 import com.hack.kidhack.feature.parent.GeofenceViewModel
 import com.hack.kidhack.feature.parent.HarmfulViewModel
@@ -132,7 +156,9 @@ import com.hack.kidhack.feature.parent.NotificationsViewModel
 import com.hack.kidhack.feature.parent.PairingViewModel
 import com.hack.kidhack.feature.parent.ParentChatViewModel
 import com.hack.kidhack.feature.parent.PayViewModel
+import com.hack.kidhack.feature.parent.CameraRequestViewModel
 import com.hack.kidhack.feature.parent.ScreenshotViewModel
+import com.hack.kidhack.feature.child.ChildPairingViewModel
 import com.hack.kidhack.feature.child.chat.ChildChatViewModel
 import com.hack.kidhack.feature.child.home.ChildHomeViewModel
 import com.hack.kidhack.feature.child.mypage.ChildMypageViewModel
@@ -160,7 +186,14 @@ val appModule = module {
     single<SelectedChildRepository> { SelectedChildRepositoryImpl(androidContext()) }
     single<ChildOnboardingStore> { ChildOnboardingStoreImpl(androidContext()) }
     single { ChatMessageStore(androidContext()) }
-    single { ChildAlertStore(androidContext()) }
+    single { ChildAlertStore(androidContext(), get()) }
+    single { ParentAlertStore(androidContext(), get()) }
+    single { HarmfulSettingsStore(androidContext()) }
+    single { ParentWatchStore(androidContext()) }
+    single { PushTokenStore(androidContext()) }
+    single { BlocklistStore(androidContext()) }
+    single { MockNotificationFeed(androidContext()) }
+    single { MockPhotoFeed(androidContext()) }
     single { ChildPhotoStore(androidContext()) }
     single { CapturedShotStore(androidContext()) }
     single { ProfileScopeStore(androidContext()) }
@@ -179,6 +212,8 @@ val appModule = module {
                 TokenAuthenticator(
                     sessionRepository = get(),
                     sessionEvents = get(),
+                    chatMessageStore = get(),
+                    chatWebSocketClient = get(),
                     baseUrl = BuildConfig.BASE_URL.trimEnd('/') + "/",
                     refreshClient = OkHttpClient.Builder()
                         .connectTimeout(15, TimeUnit.SECONDS)
@@ -205,7 +240,10 @@ val appModule = module {
     single { get<Retrofit>().create(PairingApi::class.java) }
     single { get<Retrofit>().create(ChildApi::class.java) }
     single { get<Retrofit>().create(LocationApi::class.java) }
-    single { get<Retrofit>().create(GeofenceApi::class.java) }
+    single { get<Retrofit>().create(DeviceApi::class.java) }
+    single { get<Retrofit>().create(DashboardApi::class.java) }
+    single { get<Retrofit>().create(PlaceApi::class.java) }
+    single { get<Retrofit>().create(LocationEventApi::class.java) }
     single { get<Retrofit>().create(NotificationApi::class.java) }
     single { get<Retrofit>().create(BlocklistApi::class.java) }
     single { get<Retrofit>().create(ScreenshotApi::class.java) }
@@ -217,6 +255,7 @@ val appModule = module {
     single { get<Retrofit>().create(AppUsageApi::class.java) }
     single { get<Retrofit>().create(AllowanceApi::class.java) }
     single { get<Retrofit>().create(CommandApi::class.java) }
+    single { get<Retrofit>().create(ChildAlertApi::class.java) }
     single { get<Retrofit>().create(PhotoApi::class.java) }
     single { get<Retrofit>().create(AppControlApi::class.java) }
     single { get<Retrofit>().create(InquiryApi::class.java) }
@@ -225,19 +264,31 @@ val appModule = module {
     single { get<Retrofit>().create(CardApi::class.java) }
 
     single<AuthRepository> {
-        if (useMock) FakeAuthRepository(get(), get()) else RealAuthRepository(get(), get(), get(), get())
+        if (useMock) {
+            FakeAuthRepository(get(), get(), get(), get())
+        } else {
+            RealAuthRepository(get(), get(), get(), get(), get(), get())
+        }
     }
     single<UserRepository> { if (useMock) FakeUserRepository(get()) else RealUserRepository(get()) }
     single<PairingRepository> { if (useMock) FakePairingRepository() else RealPairingRepository(get()) }
     single<ChildRepository> { if (useMock) FakeChildRepository() else RealChildRepository(get()) }
     single<LocationRepository> { if (useMock) FakeLocationRepository() else RealLocationRepository(get()) }
-    single<GeofenceRepository> { if (useMock) FakeGeofenceRepository() else RealGeofenceRepository(get()) }
-    single<NotificationRepository> {
-        if (useMock) FakeNotificationRepository() else RealNotificationRepository(get())
+    single<DeviceRepository> { if (useMock) FakeDeviceRepository() else RealDeviceRepository(get()) }
+    single<DashboardRepository> { if (useMock) FakeDashboardRepository(get(), get(), get()) else RealDashboardRepository(get()) }
+    single<PlaceRepository> { if (useMock) FakePlaceRepository() else RealPlaceRepository(get()) }
+    single<LocationEventRepository> {
+        if (useMock) FakeLocationEventRepository() else RealLocationEventRepository(get())
     }
-    single<BlocklistRepository> { if (useMock) FakeBlocklistRepository() else RealBlocklistRepository(get()) }
+    single<NotificationRepository> {
+        if (useMock) FakeNotificationRepository(get()) else RealNotificationRepository(get())
+    }
+    single<ChildAlertRepository> {
+        if (useMock) FakeChildAlertRepository(get()) else RealChildAlertRepository(get())
+    }
+    single<BlocklistRepository> { if (useMock) FakeBlocklistRepository(get(), get()) else RealBlocklistRepository(get()) }
     single<ScreenshotRepository> {
-        if (useMock) FakeScreenshotRepository(get()) else RealScreenshotRepository(get())
+        if (useMock) FakeScreenshotRepository(get(), get()) else RealScreenshotRepository(get())
     }
     single<CommunityRepository> {
         if (useMock) FakeCommunityRepository() else RealCommunityRepository(get())
@@ -245,8 +296,8 @@ val appModule = module {
     single<InquiryRepository> {
         if (useMock) FakeInquiryRepository() else RealInquiryRepository(get())
     }
-    single { ChatWebSocketClient(get(), get(), BuildConfig.BASE_URL) }
-    // 어떤 구현을 쓰든 대화 기록은 기기에 남는다(앱을 완전히 종료해도 유지).
+    single { ChatWebSocketClient(get(), BuildConfig.BASE_URL) }
+    // 로그인 중 콜드 스타트용 캐시. 로그아웃 시 AuthRepository가 ChatMessageStore를 비운다.
     single<ChatRepository> {
         val delegate = if (useMock) {
             FakeChatRepository(get())
@@ -260,7 +311,7 @@ val appModule = module {
     single<SubscriptionRepository> {
         if (useMock) FakeSubscriptionRepository() else RealSubscriptionRepository(get())
     }
-    single<AppUsageRepository> { if (useMock) FakeAppUsageRepository() else RealAppUsageRepository(get()) }
+    single<AppUsageRepository> { if (useMock) FakeAppUsageRepository(get()) else RealAppUsageRepository(get()) }
     single<AppControlRepository> {
         if (useMock) FakeAppControlRepository() else RealAppControlRepository(get())
     }
@@ -276,7 +327,7 @@ val appModule = module {
     single<CommandRepository> {
         if (useMock) FakeCommandRepository() else RealCommandRepository(get(), get())
     }
-    single<PhotoRepository> { if (useMock) FakePhotoRepository(get()) else RealPhotoRepository(get()) }
+    single<PhotoRepository> { if (useMock) FakePhotoRepository(get(), get()) else RealPhotoRepository(get()) }
 
     // 루키즈페이 용돈 지갑 (부모 송금/회수 ↔ 자녀 QR 결제)
     single<AllowanceRepository> {
@@ -287,17 +338,19 @@ val appModule = module {
     viewModel { RegisterViewModel(get(), get(), get(), androidContext()) }
     viewModel { ForgotViewModel(get()) }
 
-    viewModel { DashboardViewModel(get(), get(), get(), get(), get()) }
-    viewModel { LocationViewModel(get(), get(), get()) }
+    viewModel { DashboardViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { AppUsageDetailViewModel(get(), get(), get()) }
+    viewModel { LocationViewModel(get(), get(), get(), get(), get()) }
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
-    viewModel { ParentChatViewModel(get(), get(), get()) }
-    viewModel { NotificationsViewModel(get(), get()) }
+    viewModel { ParentChatViewModel(get(), get(), get(), get()) }
+    viewModel { NotificationsViewModel(get(), get(), get(), get()) }
     viewModel { MypageViewModel(get(), get(), get(), get(), get()) }
     viewModel { EditProfileViewModel(get()) }
     viewModel { AppControlViewModel(get(), get(), get()) }
     viewModel { ScreenshotViewModel(get(), get(), get()) }
+    viewModel { CameraRequestViewModel(get(), get(), get()) }
     viewModel { ChildProfileViewModel(get(), get()) }
-    viewModel { HarmfulViewModel(get(), get(), get()) }
+    viewModel { HarmfulViewModel(get(), get(), get(), get()) }
     viewModel { PairingViewModel(get(), get()) }
     viewModel { CommunityListViewModel(get()) }
     viewModel { params -> CommunityDetailViewModel(params.get(), get(), get()) }
@@ -308,9 +361,10 @@ val appModule = module {
     viewModel { CardViewModel(get()) }
 
     viewModel { ChildHomeViewModel(get(), get(), get(), get(), get(), get()) }
-    viewModel { ChildChatViewModel(get()) }
-    viewModel { ChildServicesViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { ChildChatViewModel(get(), get()) }
+    viewModel { ChildServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildMypageViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { ChildPairingViewModel(get()) }
     viewModel { ChildScreenshotViewModel(get(), get(), get()) }
     viewModel { ChildCameraViewModel(get(), get(), get(), get()) }
     viewModel { ChildPayViewModel(get(), get()) }

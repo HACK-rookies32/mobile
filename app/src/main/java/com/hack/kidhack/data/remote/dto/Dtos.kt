@@ -1,12 +1,14 @@
 package com.hack.kidhack.data.remote.dto
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -19,6 +21,37 @@ internal object FlexibleStringSerializer : KSerializer<String> {
         val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeString()
         val primitive = jsonDecoder.decodeJsonElement() as? JsonPrimitive ?: return ""
         return primitive.content
+    }
+
+    override fun serialize(encoder: Encoder, value: String) {
+        encoder.encodeString(value)
+    }
+}
+
+/**
+ * Spring STOMP(Jackson)은 LocalDateTime을 ISO 문자열이 아니라
+ * `[year, month, day, hour, minute, second, nano]` 배열로 보낼 수 있다.
+ */
+internal object FlexibleDateTimeSerializer : KSerializer<String> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("FlexibleDateTime", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): String {
+        val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeString()
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            is JsonPrimitive -> element.content
+            is JsonArray -> {
+                val parts = element.mapNotNull { (it as? JsonPrimitive)?.content?.toIntOrNull() }
+                when {
+                    parts.size >= 6 -> "%04d-%02d-%02dT%02d:%02d:%02d".format(
+                        parts[0], parts[1], parts[2], parts[3], parts[4], parts[5],
+                    )
+                    parts.size >= 5 -> "%02d:%02d".format(parts[3], parts[4])
+                    else -> ""
+                }
+            }
+            else -> ""
+        }
     }
 
     override fun serialize(encoder: Encoder, value: String) {
@@ -87,6 +120,7 @@ data class UserDto(
     val phone: String? = null,
     val email: String? = null,
     val profileImageUrl: String? = null,
+    val parentId: Long? = null,
 )
 
 @Serializable
@@ -119,8 +153,13 @@ data class PairingConnectRequest(val pairingCode: String)
 
 @Serializable
 data class ChildDto(
+    /** Backend may send numeric id; accept string or number. */
+    @Serializable(with = FlexibleStringSerializer::class)
     val id: String,
-    val name: String,
+    /** App/domain field; list API may omit this and send username instead. */
+    val name: String? = null,
+    val username: String? = null,
+    val nickname: String? = null,
     val alias: String? = null,
     val profileImageUrl: String? = null,
     val school: String? = null,
@@ -139,35 +178,111 @@ data class ChildUpdateRequest(
     val school: String? = null,
 )
 
+/** POST /location/track 요청. 명세상 좌표가 문자열이다(places는 숫자). */
 @Serializable
-data class LocationDto(
-    val lat: String,
-    val lng: String,
-    val recordedAt: String,
-    val label: String? = null,
+data class LocationTrackRequest(
+    val childId: Long,
+    val latitude: String,
+    val longitude: String,
 )
 
 @Serializable
-data class GpsStatusRequest(val gpsEnabled: Boolean, val reportedAt: String)
+data class LocationTrackResponse(
+    val id: Long,
+    val childId: Long,
+    val latitude: String,
+    val longitude: String,
+    val segmentStart: String? = null,
+    val segmentEnd: String? = null,
+    val updatedAt: String? = null,
+)
+
+/** FCM 토큰 등록 (신규 제안 계약). platform 은 서버가 발송 채널을 고르는 데 쓴다. */
+@Serializable
+data class PushTokenRequest(val token: String, val platform: String = "ANDROID")
 
 @Serializable
-data class GeofenceDto(
-    val id: String? = null,
+data class RealtimeToggleResponse(
+    val childId: Long,
+    val realtimeEnabled: Boolean,
+)
+
+@Serializable
+data class DeviceEventRequest(
+    val childId: Long,
+    val type: String, // "POWER_OFF" | "GPS_OFF"
+)
+
+/** GET /children/{childId}/dashboard (명세 4.3) 통합 응답. */
+@Serializable
+data class DashboardResponse(
+    val childId: Long,
+    val currentLocation: LocationTrackResponse? = null,
+    val realtimeEnabled: Boolean,
+    val recentNotifications: List<NotificationDto> = emptyList(),
+    val blockRules: List<DashboardBlockRuleDto> = emptyList(),
+    val places: List<PlaceResponse> = emptyList(),
+)
+
+@Serializable
+data class DashboardBlockRuleDto(
+    val id: Long,
+    val childId: Long,
+    val pattern: String,
+)
+
+/** POST /location/places 요청. `type` = GEOFENCE | DESTINATION. */
+@Serializable
+data class PlaceRequest(
+    val childId: Long,
     val name: String,
-    val lat: String,
-    val lng: String,
-    val radius: Int,
-    val notifyOnArrival: Boolean = true,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Double,
+    val type: String,
+)
+
+@Serializable
+data class PlaceResponse(
+    val id: Long,
+    val childId: Long,
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Double,
+    val type: String,
+)
+
+/** GET /location/events/{childId}. `eventType` = ENTER | EXIT | ARRIVED. */
+@Serializable
+data class LocationEventDto(
+    val id: Long,
+    val childId: Long,
+    val placeId: Long,
+    val eventType: String,
+    val occurredAt: String,
 )
 
 @Serializable
 data class NotificationDto(
     val id: String,
+    val recipientId: String,
+    val type: String,
+    val message: String,
+    val read: Boolean = false,
+    val createdAt: String,
+    /** 명세에는 없지만 서버가 주면 자녀별로 나눠 보여 준다. */
+    val childId: String? = null,
+)
+
+/** docs/child-push-contract.md 4절 — 자녀 안전 사건 동기화 제안 계약. */
+@Serializable
+data class ChildAlertDto(
+    val id: String,
     val type: String,
     val title: String,
-    val body: String,
-    val createdAt: String,
-    val read: Boolean = false,
+    val body: String = "",
+    val occurredAt: String = "",
 )
 
 @Serializable
@@ -201,12 +316,13 @@ data class CommentDto(
 
 @Serializable
 data class PostDto(
-    val id: String,
+    @SerialName("postId") val id: String,
     val title: String,
-    val author: String,
-    val commentCount: Int = 0,
+    @SerialName("authorNickname") val author: String,
+    @SerialName("createdAt") val createdAtLabel: String,
     val likeCount: Int = 0,
-    val createdAtLabel: String = "",
+    // TODO: 명세서 목록/상세 응답에 commentCount 없음 — 서버 미제공 시 0 기본값 유지
+    val commentCount: Int = 0,
     val liked: Boolean = false,
     val imageUrls: List<String> = emptyList(),
     val links: List<String> = emptyList(),
@@ -229,20 +345,33 @@ data class ReportRequest(val reason: String, val detail: String? = null)
 
 @Serializable
 data class ChatRoomDto(
+    @Serializable(with = FlexibleStringSerializer::class)
     val id: String,
-    val title: String,
+    val title: String = "",
     val lastMessage: String = "",
     val lastAt: String = "",
     val online: Boolean = false,
+    val parentId: Long? = null,
+    val childId: Long? = null,
+    val createdAt: String? = null,
+)
+
+@Serializable
+data class CreateChatRoomRequest(
+    val parentId: Long,
+    val childId: Long,
 )
 
 @Serializable
 data class ChatMessageDto(
+    @Serializable(with = FlexibleStringSerializer::class)
     val id: String,
     val roomId: String,
-    val fromRole: String,
-    val text: String,
-    val sentAt: String,
+    val fromRole: String = "",
+    val text: String = "",
+    val sentAt: String = "",
+    val senderId: Long? = null,
+    val content: String? = null,
 )
 
 @Serializable
@@ -284,14 +413,31 @@ data class SubscriptionDto(
 )
 
 @Serializable
-data class AppUsageDto(
+data class AppUsageReportItemDto(
     val appName: String,
     val durationSec: Int,
-    val category: String? = null,
+    val recordedAt: String,
 )
 
 @Serializable
-data class AppUsageReportRequest(val usages: List<AppUsageDto>)
+data class AppUsageReportRequest(
+    val childId: Long,
+    val usages: List<AppUsageReportItemDto>,
+)
+
+@Serializable
+data class AppUsageStatDto(
+    val key: String,
+    val durationSec: Int,
+)
+
+/** GET /monitoring/usage/{childId} 집계 응답. groupBy = APP | HOUR | DAY. */
+@Serializable
+data class AppUsageAggregateResponse(
+    val childId: Long,
+    val groupBy: String,
+    val items: List<AppUsageStatDto> = emptyList(),
+)
 
 /**
  * 부모가 보낸 원격 요청.

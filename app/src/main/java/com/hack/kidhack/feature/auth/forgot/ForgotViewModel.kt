@@ -2,6 +2,7 @@ package com.hack.kidhack.feature.auth.forgot
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hack.kidhack.core.common.digitsOnlyPhone
 import com.hack.kidhack.core.common.formatPhoneNumber
 import com.hack.kidhack.data.remote.userMessage
 import com.hack.kidhack.domain.repository.AuthRepository
@@ -36,7 +37,7 @@ class ForgotViewModel(
 
     fun onFindName(v: String) = _state.update { it.copy(findName = v, findError = null) }
     fun onFindPhone(v: String) = _state.update {
-        it.copy(findPhone = formatPhoneNumber(v), findError = null)
+        it.copy(findPhone = digitsOnlyPhone(v), findError = null)
     }
     fun onResetLoginId(v: String) = _state.update { it.copy(resetLoginId = v, resetError = null) }
     fun onVerifyCode(v: String) = _state.update { it.copy(verifyCode = v, resetError = null) }
@@ -51,7 +52,7 @@ class ForgotViewModel(
         }
         viewModelScope.launch {
             _state.update { it.copy(findLoading = true, findError = null, findInfo = null) }
-            runCatching { authRepository.findId(s.findName.trim(), s.findPhone.trim()) }
+            runCatching { authRepository.findId(s.findName.trim(), formatPhoneNumber(s.findPhone)) }
                 .onSuccess { id ->
                     _state.update {
                         it.copy(

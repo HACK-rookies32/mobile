@@ -11,8 +11,11 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.hack.kidhack.BuildConfig
+import com.hack.kidhack.background.alert.ParentAlertBus
 import com.hack.kidhack.background.command.ChildCommandBus
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.data.repository.fake.FakeData
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.model.Session
@@ -26,6 +29,7 @@ fun KidhackNavHost() {
     val sessionRepository = koin.get<SessionRepository>()
     val sessionEvents = koin.get<SessionEvents>()
     val commandBus = koin.get<ChildCommandBus>()
+    val parentAlertBus = koin.get<ParentAlertBus>()
     val navController = rememberNavController()
     val colors = LocalKidhackColors.current
 
@@ -57,6 +61,20 @@ fun KidhackNavHost() {
         }
     }
 
+    // 부모 안전 알림 푸시 탭 → 알림 탭. 탭 위에 쌓지 않고 부모 그래프 최상위로 연다.
+    LaunchedEffect(Unit) {
+        parentAlertBus.pending.collect {
+            if (sessionRepository.current()?.user?.role == Role.PARENT) {
+                navController.navigate(Route.ParentNotifications.path) {
+                    popUpTo(Route.ParentGraph.path) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = false
+                }
+            }
+            parentAlertBus.consume()
+        }
+    }
+
     LaunchedEffect(Unit) {
         sessionEvents.logout.collect {
             navController.navigate(Route.Login.path) {
@@ -82,7 +100,11 @@ fun KidhackNavHost() {
                 CircularProgressIndicator(color = androidx.compose.ui.graphics.Color.White)
             }
             LaunchedEffect(Unit) {
-                val session = sessionRepository.current()
+                var session = sessionRepository.current()
+                // 목업: 예전 가입 세션(id=user-…)이나 parentId 누락 세션을 더미 계정으로 교정
+                if (BuildConfig.USE_MOCK && session != null) {
+                    session = normalizeMockSession(sessionRepository, session)
+                }
                 when (session?.user?.role) {
                     Role.PARENT -> navController.navigate(Route.ParentGraph.path) {
                         popUpTo(Route.Splash.path) { inclusive = true }
@@ -100,4 +122,36 @@ fun KidhackNavHost() {
         parentGraph(navController)
         childGraph(navController)
     }
+}
+
+/**
+ * 목업 세션 교정.
+ * - 예전 가입으로 남은 `user-…` id
+ * - parentId 없이 저장된 자녀 세션
+ * → 더미 minjun(101) / 숫자 id + parentId 로 맞춘다.
+ */
+private suspend fun normalizeMockSession(
+    sessionRepository: SessionRepository,
+    session: Session,
+): Session {
+    val user = session.user
+    val idOk = user.id.toLongOrNull() != null
+    val parentOk = user.role != Role.CHILD || user.parentId != null
+    if (idOk && parentOk) return session
+
+    val fixed = when {
+        user.loginId.equals("minjun", ignoreCase = true) ||
+            (user.role == Role.CHILD && !idOk) -> FakeData.sessionFor(FakeData.childUser)
+        user.role == Role.CHILD -> FakeData.sessionFor(
+            user.copy(
+                id = user.id.toLongOrNull()?.toString() ?: "101",
+                parentId = user.parentId ?: 1L,
+            ),
+        )
+        else -> FakeData.sessionFor(
+            user.copy(id = user.id.toLongOrNull()?.toString() ?: "1"),
+        )
+    }
+    sessionRepository.save(fixed)
+    return fixed
 }

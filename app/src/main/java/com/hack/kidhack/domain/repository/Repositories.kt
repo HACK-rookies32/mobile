@@ -7,15 +7,19 @@ import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
+import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildPhoto
+import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
+import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.PairingCode
@@ -90,21 +94,56 @@ interface ChildRepository {
 }
 
 interface LocationRepository {
-    suspend fun current(childId: String): LocationPoint
+    /** 자녀 앱에서 좌표 업로드. 저장된 세그먼트/포인트를 돌려준다. */
+    suspend fun track(childId: String, latitude: String, longitude: String): LocationPoint
+
+    /** 동선 세그먼트 최신순. 실시간 ON이면 첫 항목이 현재 위치. */
     suspend fun history(childId: String): List<LocationPoint>
-    suspend fun uploadBatch(points: List<LocationPoint>)
-    suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String)
+
+    /** 실시간 추적 토글. 서버가 확정한 상태를 돌려준다. */
+    suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean
 }
 
-interface GeofenceRepository {
+interface DeviceRepository {
+    /** 기기 전원/GPS 꺼짐 보고. type = "POWER_OFF" | "GPS_OFF" */
+    suspend fun reportEvent(childId: String, type: String)
+
+    /** FCM 토큰 등록·해제. 서버가 아직 없으면 호출자가 runCatching으로 삼킨다. */
+    suspend fun registerPushToken(token: String)
+    suspend fun unregisterPushToken(token: String)
+}
+
+interface DashboardRepository {
+    suspend fun get(childId: String): ChildDashboard
+}
+
+interface PlaceRepository {
     suspend fun list(childId: String): List<Geofence>
-    suspend fun create(childId: String, geofence: Geofence): Geofence
-    suspend fun delete(childId: String, geofenceId: String)
+    suspend fun create(childId: String, place: Geofence): Geofence
+
+    /** 백엔드에 신설 요청한 DELETE /location/places/{placeId} 선반영. */
+    suspend fun delete(childId: String, placeId: String)
+}
+
+interface LocationEventRepository {
+    suspend fun events(childId: String): List<LocationEvent>
 }
 
 interface NotificationRepository {
-    fun paged(type: String?): Flow<PagingData<AppNotification>>
-    suspend fun list(type: String?): List<AppNotification>
+    /** 명세 4.5 GET /notifications/{recipientId} — page/size 없이 배열 그대로 반환. */
+    suspend fun list(recipientId: String, childId: String? = null): List<AppNotification>
+    suspend fun markRead(notificationId: String)
+}
+
+/**
+ * 자녀 안전 사건의 서버 동기화 (docs/child-push-contract.md 4절 제안 계약).
+ *
+ * 자녀 앱이 [upload] 로 올리고 보호자 앱이 [list] 로 읽는다.
+ * 서버가 아직 구현하지 않아도 앱은 정상 동작해야 하므로, 실패는 호출자가 삼킨다.
+ */
+interface ChildAlertRepository {
+    suspend fun upload(childId: String, alerts: List<ChildAlertEvent>)
+    suspend fun list(childId: String): List<ChildAlertEvent>
 }
 
 interface BlocklistRepository {
@@ -128,7 +167,12 @@ interface ScreenshotRepository {
     ): Screenshot
 }
 
-/** 자녀 카메라로 찍은 사진을 부모 계정으로 올린다. */
+/**
+ * 자녀 카메라 촬영.
+ *
+ * 자녀 앱이 [upload] 로 올리고, 부모 앱이 [list] 로 갤러리를 보고
+ * [requestShot] 으로 「지금 찍어 달라」 요청을 보낸다(ScreenshotRepository 와 대칭).
+ */
 interface PhotoRepository {
     suspend fun upload(
         childId: String,
@@ -136,6 +180,11 @@ interface PhotoRepository {
         capturedAt: String,
         requestId: String?,
     ): ChildPhoto
+
+    suspend fun list(childId: String): List<ChildPhoto>
+
+    /** 부모 모드 전용. 서버가 자녀 기기로 CAMERA_REQUEST 푸시를 밀게 한다. */
+    suspend fun requestShot(childId: String)
 }
 
 /**
@@ -162,7 +211,7 @@ interface CommandRepository {
 }
 
 interface CommunityRepository {
-    fun pagedPosts(): Flow<PagingData<Post>>
+    fun pagedPosts(keyword: String? = null): Flow<PagingData<Post>>
     suspend fun posts(): List<Post>
     suspend fun post(postId: String): Post
     suspend fun create(
@@ -207,6 +256,8 @@ interface CardRepository {
 }
 
 interface ChatRepository {
+    /** 부모–자녀 1:1 방. 없으면 서버가 생성한다. */
+    suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom
     suspend fun rooms(): List<ChatRoom>
     suspend fun messages(roomId: String, before: String? = null, size: Int = 30): List<ChatMessage>
     fun observeMessages(roomId: String): Flow<ChatMessage>
@@ -232,7 +283,12 @@ interface SubscriptionRepository {
 }
 
 interface AppUsageRepository {
-    suspend fun list(childId: String, groupBy: String): List<AppUsage>
+    suspend fun list(
+        childId: String,
+        groupBy: String = "DAY",
+        from: String? = null,
+        to: String? = null,
+    ): List<AppUsageStat>
     suspend fun report(childId: String, usages: List<AppUsage>)
 }
 

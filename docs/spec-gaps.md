@@ -595,3 +595,15 @@ GAP-01(방향)과 별개로 **언제** 코드를 보내는지가 갈린다.
 14. **GAP-14 프로필 필드 · GAP-15 채팅 부가** — Fake/숨김으로 1차를 막지 않음.
 
 합의 기록은 이 파일을 수정해 ID별로 「결정: … / 일자」한 줄을 남긴다. 엔드포인트가 새로 생기면 명세 버전을 인용하고, 여기 적히지 않은 경로를 클라이언트에 넣지 않는다.
+
+## 결정 기록
+
+- GPS 상태 보고(reportGpsStatus, POST /devices/gps-status) (2026-08-26): 위치기반 서비스 v0.2 도메인 분리와 무관하게 LocationRepository에 임시 유지. 추후 백엔드에 /device/event 등 기기 상태 전용 엔드포인트가 생기면 DeviceRepository로 이관 검토.
+- 장소(지오펜스/목적지) 삭제 API (2026-08-26): v0.2 명세에는 없으나 팀 자체 프로젝트 특성상 백엔드팀에 DELETE /location/places/{placeId} 신설을 요청함. 클라이언트는 이 계약을 선반영해두었고, 백엔드 구현 전까지는 Fake로만 정상 동작. Real 연동 시 실제 경로/응답 형식을 백엔드와 재확인 필요.
+- 실시간 추적 상태 조회 API 부재 (2026-08-26): PATCH /location/tracking/{childId}/realtime로 켜고 끌 수는 있으나 현재 상태를 조회하는 GET이 명세에 없음. 부모 화면은 진입 시 항상 OFF로 시작(서버 실제 상태와 불일치 가능). 백엔드에 GET /location/tracking/{childId} 신설 또는 GET /children/{childId}/dashboard(4.18)에 realtimeEnabled 필드 추가를 요청 예정. 삭제하지 않고 요청으로 해결하는 정책 유지.
+- 위치기반 서비스 v0.2 반영 완료 (2026-08-26): 공유 레이어(Dtos/Models/Apis/Repositories) + 부모 화면(Location/Geofence) + 자녀 백그라운드(Tracking 단건화, 온디바이스 지오펜싱/배치큐 제거) 전 단계 완료. 신규 요청한 백엔드 API 2건 — DELETE /location/places/{placeId}(이미 반영), GET 실시간 상태 조회(요청 예정).
+- 도착 알림 토글(notifyOnArrival) 필드 부재 (2026-08-26): POST /location/places 명세에 대응 필드 없음. UI 숨김 처리, 서버 전송값은 true 고정. 백엔드에 필드 추가 요청 예정, 추가되면 스위치 UI 복구.
+- 장소 타입(GEOFENCE/DESTINATION) UI 단순화 (2026-08-26): 제품 요구사항상 모든 등록 장소가 진입+이탈 알림(도착/이동) 모두 필요하여, DESTINATION(도착만 감지) 개념은 사용하지 않기로 함. 클라이언트는 항상 type=GEOFENCE로 전송, 부모에게 타입 선택 UI 노출하지 않음. 명세 자체는 변경 없음(GEOFENCE는 기존 유효 값).
+- GPS 상태 보고 /device/event 마이그레이션 (2026-08-27): POST /devices/gps-status(구버전) → POST /device/event(type=GPS_OFF)로 전환 완료. DeviceRepository 신설. GPS 재활성화(ON) 이벤트는 명세에 정의되어 있지 않아 전송하지 않음. POWER_OFF(기기 전원 꺼짐) 이벤트는 일반 앱이 안정적으로 감지할 방법이 없어(Device Owner 필요) 이번 작업 범위에서 제외. API 계약(DeviceEventRequest.type="POWER_OFF")만 준비해두고 실제 트리거는 기획/백엔드와 별도 논의 필요.
+- 대시보드 통합 API 연동 (2026-08-27): GET /children/{childId}/dashboard 신설 반영. DashboardViewModel이 location/notifications를 개별 호출하던 것을 통합 호출로 교체(DashboardRepository/ChildDashboard 신설). usages(앱 사용량)는 응답에 없어 기존 app-usage 호출 유지. blockRules(필터링 규칙)는 데이터만 받아오고 화면 미노출 — 기존 HarmfulScreen의 BlocklistApi(blacklist/whitelist 구조)와는 다른 도메인이라 통합하지 않음(GAP-04 별개 사안).
+- 앱 사용량 API /monitoring/usage 마이그레이션 + 상세 화면 신규 제작 (2026-08-27): children/{childId}/app-usage(구버전) → POST/GET /monitoring/usage(v0.2)로 전환. AppUsageRepository.list() 반환 타입을 groupBy 의미를 반영한 AppUsageStat(key, durationSec)로 변경. report()는 시그니처 유지, recordedAt은 리포지토리 계층에서 채워 자녀 측 AppUsageWorker.kt 변경 불필요. 대시보드 '전체 보기' 버튼이 앱 통제 화면으로 잘못 연결되어 있던 것을 신규 AppUsageDetailScreen(APP/HOUR/DAY 전환 가능)으로 정정. (부수: AppUsageCollector의 서버 폴백이 list()를 쓰므로 AppUsageStat→AppUsage 매핑 1줄만 반영 — 명세의 "AppUsageCollector 무영향" 전제 보정.)

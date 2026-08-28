@@ -20,6 +20,7 @@ import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.KidTextField
+import com.hack.kidhack.core.common.PhoneNumberVisualTransformation
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
@@ -51,6 +52,7 @@ fun ForgotScreen(
             viewModel::onFindPhone,
             "휴대폰 번호",
             placeholder = "010-0000-0000",
+            visualTransformation = PhoneNumberVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
         )
         KidButton(
