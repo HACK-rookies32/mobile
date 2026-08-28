@@ -66,6 +66,10 @@ import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import com.hack.kidhack.domain.repository.ChildAlertRepository
+<<<<<<< HEAD
+import com.hack.kidhack.domain.repository.DeviceRepository
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.PairingRepository
 import com.hack.kidhack.domain.repository.PaymentRepository
@@ -237,8 +241,26 @@ class FakeChildRepository : ChildRepository {
     )
 }
 
-class FakeLocationRepository : LocationRepository {
+class FakeLocationRepository(private val feed: MockNotificationFeed) : LocationRepository {
     private val historyMap = mutableMapOf<String, MutableList<LocationPoint>>()
+<<<<<<< HEAD
+    override suspend fun current(childId: String): LocationPoint =
+        FakeData.locationFor(childId)
+    override suspend fun history(childId: String): List<LocationPoint> = historyMap[childId] ?: listOf(
+        LocationPoint("37.5665", "126.9780", "14:00", "📍 학교"),
+        LocationPoint("37.5655", "126.9770", "15:30", "📍 학원"),
+        LocationPoint("37.5645", "126.9760", "17:00", "📍 집"),
+    )
+    override suspend fun uploadBatch(points: List<LocationPoint>) {}
+    override suspend fun reportGpsStatus(gpsEnabled: Boolean, reportedAt: String) {
+        if (gpsEnabled) return
+        feed.add(
+            type = "GPS_OFF",
+            title = "자녀 기기의 GPS가 꺼졌어요",
+            body = "위치를 확인할 수 없어요. 자녀에게 위치 서비스를 켜 달라고 알려 주세요.",
+            childId = FakeData.loggedInChildProfileId,
+        )
+=======
     private val realtimeMap = mutableMapOf<String, Boolean>()
 
     override suspend fun track(childId: String, latitude: String, longitude: String): LocationPoint {
@@ -261,6 +283,7 @@ class FakeLocationRepository : LocationRepository {
     override suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean {
         realtimeMap[childId] = enabled
         return enabled
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     }
 }
 
@@ -298,6 +321,69 @@ class FakePlaceRepository : PlaceRepository {
     }
 }
 
+<<<<<<< HEAD
+/**
+ * 목업 자녀 사건 동기화.
+ *
+ * 한 기기 안에서만 도니 실제 두 기기 연동은 못 하지만, 계정을 바꿔 가며 테스트할 때
+ * 자녀 사건이 [MockNotificationFeed] 를 거쳐 보호자 알림으로 흘러가는 흐름은 같다.
+ * list 는 빈 목록을 준다 — 보호자 쪽은 FakeNotificationRepository 가 이미 feed 를 읽으므로
+ * 여기서도 주면 같은 사건이 두 번 실린다.
+ */
+/** 목업은 실제 서버가 없으니 토큰을 받기만 하고 버린다. */
+class FakeDeviceRepository : DeviceRepository {
+    override suspend fun registerPushToken(token: String) = Unit
+    override suspend fun unregisterPushToken(token: String) = Unit
+}
+
+<<<<<<< HEAD
+=======
+class FakeChildAlertRepository(private val feed: MockNotificationFeed) : ChildAlertRepository {
+    override suspend fun upload(childId: String, alerts: List<ChildAlertEvent>) {
+        alerts.forEach { alert ->
+            val parentType = childAlertTypeToParent(alert.type) ?: return@forEach
+            feed.add(
+                type = parentType,
+                title = alert.title,
+                body = alert.body.ifBlank { alert.title },
+                dedupeKey = alert.id,
+                childId = FakeData.loggedInChildProfileId,
+            )
+        }
+    }
+
+    override suspend fun list(childId: String): List<ChildAlertEvent> = emptyList()
+}
+
+/**
+ * 목업 알림 목록.
+ *
+ * 고정 예시 2건만 돌려주면 자녀가 무슨 짓을 해도 부모 화면이 그대로였다.
+ * 자녀 기기가 보고한 사건([MockNotificationFeed])을 앞에 붙여 실서버처럼 보이게 한다.
+ */
+class FakeNotificationRepository(private val feed: MockNotificationFeed) : NotificationRepository {
+    override fun paged(type: String?, childId: String?): Flow<PagingData<AppNotification>> =
+        Pager(PagingConfig(20)) {
+            PageResponsePagingSource { page, size ->
+                val items = list(type, childId)
+                PageResponse(items, page, size, items.size.toLong(), 1)
+            }
+        }.flow
+    override suspend fun list(type: String?, childId: String?): List<AppNotification> =
+        (feed.all() + SAMPLES)
+            .filter { type == null || it.type == type }
+            .filter { childId == null || it.childId == null || it.childId == childId }
+
+    private companion object {
+        val SAMPLES = listOf(
+            AppNotification("n1", "LOCATION", "안전 구역 이탈", "민준이가 '학교' 구역을 벗어났습니다.", "14:20", false, FakeData.minjun.id),
+            AppNotification("n2", "HARMFUL", "유해 사이트 접속 차단", "지아의 부적절한 사이트 접속 시도가 차단되었습니다.", "12:05", true, FakeData.jia.id),
+        )
+    }
+}
+
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
 class FakeLocationEventRepository : LocationEventRepository {
     override suspend fun events(childId: String): List<LocationEvent> = FakeData.locationEvents
 }
@@ -333,6 +419,7 @@ class FakeNotificationRepository(private val feed: MockNotificationFeed) : Notif
         )
     }
 }
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 /**
  * 목업 블랙/화이트리스트.
  *
@@ -342,10 +429,20 @@ class FakeNotificationRepository(private val feed: MockNotificationFeed) : Notif
  * id 는 인덱스가 아니라 **키워드 그 자체**다. 인덱스로 만들면 목록이 바뀔 때마다 id 가 밀려서
  * `remove(itemId)` 가 엉뚱한 항목을 지운다. 실구현체도 같은 규칙을 쓴다.
  */
+<<<<<<< HEAD
+<<<<<<< HEAD
+class FakeBlocklistRepository(private val store: BlocklistStore) : BlocklistRepository {
+=======
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 class FakeBlocklistRepository(
     private val store: BlocklistStore,
     private val feed: MockNotificationFeed,
 ) : BlocklistRepository {
+<<<<<<< HEAD
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     override suspend fun get(childId: String): List<BlocklistItem> =
         store.blacklist().map { BlocklistItem(it, "BLACK", it) } +
             store.whitelist().map { BlocklistItem(it, "WHITE", it) }
@@ -354,6 +451,27 @@ class FakeBlocklistRepository(
     }
     override suspend fun remove(childId: String, itemId: String) {
         store.remove(itemId)
+<<<<<<< HEAD
+<<<<<<< HEAD
+    }
+    override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) {}
+=======
+    }
+    /**
+     * 실서버라면 여기서 보호자 알림이 만들어진다. 목업도 같게 동작시켜서
+     * 자녀의 차단 사건이 부모 화면까지 흘러가는지 확인할 수 있게 한다.
+     */
+    override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) {
+        feed.add(
+            type = "HARMFUL",
+            title = "유해 사이트 접속 차단",
+            body = matchedText + " 이(가) 포함된 사이트 접속 시도가 차단되었어요.",
+            dedupeKey = "HARMFUL-" + matchedText,
+            childId = FakeData.loggedInChildProfileId,
+        )
+    }
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
     }
     override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) {
         feed.add(
@@ -364,6 +482,7 @@ class FakeBlocklistRepository(
             childId = FakeData.loggedInChildProfileId,
         )
     }
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 }
 
 class FakeScreenshotRepository(
@@ -715,6 +834,12 @@ class FakeSubscriptionRepository : SubscriptionRepository {
 }
 
 class FakeAppUsageRepository(private val feed: MockNotificationFeed) : AppUsageRepository {
+<<<<<<< HEAD
+    override suspend fun list(childId: String, groupBy: String): List<AppUsage> =
+        FakeData.usagesFor(childId)
+    override suspend fun report(childId: String, usages: List<AppUsage>) {
+        // 한도는 자녀 앱의 ScreenTimeWatcher 와 같은 값을 쓴다(GAP-12: 서버에 한도 필드가 없다).
+=======
     override suspend fun list(
         childId: String,
         groupBy: String,
@@ -726,6 +851,7 @@ class FakeAppUsageRepository(private val feed: MockNotificationFeed) : AppUsageR
         else -> FakeData.usages.map { AppUsageStat(it.appName, it.durationSec) }
     }
     override suspend fun report(childId: String, usages: List<AppUsage>) {
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
         val totalMinutes = usages.sumOf { it.durationSec } / 60
         if (totalMinutes < DAILY_LIMIT_MINUTES) return
         feed.addOncePerDay(

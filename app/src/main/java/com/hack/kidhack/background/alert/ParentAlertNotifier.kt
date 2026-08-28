@@ -13,8 +13,11 @@ import com.hack.kidhack.R
 import com.hack.kidhack.core.permission.KidhackPermissions
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.NotificationSettings
+<<<<<<< HEAD
+=======
 import com.hack.kidhack.domain.model.body
 import com.hack.kidhack.domain.model.title
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 
 /**
  * 부모 기기에 자녀 안전 알림을 푸시로 띄운다.

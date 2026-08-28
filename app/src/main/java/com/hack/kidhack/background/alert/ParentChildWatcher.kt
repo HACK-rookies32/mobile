@@ -3,7 +3,11 @@ package com.hack.kidhack.background.alert
 import com.hack.kidhack.core.common.KoreanParticles
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.data.local.ParentWatchStore
+<<<<<<< HEAD
+import com.hack.kidhack.domain.model.AppUsage
+=======
 import com.hack.kidhack.domain.model.AppUsageStat
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.LocationPoint
@@ -11,7 +15,11 @@ import com.hack.kidhack.domain.model.childAlertTypeToParent
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.ChildAlertRepository
 import com.hack.kidhack.domain.repository.ChildRepository
+<<<<<<< HEAD
+import com.hack.kidhack.domain.repository.GeofenceRepository
+=======
 import com.hack.kidhack.domain.repository.PlaceRepository
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.domain.repository.LocationRepository
 import java.text.SimpleDateFormat
 import java.time.Instant
@@ -48,7 +56,11 @@ import kotlin.math.sqrt
 class ParentChildWatcher(
     private val childRepository: ChildRepository,
     private val locationRepository: LocationRepository,
+<<<<<<< HEAD
+    private val geofenceRepository: GeofenceRepository,
+=======
     private val placeRepository: PlaceRepository,
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     private val appUsageRepository: AppUsageRepository,
     private val childAlertRepository: ChildAlertRepository,
     private val store: ParentWatchStore,
@@ -64,9 +76,15 @@ class ParentChildWatcher(
         // 자녀 기기가 직접 올린 사건이 가장 정확하다. 파생 판정보다 먼저 처리해
         // 같은 사건이 두 경로로 두 번 울리지 않게 한다.
         relayChildAlerts(child)
+<<<<<<< HEAD
+        val location = runCatching { locationRepository.current(child.id) }.getOrNull()
+        if (location != null) {
+            val fences = runCatching { geofenceRepository.list(child.id) }.getOrNull().orEmpty()
+=======
         val location = runCatching { locationRepository.history(child.id).firstOrNull() }.getOrNull()
         if (location != null) {
             val fences = runCatching { placeRepository.list(child.id) }.getOrNull().orEmpty()
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
             checkGeofence(child, location, fences)
             checkLocationFreshness(child, location)
         }
@@ -175,7 +193,11 @@ class ParentChildWatcher(
         store.setStale(child.id, stale)
     }
 
+<<<<<<< HEAD
+    private suspend fun checkUsage(child: ChildProfile, usages: List<AppUsage>) {
+=======
     private suspend fun checkUsage(child: ChildProfile, usages: List<AppUsageStat>) {
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
         val totalMinutes = usages.sumOf { it.durationSec } / 60
         if (totalMinutes < DAILY_LIMIT_MINUTES) return
         val today = DAY_FORMAT.format(Date())

@@ -11,7 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+<<<<<<< HEAD
+=======
 import com.hack.kidhack.BuildConfig
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.background.alert.ParentAlertBus
 import com.hack.kidhack.background.command.ChildCommandBus
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors

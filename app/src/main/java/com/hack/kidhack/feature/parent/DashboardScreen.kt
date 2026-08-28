@@ -59,7 +59,11 @@ import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.ChildRepository
+<<<<<<< HEAD
+import com.hack.kidhack.domain.repository.LocationRepository
+=======
 import com.hack.kidhack.domain.repository.DashboardRepository
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.domain.repository.SelectedChildRepository
 import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,12 +79,19 @@ data class DashboardUiState(
     val selected: ChildProfile? = null,
     val lastLocation: String? = null,
     val lastLocationAt: String? = null,
+<<<<<<< HEAD
+    val usages: List<AppUsage> = emptyList(),
+=======
     val usages: List<AppUsageStat> = emptyList(),
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     /** 보관함 전체. 화면에 그리는 건 아래 [notifications] 로 걸러 낸 것이다. */
     val allNotifications: List<AppNotification> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
+<<<<<<< HEAD
+=======
     val parentName: String = "부모",
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 ) {
     /**
      * 지금 고른 자녀의 알림.
@@ -99,10 +110,16 @@ class DashboardViewModel(
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
     private val appUsageRepository: AppUsageRepository,
+<<<<<<< HEAD
+    private val alertSync: ParentAlertSync,
+    private val locationRepository: LocationRepository,
+    private val childWatcher: ParentChildWatcher,
+=======
     private val dashboardRepository: DashboardRepository,
     private val alertSync: ParentAlertSync,
     private val childWatcher: ParentChildWatcher,
     private val sessionRepository: SessionRepository,
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DashboardUiState())
@@ -118,7 +135,15 @@ class DashboardViewModel(
         // 당겨서 새로고침하지 않아도 「최근 알림」이 바로 바뀐다.
         viewModelScope.launch {
             alertSync.alerts.collect { alerts ->
+<<<<<<< HEAD
+<<<<<<< HEAD
+                _state.update { it.copy(notifications = alerts) }
+=======
                 _state.update { it.copy(allNotifications = alerts) }
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
+                _state.update { it.copy(allNotifications = alerts) }
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
             }
         }
         refresh()
@@ -134,15 +159,28 @@ class DashboardViewModel(
         viewModelScope.launch { alertSync.sync() }
     }
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     /**
      * 자녀 상태를 지금 판정한다.
      *
      * 15분 주기 워커를 기다리지 않고 당겨서 새로고침하면 바로 확인할 수 있게 한다.
+<<<<<<< HEAD
+     * 자녀당 API 를 세 번 부르므로 화면에 들어올 때마다가 아니라 새로고침에서만 돈다.
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
      */
     private fun evaluateChildren() {
         viewModelScope.launch { runCatching { childWatcher.evaluateAll() } }
     }
 
+<<<<<<< HEAD
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     fun refresh() {
         viewModelScope.launch {
             _state.update {
@@ -183,8 +221,15 @@ class DashboardViewModel(
             // TODO: Backend Integration - API 엔드포인트에 따라 파라미터(날짜, 타입 등) 조정 필요
             // 앱 사용량은 대시보드 통합 응답에 없어 개별 유지.
             val usages = appUsageRepository.list(childId, "APP")
+<<<<<<< HEAD
+            // 서버 목록을 로컬 보관함에 합쳐 저장하고 새 알림은 푸시로 띄운다.
+            // 화면에 그릴 목록은 위에서 구독한 스트림이 채우므로 여기서 대입하지 않는다.
+            alertSync.sync()
+            val loc = runCatching { locationRepository.current(childId) }.getOrNull()
+=======
             val dashboard = dashboardRepository.get(childId)
             alertSync.sync()
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
             _state.update {
                 it.copy(
                     loading = false,
@@ -192,8 +237,14 @@ class DashboardViewModel(
                     selectedId = childId,
                     selected = child,
                     usages = usages,
+<<<<<<< HEAD
+                    // TODO: Backend Integration - 실 API가 위경도만 줄 경우 역지오코딩 로직 추가 필요
+                    lastLocation = loc?.label,
+                    lastLocationAt = loc?.recordedAt?.takeLast(5),
+=======
                     lastLocation = dashboard.currentLocation?.label,
                     lastLocationAt = dashboard.currentLocation?.updatedAt?.takeLast(5),
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
                 )
             }
         }.onFailure { t ->

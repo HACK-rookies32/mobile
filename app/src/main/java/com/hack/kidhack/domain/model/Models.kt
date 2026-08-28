@@ -79,6 +79,8 @@ data class AppNotification(
      * 그런 알림은 숨기지 않고 모든 자녀에게 공통으로 보여 준다 — 감춰서 놓치는 것보다 낫다.
      */
     val childId: String? = null,
+<<<<<<< HEAD
+=======
 )
 
 /** ingyu 알림 경로가 쓰던 title/body. 서버 계약의 message를 첫 줄/나머지로 나눈다. */
@@ -96,6 +98,7 @@ data class ChildDashboard(
     val recentNotifications: List<AppNotification>,
     val blockRulePatterns: List<String>,
     val places: List<Geofence>,
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 )
 
 data class NotificationSettings(
@@ -207,6 +210,8 @@ data class AppUsage(
     val category: String? = null,
 )
 
+<<<<<<< HEAD
+=======
 /** 서버 GET /monitoring/usage 집계 결과. groupBy에 따라 key의 의미가 달라진다
  *  (APP=앱 이름, HOUR="00"~"23", DAY="yyyy-MM-dd"). */
 data class AppUsageStat(
@@ -214,6 +219,7 @@ data class AppUsageStat(
     val durationSec: Int,
 )
 
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 /**
  * 자녀 기기에서 감지된 안전 사건.
  *

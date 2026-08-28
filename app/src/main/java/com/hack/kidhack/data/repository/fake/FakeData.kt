@@ -99,6 +99,8 @@ object FakeData {
         ),
     )
 
+<<<<<<< HEAD
+=======
     // 진입(도착)과 이탈(이동) 알림을 모두 받아야 해서 전부 GEOFENCE다.
     val places = listOf(
         Geofence("1", "학교", "37.5700", "126.9762", 200, true, PlaceType.GEOFENCE),
@@ -135,6 +137,7 @@ object FakeData {
         AppUsageStat("2026-08-27", 4100),
     )
 
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     private val jiaUsages = listOf(
         AppUsage("Roblox", 46 * 60, "게임"),
         AppUsage("YouTube Kids", 25 * 60, "동영상"),

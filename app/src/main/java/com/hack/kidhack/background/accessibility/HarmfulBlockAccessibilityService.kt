@@ -11,7 +11,14 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
 import android.widget.Toast
 import com.hack.kidhack.R
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
 import com.hack.kidhack.background.ChildAlertUploadWorker
+>>>>>>> 28ecca4 (알림 기능 수정 2차)
+=======
+import com.hack.kidhack.background.ChildAlertUploadWorker
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.core.common.HarmfulKeywordMatcher
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.domain.model.BlocklistItem

@@ -15,9 +15,13 @@ import com.hack.kidhack.data.remote.dto.CommentDto
 import com.hack.kidhack.data.remote.dto.InquiryAnswerDto
 import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
+<<<<<<< HEAD
+import com.hack.kidhack.data.remote.dto.LocationDto
+=======
 import com.hack.kidhack.data.remote.dto.LocationEventDto
 import com.hack.kidhack.data.remote.dto.LocationTrackResponse
 import com.hack.kidhack.data.remote.dto.DashboardResponse
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.data.remote.dto.ChildAlertDto
 import com.hack.kidhack.data.remote.dto.NotificationDto
 import com.hack.kidhack.data.remote.dto.NotificationSettingsDto
@@ -40,7 +44,10 @@ import com.hack.kidhack.domain.model.AllowanceType
 import com.hack.kidhack.data.remote.dto.WalletDto
 import com.hack.kidhack.data.remote.dto.WalletTransactionDto
 import com.hack.kidhack.domain.model.AppNotification
+<<<<<<< HEAD
+=======
 import com.hack.kidhack.domain.model.ChildDashboard
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.AppUsageStat
@@ -86,7 +93,10 @@ fun UserDto.toDomain(): User {
         loginId = resolvedLogin,
         name = resolvedName,
         role = role.toRoleOrNull() ?: Role.PARENT,
+<<<<<<< HEAD
+=======
         nickname = nickname,
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
         phone = phoneNumber?.takeIf { it.isNotBlank() } ?: phone.orEmpty(),
         email = email,
         profileImageUrl = profileImageUrl,
@@ -154,6 +164,8 @@ fun PlaceResponse.toDomain(): Geofence = Geofence(
     type = runCatching { PlaceType.valueOf(type) }.getOrDefault(PlaceType.GEOFENCE),
 )
 
+<<<<<<< HEAD
+=======
 fun LocationEventDto.toDomain(): LocationEvent = LocationEvent(
     id = id.toString(),
     placeId = placeId.toString(),
@@ -171,6 +183,7 @@ fun DashboardResponse.toDomain(): ChildDashboard = ChildDashboard(
     places = places.map { it.toDomain() },
 )
 
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 fun ChildAlertDto.toDomain(): ChildAlertEvent = ChildAlertEvent(id, type, title, body, occurredAt)
 
 fun ChildAlertEvent.toDto(): ChildAlertDto = ChildAlertDto(id, type, title, body, occurredAt)
@@ -236,6 +249,15 @@ fun ChatRoomDto.toDomain(titleOverride: String? = null): ChatRoom = ChatRoom(
     childId = childId,
 )
 
+<<<<<<< HEAD
+fun ChatMessageDto.toDomain(): ChatMessage = ChatMessage(
+    id = id,
+    roomId = roomId,
+    fromRole = fromRole.toRoleOrNull() ?: Role.PARENT,
+    text = text,
+    sentAt = sentAt,
+)
+=======
 fun ChatMessageDto.toDomain(myUserId: Long? = null, myRole: Role = Role.PARENT): ChatMessage {
     val resolvedText = content?.takeIf { it.isNotBlank() } ?: text
     val role = when {
@@ -258,6 +280,7 @@ fun ChatMessageDto.toDomain(myUserId: Long? = null, myRole: Role = Role.PARENT):
         sentAt = sentAt,
     )
 }
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 
 fun PaymentDto.toDomain(): Payment = Payment(
     id = id,

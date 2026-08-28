@@ -8,8 +8,12 @@ import android.location.LocationManager
 import android.os.Build
 import com.hack.kidhack.background.ChildAlertUploadWorker
 import com.hack.kidhack.data.local.ChildAlertStore
+<<<<<<< HEAD
+import com.hack.kidhack.domain.repository.LocationRepository
+=======
 import com.hack.kidhack.domain.repository.DeviceRepository
 import com.hack.kidhack.domain.repository.SessionRepository
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,8 +29,12 @@ import kotlinx.coroutines.launch
  */
 class GpsStatusMonitor(
     private val context: Context,
+<<<<<<< HEAD
+    private val locationRepository: LocationRepository,
+=======
     private val deviceRepository: DeviceRepository,
     private val sessionRepository: SessionRepository,
+>>>>>>> 3c24953b345a846397da744d9d2a9170b7a27e57
     private val alertStore: ChildAlertStore,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -81,6 +89,16 @@ class GpsStatusMonitor(
             runCatching {
                 val childId = sessionRepository.current()?.user?.id ?: return@launch
                 deviceRepository.reportEvent(childId, "GPS_OFF")
+            }
+            if (!enabled) {
+                // 자녀 홈 「최근 알림」에도 남기고, 보호자가 곧 받아 보도록 바로 올린다.
+                alertStore.record(
+                    type = ChildAlertStore.TYPE_GPS_OFF,
+                    title = "GPS가 꺼졌어요",
+                    body = "위치 전송이 멈췄어요. 위치 서비스를 다시 켜 주세요.",
+                    dedupeWindowMs = GPS_ALERT_DEDUPE_MS,
+                )
+                ChildAlertUploadWorker.enqueueNow(context)
             }
             if (!enabled) {
                 // 자녀 홈 「최근 알림」에도 남기고, 보호자가 곧 받아 보도록 바로 올린다.
