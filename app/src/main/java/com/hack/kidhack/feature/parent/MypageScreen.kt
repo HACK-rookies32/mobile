@@ -192,6 +192,7 @@ fun ParentMypageScreen(
     onOpenContact: () -> Unit = {},
     onOpenPay: () -> Unit = {},
     onOpenCards: () -> Unit = {},
+    onOpenTerms: () -> Unit = {},
     viewModel: MypageViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -333,7 +334,7 @@ fun ParentMypageScreen(
             ListRow(stringResource(R.string.parent_mypage_cards), leading = "🪪", onClick = onOpenCards, showDivider = false)
         }
         GroupCard(stringResource(R.string.parent_mypage_other)) {
-            ListRow(stringResource(R.string.parent_mypage_terms), onClick = {})
+            ListRow(stringResource(R.string.parent_mypage_terms), onClick = onOpenTerms)
             ListRow(stringResource(R.string.parent_mypage_version), trailing = "", onClick = null, showDivider = false)
         }
         KidButton(

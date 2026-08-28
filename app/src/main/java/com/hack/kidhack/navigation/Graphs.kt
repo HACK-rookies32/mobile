@@ -61,6 +61,7 @@ import com.hack.kidhack.feature.parent.ParentPairingScreen
 import com.hack.kidhack.feature.parent.ParentPayScreen
 import com.hack.kidhack.feature.parent.ParentCameraRequestScreen
 import com.hack.kidhack.feature.parent.ParentScreenshotScreen
+import com.hack.kidhack.feature.parent.ParentTermsScreen
 
 fun NavGraphBuilder.authGraph(
     navController: NavHostController,
@@ -116,6 +117,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 onOpenContact = { navController.navigate(Route.ParentContact.path) },
                 onOpenPay = { navController.navigate(Route.ParentPay.path) },
                 onOpenCards = { navController.navigate(Route.ParentCards.path) },
+                onOpenTerms = { navController.navigate(Route.ParentTerms.path) },
             )
         }
         composable(Route.ParentEditProfile.path) { ParentShell(navController) { ParentEditProfileScreen(onBack = { navController.popBackStack() }) } }
@@ -160,6 +162,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
         }
         composable(Route.ParentNotice.path) { ParentShell(navController) { ParentNoticeScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentContact.path) { ParentShell(navController) { ParentContactScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentTerms.path) { ParentShell(navController) { ParentTermsScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentPay.path) {
             ParentShell(navController) {
                 ParentPayScreen(
