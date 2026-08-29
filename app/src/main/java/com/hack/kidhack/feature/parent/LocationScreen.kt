@@ -122,7 +122,6 @@ class LocationViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
-                // TODO: Backend Integration - 실 API 연결 시 RealChildRepository 사용하도록 수정 필요
                 val children = childRepository.children()
                 val id = selectedChildRepository.resolveId(children)
                 childId = id
@@ -134,6 +133,10 @@ class LocationViewModel(
                 // 장소·출입 기록은 부가 정보라 실패해도 위치 표시는 그대로 간다.
                 val places = runCatching { placeRepository.list(id) }.getOrDefault(emptyList())
                 val events = runCatching { locationEventRepository.events(id) }.getOrDefault(emptyList())
+                // 스위치 초기값을 서버에서 가져온다. 예전에는 false 로 시작해서, 실제로
+                // 추적이 켜져 있어도 화면에서는 꺼진 것처럼 보였다.
+                val realtime = runCatching { locationRepository.realtimeEnabled(id) }
+                    .getOrDefault(_state.value.realtimeEnabled)
                 _state.update {
                     it.copy(
                         loading = false,
@@ -141,6 +144,7 @@ class LocationViewModel(
                         history = history,
                         places = places,
                         events = events,
+                        realtimeEnabled = realtime,
                     )
                 }
             }.onFailure { t ->
@@ -151,7 +155,6 @@ class LocationViewModel(
 
     fun toggleRoute() = _state.update { it.copy(showRoute = !it.showRoute) }
 
-    // TODO: Backend Integration - 실시간 상태 조회 API가 없어 토글 결과만 로컬에 들고 있다
     fun setRealtime(enabled: Boolean) {
         val id = childId ?: return
         viewModelScope.launch {

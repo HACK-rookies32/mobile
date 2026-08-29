@@ -19,13 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -69,9 +66,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 data class ChildProfileUiState(
     val child: ChildProfile? = null,
@@ -80,7 +74,6 @@ data class ChildProfileUiState(
     val birthDate: String = "",
     val profileImageUrl: String? = null,
     val showPhotoOptions: Boolean = false,
-    val showDatePicker: Boolean = false,
     val saved: Boolean = false,
     val loading: Boolean = true,
     val error: String? = null,
@@ -96,21 +89,9 @@ class ChildProfileViewModel(
 
     init { load() }
 
-    fun onName(v: String) = _state.update { it.copy(name = v, saved = false) }
     fun onAlias(v: String) = _state.update { it.copy(alias = v, saved = false) }
     
     fun togglePhotoOptions(show: Boolean) = _state.update { it.copy(showPhotoOptions = show) }
-    fun toggleDatePicker(show: Boolean) = _state.update { it.copy(showDatePicker = show) }
-
-    fun onBirthDateSelected(millis: Long?) {
-        if (millis == null) {
-            toggleDatePicker(false)
-            return
-        }
-        val date = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-        val formatted = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-        _state.update { it.copy(birthDate = formatted, showDatePicker = false, saved = false) }
-    }
 
     fun onPhotoSelected(uri: Uri?) {
         // TODO: Backend Integration - 실제 서버 연동 시 이미지를 서버에 업로드하고 반환된 URL을 저장해야 함
@@ -153,23 +134,24 @@ class ChildProfileViewModel(
         val child = _state.value.child ?: return
         viewModelScope.launch {
             runCatching {
+                // 서버 ChildUpdateRequest 는 nickname·profileImageUrl 만 받는다.
+                // 이름·생년월일을 같이 보내던 시절에는 서버가 조용히 버리는데도
+                // 화면은 "저장되었습니다" 를 띄웠다.
                 childRepository.updateChild(
                     childId = child.id,
-                    name = _state.value.name.trim(),
-                    alias = _state.value.alias.trim().ifBlank { null },
+                    nickname = _state.value.alias.trim().ifBlank { null },
                     profileImageUrl = _state.value.profileImageUrl,
-                    birthDate = _state.value.birthDate.trim().ifBlank { null },
                 )
             }.onSuccess { updated ->
-                _state.update { 
+                _state.update {
                     it.copy(
-                        child = updated, 
-                        name = updated.name, 
+                        child = updated,
+                        name = updated.name,
                         alias = updated.alias.orEmpty(),
                         birthDate = updated.birthDate.orEmpty(),
                         profileImageUrl = updated.profileImageUrl,
-                        saved = true 
-                    ) 
+                        saved = true,
+                    )
                 }
             }.onFailure { t ->
                 _state.update { it.copy(error = t.message) }
@@ -221,7 +203,10 @@ fun ParentChildProfileScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(state.name.ifBlank { child.name }, fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 20.sp, color = colors.text)
-                    Text(child.ageLabel.orEmpty(), color = colors.muted, fontSize = 14.sp)
+                    // 나이/학년 라벨은 서버가 주지 않는다. 별명이 있으면 그걸 보여 준다.
+                    child.alias?.takeIf { it.isNotBlank() && it != child.name }?.let {
+                        Text(it, color = colors.muted, fontSize = 14.sp)
+                    }
                     Spacer(Modifier.height(8.dp))
                     KidButton(
                         text = stringResource(R.string.parent_profile_change_photo),
@@ -233,38 +218,27 @@ fun ParentChildProfileScreen(
             KidCard {
                 Text(stringResource(R.string.parent_profile_basic), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
                 Spacer(Modifier.height(8.dp))
-                KidTextField(state.name, viewModel::onName, stringResource(R.string.parent_profile_name))
+                // 서버가 수정 대상으로 받는 건 별명뿐이다. 이름·생년월일은 가입 정보라
+                // 부모가 바꿀 수 없어 읽기 전용으로 보여 준다.
+                KidTextField(
+                    value = state.name,
+                    onValueChange = {},
+                    label = stringResource(R.string.parent_profile_name),
+                    enabled = false,
+                )
                 KidTextField(state.alias, viewModel::onAlias, stringResource(R.string.parent_profile_alias))
-                Box(Modifier.clickable { viewModel.toggleDatePicker(true) }) {
-                    KidTextField(
-                        value = state.birthDate,
-                        onValueChange = {},
-                        label = stringResource(R.string.parent_profile_birth),
-                        placeholder = "날짜를 선택하세요",
-                        enabled = false
-                    )
-                }
+                KidTextField(
+                    value = state.birthDate,
+                    onValueChange = {},
+                    label = stringResource(R.string.parent_profile_birth),
+                    enabled = false,
+                )
             }
             if (state.saved) {
                 Text("성공적으로 저장되었습니다", color = colors.safe, fontSize = 12.sp, fontWeight = FontBold)
             }
             KidButton(stringResource(R.string.parent_profile_save), viewModel::save, Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-        }
-    }
-
-    if (state.showDatePicker) {
-        val datePickerState = rememberDatePickerState()
-        DatePickerDialog(
-            onDismissRequest = { viewModel.toggleDatePicker(false) },
-            confirmButton = {
-                KidButton("확인", { viewModel.onBirthDateSelected(datePickerState.selectedDateMillis) }, variant = KidButtonVariant.Ghost)
-            },
-            dismissButton = {
-                KidButton("취소", { viewModel.toggleDatePicker(false) }, variant = KidButtonVariant.Ghost)
-            }
-        ) {
-            DatePicker(state = datePickerState)
         }
     }
 

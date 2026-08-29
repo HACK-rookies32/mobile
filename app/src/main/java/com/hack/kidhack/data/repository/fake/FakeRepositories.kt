@@ -265,15 +265,11 @@ class FakeChildRepository : ChildRepository {
         FakeData.children.first { it.id == childId }
     override suspend fun updateChild(
         childId: String,
-        name: String?,
-        alias: String?,
+        nickname: String?,
         profileImageUrl: String?,
-        birthDate: String?,
     ): ChildProfile = child(childId).copy(
-        name = name ?: child(childId).name,
-        alias = alias ?: child(childId).alias,
+        alias = nickname ?: child(childId).alias,
         profileImageUrl = profileImageUrl ?: child(childId).profileImageUrl,
-        birthDate = birthDate ?: child(childId).birthDate,
     )
     override suspend fun unpair(childId: String) {
         delay(200)
@@ -306,6 +302,9 @@ class FakeLocationRepository : LocationRepository {
 
     override suspend fun history(childId: String): List<LocationPoint> =
         historyMap[childId] ?: FakeData.locationSegments
+
+    override suspend fun realtimeEnabled(childId: String): Boolean =
+        realtimeMap[childId] ?: false
 
     override suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean {
         realtimeMap[childId] = enabled

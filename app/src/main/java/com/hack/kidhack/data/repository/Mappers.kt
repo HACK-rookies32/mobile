@@ -10,6 +10,7 @@ import com.hack.kidhack.data.remote.dto.CardDto
 import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
+import com.hack.kidhack.data.remote.dto.ChildDetailDto
 import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.CommentDto
@@ -18,6 +19,7 @@ import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
 import com.hack.kidhack.data.remote.dto.LocationEventDto
 import com.hack.kidhack.data.remote.dto.LocationTrackResponse
+import com.hack.kidhack.data.remote.dto.TrackPointDto
 import com.hack.kidhack.data.remote.dto.DashboardResponse
 import com.hack.kidhack.data.remote.dto.ChildAlertDto
 import com.hack.kidhack.data.remote.dto.NotificationDto
@@ -126,10 +128,17 @@ fun ChildDto.toDomain(): ChildProfile = ChildProfile(
         ?: "자녀",
     alias = alias?.takeIf { it.isNotBlank() }
         ?: nickname?.takeIf { it.isNotBlank() },
-    ageLabel = ageLabel,
     birthDate = birthDate,
     profileImageUrl = profileImageUrl,
-    online = online,
+    realtimeEnabled = realtimeEnabled,
+)
+
+/** 동선 좌표. 서버가 숫자로 주지만 도메인은 문자열을 쓴다(지도 표시·기존 화면 호환). */
+fun TrackPointDto.toDomain(): LocationPoint = LocationPoint(
+    lat = lat.toString(),
+    lng = lng.toString(),
+    recordedAt = at.orEmpty(),
+    updatedAt = at,
 )
 
 fun LocationTrackResponse.toDomain(): LocationPoint = LocationPoint(
@@ -165,7 +174,11 @@ fun DashboardResponse.toDomain(): ChildDashboard = ChildDashboard(
     childId = childId.toString(),
     currentLocation = currentLocation?.toDomain(),
     realtimeEnabled = realtimeEnabled,
-    recentNotifications = recentNotifications.map { it.toDomain() },
+    // 서버가 나눠 준 두 목록을 최신순으로 합친다. createdAt 은 오프셋 없는 ISO 라
+    // 문자열 내림차순이 곧 시간 내림차순이다.
+    recentNotifications = (childNotifications + parentNotifications)
+        .map { it.toDomain() }
+        .sortedByDescending { it.createdAt },
     blockRulePatterns = blockRules.map { it.pattern },
     places = places.map { it.toDomain() },
 )
@@ -210,6 +223,22 @@ fun NotificationSettings.toDto(): NotificationSettingsDto = buildMap {
     put("APP_USAGE", appUsage)
     put("NOTICE", notice)
 }
+
+/** 상세 응답. 목록에 없는 loginId·email·phone·address·paired 를 채운다. */
+fun ChildDetailDto.toDomain(): ChildProfile = ChildProfile(
+    id = id,
+    name = username?.takeIf { it.isNotBlank() }
+        ?: nickname?.takeIf { it.isNotBlank() }
+        ?: "자녀",
+    alias = nickname?.takeIf { it.isNotBlank() },
+    birthDate = birthDate,
+    profileImageUrl = profileImageUrl,
+    paired = paired,
+    loginId = loginId,
+    email = email,
+    phone = phoneNumber,
+    address = address,
+)
 
 fun ActivityDto.toDomain(): Activity = Activity(
     id = id,

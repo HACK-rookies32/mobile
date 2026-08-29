@@ -54,18 +54,16 @@ object FakeData {
         id = "101",
         name = "김민준",
         alias = "민준",
-        ageLabel = "12세 · 초등학교 6학년",
         birthDate = "2014년 3월 15일",
-        online = true,
+        realtimeEnabled = true,
     )
 
     val jia = ChildProfile(
         id = "102",
         name = "이지아",
         alias = "지아",
-        ageLabel = "9세 · 초등학교 3학년",
         birthDate = "2017년 6월 2일",
-        online = false,
+        realtimeEnabled = false,
     )
 
     val children = listOf(minjun, jia)

@@ -3,8 +3,8 @@
     <string name="parent_hello">안녕하세요, %1$s님 👋</string>
     <string name="parent_dashboard_title">오늘의 모니터링</string>
     <string name="parent_dashboard_last_location">마지막 위치</string>
-    <string name="parent_dashboard_online">온라인</string>
-    <string name="parent_dashboard_offline">오프라인</string>
+    <string name="parent_dashboard_tracking_on">실시간 추적 켜짐</string>
+    <string name="parent_dashboard_tracking_off">실시간 추적 꺼짐</string>
     <string name="parent_dashboard_stat_screentime">오늘 스크린타임</string>
     <string name="parent_dashboard_stat_blocked">차단된 앱</string>
     <string name="parent_dashboard_stat_alerts">위험 알림</string>

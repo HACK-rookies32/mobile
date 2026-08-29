@@ -25,6 +25,7 @@ import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
 import com.hack.kidhack.data.remote.dto.CreateChatRoomRequest
+import com.hack.kidhack.data.remote.dto.ChildDetailDto
 import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
@@ -58,6 +59,7 @@ import com.hack.kidhack.data.remote.dto.PointBalanceDto
 import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
 import com.hack.kidhack.data.remote.dto.RealtimeToggleResponse
+import com.hack.kidhack.data.remote.dto.TrackResponse
 import com.hack.kidhack.data.remote.dto.RefreshRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
 import com.hack.kidhack.data.remote.dto.ReportRequest
@@ -167,13 +169,13 @@ interface ChildApi {
     suspend fun children(): ApiEnvelope<List<ChildDto>>
 
     @GET("children/{childId}")
-    suspend fun child(@Path("childId") childId: String): ApiEnvelope<ChildDto>
+    suspend fun child(@Path("childId") childId: String): ApiEnvelope<ChildDetailDto>
 
     @PATCH("children/{childId}")
     suspend fun update(
         @Path("childId") childId: String,
         @Body body: ChildUpdateRequest,
-    ): ApiEnvelope<ChildDto>
+    ): ApiEnvelope<ChildDetailDto>
 
     /**
      * 자녀 페어링 해제 (PARENT).
@@ -194,9 +196,16 @@ interface LocationApi {
     @POST("location/track")
     suspend fun track(@Body body: LocationTrackRequest): ApiEnvelope<LocationTrackResponse>
 
-    /** 최신순 세그먼트. 실시간 ON이면 첫 항목이 현재 위치. */
+    /**
+      * 동선 좌표 목록. 서버는 **시간 오름차순**으로 준다(마지막 항목이 가장 최근).
+      * 미사용 필터: `date`(하루치), `from`/`to`(구간). 없으면 보관 기간 전체.
+      */
     @GET("location/track/{childId}")
-    suspend fun history(@Path("childId") childId: String): ApiEnvelope<List<LocationTrackResponse>>
+    suspend fun history(@Path("childId") childId: String): ApiEnvelope<TrackResponse>
+
+    /** 실시간 추적 현재 상태 조회. */
+    @GET("location/tracking/{childId}/realtime")
+    suspend fun realtime(@Path("childId") childId: String): ApiEnvelope<RealtimeToggleResponse>
 
     /** body 없이 query `enabled`만 사용한다. */
     @PATCH("location/tracking/{childId}/realtime")
@@ -233,7 +242,7 @@ interface PlaceApi {
     @GET("location/places/{childId}")
     suspend fun list(@Path("childId") childId: String): ApiEnvelope<List<PlaceResponse>>
 
-    /** v0.2 명세에 없는 경로. 백엔드에 신설 요청한 계약을 선반영한 것이다(docs/spec-gaps.md). */
+    /** 지정 장소 삭제. */
     @DELETE("location/places/{placeId}")
     suspend fun delete(@Path("placeId") placeId: String): ApiEnvelope<Unit>
 }

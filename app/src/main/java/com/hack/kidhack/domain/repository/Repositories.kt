@@ -111,12 +111,11 @@ interface PairingRepository {
 interface ChildRepository {
     suspend fun children(): List<ChildProfile>
     suspend fun child(childId: String): ChildProfile
+    /** 서버 ChildUpdateRequest 가 받는 항목만. 이름·생년월일은 수정 대상이 아니다. */
     suspend fun updateChild(
         childId: String,
-        name: String?,
-        alias: String?,
+        nickname: String?,
         profileImageUrl: String?,
-        birthDate: String?,
     ): ChildProfile
 
     /**
@@ -133,8 +132,14 @@ interface LocationRepository {
     /** 자녀 앱에서 좌표 업로드. 저장된 세그먼트/포인트를 돌려준다. */
     suspend fun track(childId: String, latitude: String, longitude: String): LocationPoint
 
-    /** 동선 세그먼트 최신순. 실시간 ON이면 첫 항목이 현재 위치. */
+    /**
+     * 동선 좌표를 **최신순**으로. 첫 항목이 가장 최근 위치다.
+     * (서버는 오름차순으로 주고 구현에서 뒤집는다.)
+     */
     suspend fun history(childId: String): List<LocationPoint>
+
+    /** 실시간 추적 현재 상태. 화면 진입 시 스위치 초기값을 서버에서 가져오는 데 쓴다. */
+    suspend fun realtimeEnabled(childId: String): Boolean
 
     /** 실시간 추적 토글. 서버가 확정한 상태를 돌려준다. */
     suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean

@@ -36,10 +36,16 @@ data class ChildProfile(
     val id: String,
     val name: String,
     val alias: String? = null,
-    val ageLabel: String? = null,
     val birthDate: String? = null,
     val profileImageUrl: String? = null,
-    val online: Boolean = false,
+    /** 실시간 위치 추적 on/off. 목록 조회에만 담겨 온다. */
+    val realtimeEnabled: Boolean = false,
+    /** 상세 조회에만 담겨 온다. 부모와 연결돼 있는지. */
+    val paired: Boolean = false,
+    val loginId: String? = null,
+    val email: String? = null,
+    val phone: String? = null,
+    val address: String? = null,
 )
 
 data class LocationPoint(
@@ -102,6 +108,7 @@ data class ChildDashboard(
     val childId: String,
     val currentLocation: LocationPoint?,
     val realtimeEnabled: Boolean,
+    /** 자녀 알림과 부모 알림을 시간순으로 합친 목록. 서버는 둘을 나눠서 준다. */
     val recentNotifications: List<AppNotification>,
     val blockRulePatterns: List<String>,
     val places: List<Geofence>,
