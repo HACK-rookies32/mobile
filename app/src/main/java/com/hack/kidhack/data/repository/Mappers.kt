@@ -10,6 +10,7 @@ import com.hack.kidhack.data.remote.dto.CardDto
 import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
+import com.hack.kidhack.data.remote.dto.BlockRuleDto
 import com.hack.kidhack.data.remote.dto.ChildDetailDto
 import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildPhotoDto
@@ -31,11 +32,14 @@ import com.hack.kidhack.data.remote.dto.PointBalanceDto
 import com.hack.kidhack.data.remote.dto.PointHistoryDto
 import com.hack.kidhack.data.remote.dto.PostDto
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
+import com.hack.kidhack.data.remote.dto.ScreenshotUploadDto
 import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UserDto
 import com.hack.kidhack.domain.model.Activity
 import com.hack.kidhack.domain.model.ActivityType
+import com.hack.kidhack.domain.model.BlocklistItem
+import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.Allowance
 import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
@@ -55,6 +59,7 @@ import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.InstalledApp
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryAnswer
 import com.hack.kidhack.domain.model.LocationEvent
@@ -253,10 +258,32 @@ fun ActivityDto.toDomain(): Activity = Activity(
     createdAtLabel = createdAt.orEmpty(),
 )
 
+fun BlockRuleDto.toDomain(): BlocklistItem = BlocklistItem(id = id, pattern = pattern)
+
+fun AppControlDto.toDomain(): AppControlItem = AppControlItem(
+    ruleId = id,
+    packageName = packageName,
+    name = appName.ifBlank { packageName },
+    dailyLimitMinutes = dailyLimitMinutes,
+    enabled = enabled,
+)
+
+fun InstalledAppDto.toDomain(): InstalledApp = InstalledApp(
+    packageName = packageName,
+    appName = appName.ifBlank { packageName },
+)
+
 fun ScreenshotDto.toDomain(): Screenshot = Screenshot(
-    id = id,
+    id = screenshotId,
+    capturedAt = capturedAt.orEmpty(),
+    trigger = trigger,
+    imageUrl = imageUrl,
+)
+
+/** 업로드 응답에는 촬영 시각·트리거가 없어 요청에 쓴 값을 그대로 채운다. */
+fun ScreenshotUploadDto.toDomain(capturedAt: String, trigger: String): Screenshot = Screenshot(
+    id = screenshotId,
     capturedAt = capturedAt,
-    description = description,
     trigger = trigger,
     imageUrl = imageUrl,
 )
@@ -379,22 +406,6 @@ fun AllowancePaymentDto.toDomain(): AllowancePayment = AllowancePayment(
     approvedAt = approvedAt,
     merchant = merchant,
  )
-
-fun AppControlDto.toDomain(): com.hack.kidhack.domain.model.AppControlItem = com.hack.kidhack.domain.model.AppControlItem(
-    packageName = packageName,
-    name = appName,
-    icon = icon ?: "❓",
-    category = category ?: "기타",
-    blocked = blocked,
-    limitMinutes = limitMinutes,
-    limit = if (blocked) "차단" else if (limitMinutes == null || limitMinutes == 0) "무제한" else "${limitMinutes / 60}시간 ${limitMinutes % 60}분"
-)
-
-fun InstalledAppDto.toDomain(): com.hack.kidhack.domain.model.InstalledApp = com.hack.kidhack.domain.model.InstalledApp(
-    packageName = packageName,
-    appName = appName,
-    category = category
-)
 
 fun InquiryDto.toDomain(): Inquiry = Inquiry(
     id = id,

@@ -121,16 +121,16 @@ data class NotificationSettings(
     val notice: Boolean,
 )
 
+/** 자녀별 차단 규칙. 서버에 허용 목록(whitelist) 개념은 없다. */
 data class BlocklistItem(
+    /** 규칙 id. 삭제할 때 이 값을 쓴다(패턴이 아니라). */
     val id: String,
-    val listType: String,
-    val keyword: String,
+    val pattern: String,
 )
 
 data class Screenshot(
     val id: String,
     val capturedAt: String,
-    val description: String,
     val trigger: String,
     val imageUrl: String? = null,
 )
@@ -269,20 +269,33 @@ data class PairingCode(
     val expiresIn: Int,
 )
 
+/**
+ * 앱 사용시간 제한 규칙.
+ *
+ * 서버에 「차단」 필드가 없다 — 하루 한도 0분이 곧 차단이다([blocked]).
+ * 수정·삭제는 [ruleId] 로 한다(패키지명이 아니라).
+ */
 data class AppControlItem(
+    val ruleId: String,
     val packageName: String,
     val name: String,
-    val icon: String,
-    val category: String,
-    val blocked: Boolean,
-    val limit: String,
-    val limitMinutes: Int? = null,
-)
+    val dailyLimitMinutes: Int? = null,
+    val enabled: Boolean = true,
+) {
+    val blocked: Boolean get() = enabled && dailyLimitMinutes == 0
+
+    /** 목록에 보여 줄 한도 표기. */
+    val limit: String get() = when {
+        !enabled -> "미적용"
+        dailyLimitMinutes == null -> "무제한"
+        dailyLimitMinutes == 0 -> "차단"
+        else -> "하루 ${dailyLimitMinutes}분"
+    }
+}
 
 data class InstalledApp(
     val packageName: String,
     val appName: String,
-    val category: String?,
 )
 
 data class Wallet(

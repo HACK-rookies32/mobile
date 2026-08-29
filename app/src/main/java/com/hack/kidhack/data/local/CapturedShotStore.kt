@@ -89,7 +89,8 @@ class CapturedShotStore(context: Context) {
     private fun Entry.toDomain() = Screenshot(
         id = id,
         capturedAt = capturedAt,
-        description = description,
+        // 서버 ScreenshotResponse 에 설명이 없어 도메인에서도 뺐다.
+        // 로컬 Entry.description 은 시드 데이터용으로만 남는다.
         trigger = trigger,
         imageUrl = fileName?.let { File(root, it) }?.takeIf { it.exists() }?.absolutePath,
     )

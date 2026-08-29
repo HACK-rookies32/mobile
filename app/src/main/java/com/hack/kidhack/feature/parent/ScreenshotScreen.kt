@@ -269,7 +269,7 @@ fun ParentScreenshotScreen(
                             .background(Color.White)
                     )
                     Spacer(Modifier.height(16.dp))
-                    Text(shot.description, color = Color.White, fontWeight = FontBold, fontSize = 16.sp)
+                    Text(stringResource(shot.triggerLabelRes()), color = Color.White, fontWeight = FontBold, fontSize = 16.sp)
                     Text(shot.capturedAt, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
                     Spacer(Modifier.height(24.dp))
                     KidButton("닫기", { viewModel.selectShot(null) }, variant = KidButtonVariant.Secondary)
@@ -303,7 +303,7 @@ private fun ScreenshotRow(shot: Screenshot, onView: () -> Unit) {
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(shot.description, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
+                Text(stringResource(shot.triggerLabelRes()), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
                 Text(shot.capturedAt, color = colors.muted, fontSize = 12.sp)
             }
             KidButton(
@@ -314,3 +314,11 @@ private fun ScreenshotRow(shot: Screenshot, onView: () -> Unit) {
         }
     }
 }
+
+/** 서버는 캡처 설명을 주지 않는다(ScreenshotResponse 에 없음). 트리거를 제목처럼 쓴다. */
+private fun Screenshot.triggerLabelRes(): Int =
+    if (trigger.equals("SCHEDULED", ignoreCase = true)) {
+        R.string.parent_screenshot_trigger_scheduled
+    } else {
+        R.string.parent_screenshot_trigger_manual
+    }

@@ -112,8 +112,12 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
                 body = matched,
                 dedupeKey = ChildAlertStore.TYPE_HARMFUL_BLOCK + "-" + matched,
             )
+            // 서버에 접속 대상을 올린다. 서버는 자녀별 규칙에 더해 관리자 전역 유해
+            // 키워드까지 보고 차단 여부를 판정한다(응답의 blocked). 기기에서는 이미
+            // 로컬 규칙으로 막았으므로 여기서는 기록·동기화 목적이다.
             runCatching {
-                blocklistRepository.reportHarmfulAccess(matched, Instant.now().toString())
+                val childId = sessionRepository.current()?.user?.id
+                if (childId != null) blocklistRepository.reportVisit(childId, matched)
             }
             // 보호자가 다음 폴링에서 바로 받도록 방금 남긴 기록을 즉시 올린다.
             ChildAlertUploadWorker.enqueueNow(applicationContext)
@@ -215,20 +219,15 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
         private const val MAX_TEXT_LENGTH = 4_000
 
         /**
-         * 판정 순서는 블랙리스트 적중 → 화이트리스트 예외다.
+         * 차단 패턴에 걸리면 그 패턴을 돌려준다.
+         *
+         * 예전에는 블랙리스트 적중 → 화이트리스트 예외 순으로 봤는데, **서버에 허용 목록
+         * 개념이 없어**(BlockRuleResponse 는 pattern 하나뿐) 예외 단계를 걷어냈다.
          *
          * 단순 `contains` 로 보면 영단어 키워드가 오탐을 낸다(`meth` → `method`).
          * 매칭 규칙은 [HarmfulKeywordMatcher] 가 갖고 있다.
          */
-        fun shouldBlock(text: String, items: List<BlocklistItem>): String? {
-            val black = items.filter { it.listType.equals("BLACK", ignoreCase = true) }
-            val white = items.filter { it.listType.equals("WHITE", ignoreCase = true) }
-            val hit = black.firstOrNull { HarmfulKeywordMatcher.matches(text, it.keyword) }
-                ?: return null
-            if (white.any { HarmfulKeywordMatcher.matches(text, it.keyword) }) {
-                return null
-            }
-            return hit.keyword
-        }
+        fun shouldBlock(text: String, items: List<BlocklistItem>): String? =
+            items.firstOrNull { HarmfulKeywordMatcher.matches(text, it.pattern) }?.pattern
     }
 }

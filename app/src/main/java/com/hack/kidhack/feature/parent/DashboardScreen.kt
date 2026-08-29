@@ -55,8 +55,10 @@ import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.AppNotification
+import com.hack.kidhack.core.common.todayRange
 import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.ChildProfile
+import com.hack.kidhack.domain.repository.AppControlRepository
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.DashboardRepository
@@ -76,6 +78,7 @@ data class DashboardUiState(
     val lastLocation: String? = null,
     val lastLocationAt: String? = null,
     val usages: List<AppUsageStat> = emptyList(),
+    val blockedAppCount: Int = 0,
     /** 보관함 전체. 화면에 그리는 건 아래 [notifications] 로 걸러 낸 것이다. */
     val allNotifications: List<AppNotification> = emptyList(),
     val loading: Boolean = true,
@@ -99,6 +102,7 @@ class DashboardViewModel(
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
     private val appUsageRepository: AppUsageRepository,
+    private val appControlRepository: AppControlRepository,
     private val dashboardRepository: DashboardRepository,
     private val alertSync: ParentAlertSync,
     private val childWatcher: ParentChildWatcher,
@@ -180,10 +184,16 @@ class DashboardViewModel(
         runCatching {
             val child = _state.value.children.find { it.id == childId }
                 ?: childRepository.child(childId)
-            // TODO: Backend Integration - API 엔드포인트에 따라 파라미터(날짜, 타입 등) 조정 필요
-            // 앱 사용량은 대시보드 통합 응답에 없어 개별 유지.
-            val usages = appUsageRepository.list(childId, "APP")
+            // 앱 사용량은 대시보드 통합 응답에 없어 개별 조회한다.
+            // 범위를 안 주면 서버가 최근 1주일을 합산해 「오늘」이 아니게 된다.
+            val (from, to) = todayRange()
+            val usages = appUsageRepository.list(childId, "APP", from, to)
             val dashboard = dashboardRepository.get(childId)
+            // 「차단된 앱」 = 하루 한도 0분인 규칙. 서버에 blocked 필드가 없어 이렇게 센다.
+            // 부가 정보라 실패해도 대시보드 나머지는 그대로 간다.
+            val blockedApps = runCatching {
+                appControlRepository.items(childId).count { it.blocked }
+            }.getOrDefault(0)
             alertSync.sync()
             _state.update {
                 it.copy(
@@ -192,6 +202,7 @@ class DashboardViewModel(
                     selectedId = childId,
                     selected = child,
                     usages = usages,
+                    blockedAppCount = blockedApps,
                     lastLocation = dashboard.currentLocation?.label,
                     lastLocationAt = dashboard.currentLocation?.updatedAt?.takeLast(5),
                 )
@@ -374,8 +385,9 @@ fun ParentDashboardScreen(
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(stringResource(R.string.parent_dashboard_last_location), color = colors.muted, fontSize = 11.sp, fontWeight = FontBold)
                                 Text(
+                                    // 위치 기록이 없으면 「학교」로 메우고 있었다. 없는 걸 없다고 말한다.
                                     state.lastLocation?.let { "📍 ${it.substringAfterLast('(').removeSuffix(")").ifBlank { it }}" }
-                                        ?: stringResource(R.string.parent_location_school),
+                                        ?: stringResource(R.string.parent_dashboard_no_location),
                                     fontFamily = KidhackFontFamily,
                                     fontWeight = FontBold,
                                     fontSize = 12.sp,
@@ -387,9 +399,7 @@ fun ParentDashboardScreen(
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         StatCard("⏱️", stringResource(R.string.parent_dashboard_stat_screentime), formatDuration(totalSec), Modifier.weight(1f))
-                        // GAP-03: 앱통제 API 없음, docs/spec-gaps.md 참고 — Fake 상수, 실API 연결 금지
-                        // TODO: Backend Integration - 차단된 앱 개수를 반환하는 API가 추가되면 해당 값으로 교체
-                        StatCard("🛡️", stringResource(R.string.parent_dashboard_stat_blocked), stringResource(R.string.parent_dashboard_blocked_count), Modifier.weight(1f))
+                        StatCard("🛡️", stringResource(R.string.parent_dashboard_stat_blocked), "${state.blockedAppCount}개", Modifier.weight(1f))
                         StatCard("⚠️", stringResource(R.string.parent_dashboard_stat_alerts), "${alertCount}건", Modifier.weight(1f))
                     }
                     KidCard {

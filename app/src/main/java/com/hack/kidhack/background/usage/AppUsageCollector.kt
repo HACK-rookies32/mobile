@@ -4,6 +4,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import com.hack.kidhack.core.common.todayRange
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.SessionRepository
@@ -41,7 +42,8 @@ class AppUsageCollector(
 
         val fallback = runCatching {
             // list()가 이제 AppUsageStat(key=앱이름, durationSec)을 주므로 AppUsage로 매핑한다.
-            appUsageRepository.list(sessionRepository.childId(), "APP")
+            val (from, to) = todayRange()
+            appUsageRepository.list(sessionRepository.childId(), "APP", from, to)
                 .map { AppUsage(appName = it.key, durationSec = it.durationSec, category = null) }
         }.getOrDefault(emptyList())
         Result(fallback.sortedByDescending { it.durationSec }.take(limit), fromDevice = false)

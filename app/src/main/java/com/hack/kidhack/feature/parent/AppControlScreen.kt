@@ -129,14 +129,21 @@ class AppControlViewModel(
         }
     }
 
+    /**
+     * 차단 토글. 서버에 `blocked` 필드가 없어 **하루 한도 0분**으로 표현한다.
+     * 해제하면 이전 한도를 알 수 없으므로 무제한(null)으로 되돌린다.
+     */
     fun toggle(item: AppControlItem, blocked: Boolean) {
         viewModelScope.launch {
             runCatching {
-                val id = selectedChildRepository.current() ?: return@launch
-                appControlRepository.updateAppControl(id, item.packageName, blocked, item.limitMinutes)
+                appControlRepository.updateRule(
+                    ruleId = item.ruleId,
+                    dailyLimitMinutes = if (blocked) 0 else null,
+                    enabled = true,
+                )
             }.onSuccess { updated ->
                 _state.update { s ->
-                    s.copy(items = s.items.map { if (it.packageName == updated.packageName) updated else it })
+                    s.copy(items = s.items.map { if (it.ruleId == updated.ruleId) updated else it })
                 }
             }
         }
@@ -147,7 +154,13 @@ class AppControlViewModel(
         viewModelScope.launch {
             runCatching {
                 val id = selectedChildRepository.current() ?: return@launch
-                appControlRepository.updateAppControl(id, app.packageName, blocked, limitMinutes)
+                val existing = _state.value.items.firstOrNull { it.packageName == app.packageName }
+                val limit = if (blocked) 0 else limitMinutes
+                if (existing != null) {
+                    appControlRepository.updateRule(existing.ruleId, limit, enabled = true)
+                } else {
+                    appControlRepository.addRule(id, app.packageName, app.appName, limit)
+                }
             }.onSuccess { newItem ->
                 _state.update { s ->
                     s.copy(
@@ -160,14 +173,12 @@ class AppControlViewModel(
         }
     }
 
-    fun removeControl(packageName: String) {
+    fun removeControl(ruleId: String) {
         viewModelScope.launch {
-            runCatching {
-                val id = selectedChildRepository.current() ?: return@launch
-                appControlRepository.deleteAppControl(id, packageName)
-            }.onSuccess {
-                _state.update { s -> s.copy(items = s.items.filterNot { it.packageName == packageName }) }
-            }
+            runCatching { appControlRepository.deleteRule(ruleId) }
+                .onSuccess {
+                    _state.update { s -> s.copy(items = s.items.filterNot { it.ruleId == ruleId }) }
+                }
         }
     }
 }
@@ -209,11 +220,11 @@ fun ParentAppControlScreen(
                     Box(
                         Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(colors.surface),
                         contentAlignment = Alignment.Center,
-                    ) { Text(app.icon, fontSize = 20.sp) }
+                    ) { Text("📱", fontSize = 20.sp) }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(app.name, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
-                        Text(app.category, color = colors.muted, fontSize = 12.sp)
+                        Text(app.packageName, color = colors.muted, fontSize = 12.sp)
                     }
                     if (!app.blocked && app.limit != "무제한") {
                         Text(

@@ -10,10 +10,13 @@ import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
 import com.hack.kidhack.data.remote.dto.AppControlDto
 import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
+import com.hack.kidhack.data.remote.dto.AppControlCreateRequest
+import com.hack.kidhack.data.remote.dto.AppSyncItemDto
+import com.hack.kidhack.data.remote.dto.AppSyncRequest
 import com.hack.kidhack.data.remote.dto.AppUsageAggregateResponse
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
-import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
-import com.hack.kidhack.data.remote.dto.BlocklistResponse
+import com.hack.kidhack.data.remote.dto.BlockRuleDto
+import com.hack.kidhack.data.remote.dto.BlockRuleRequest
 import com.hack.kidhack.data.remote.dto.CardDto
 import com.hack.kidhack.data.remote.dto.CardRegisterRequest
 import com.hack.kidhack.data.remote.dto.ChargeCancelRequest
@@ -37,11 +40,10 @@ import com.hack.kidhack.data.remote.dto.FindIdVerifyRequest
 import com.hack.kidhack.data.remote.dto.FindIdVerifyResponse
 import com.hack.kidhack.data.remote.dto.DashboardResponse
 import com.hack.kidhack.data.remote.dto.DeviceEventRequest
-import com.hack.kidhack.data.remote.dto.PushTokenRequest
-import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
+import com.hack.kidhack.data.remote.dto.DeviceTokenRequest
+import com.hack.kidhack.data.remote.dto.DeviceTokenResponse
 import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
-import com.hack.kidhack.data.remote.dto.InstalledAppsResponse
 import com.hack.kidhack.data.remote.dto.LocationEventDto
 import com.hack.kidhack.data.remote.dto.LocationTrackRequest
 import com.hack.kidhack.data.remote.dto.LocationTrackResponse
@@ -67,11 +69,14 @@ import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordSendCodeRequest
 import com.hack.kidhack.data.remote.dto.SendCodeResponse
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
+import com.hack.kidhack.data.remote.dto.ScreenshotUploadDto
 import com.hack.kidhack.data.remote.dto.SignupRequest
 import com.hack.kidhack.data.remote.dto.UsePointRequest
 import com.hack.kidhack.data.remote.dto.TransferRequest
 import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UserDto
+import com.hack.kidhack.data.remote.dto.VisitRequest
+import com.hack.kidhack.data.remote.dto.VisitResponse
 import com.hack.kidhack.data.remote.dto.UserUpdateRequest
 import com.hack.kidhack.data.remote.dto.WalletDto
 import com.hack.kidhack.data.remote.dto.WalletTransactionDto
@@ -221,12 +226,17 @@ interface DeviceApi {
     @POST("device/event")
     suspend fun reportEvent(@Body body: DeviceEventRequest): ApiEnvelope<Unit>
 
-    /** FCM 토큰 등록·해제 (신규 제안 계약). */
-    @POST("devices/push-token")
-    suspend fun registerPushToken(@Body body: PushTokenRequest): ApiEnvelope<Unit>
+    /** FCM 토큰 등록. 로그인 직후와 onNewToken 때 호출한다. */
+    @POST("devices/fcm-token")
+    suspend fun registerPushToken(@Body body: DeviceTokenRequest): ApiEnvelope<Unit>
 
-    @HTTP(method = "DELETE", path = "devices/push-token", hasBody = true)
-    suspend fun unregisterPushToken(@Body body: PushTokenRequest): ApiEnvelope<Unit>
+    /** FCM 토큰 해제. 로그아웃 때 호출한다. 멱등(없어도 200). */
+    @HTTP(method = "DELETE", path = "devices/fcm-token", hasBody = true)
+    suspend fun unregisterPushToken(@Body body: DeviceTokenRequest): ApiEnvelope<Unit>
+
+    /** 내 기기 토큰 목록. 기기별 모델이라 여러 개일 수 있다. */
+    @GET("devices/fcm-token")
+    suspend fun pushTokens(): ApiEnvelope<List<DeviceTokenResponse>>
 }
 
 interface DashboardApi {
@@ -282,24 +292,24 @@ interface ChildAlertApi {
     ): ApiEnvelope<List<ChildAlertDto>>
 }
 
+/** 유해사이트/앱 차단 — 자녀별 차단 규칙 CRUD + 접속 판정. */
 interface BlocklistApi {
-    @GET("children/{childId}/blocklist")
-    suspend fun get(@Path("childId") childId: String): ApiEnvelope<BlocklistResponse>
+    @GET("filtering/rules/{childId}")
+    suspend fun rules(@Path("childId") childId: String): ApiEnvelope<List<BlockRuleDto>>
 
-    @POST("children/{childId}/blocklist")
-    suspend fun add(
-        @Path("childId") childId: String,
-        @Body body: BlocklistAddRequest,
-    ): ApiEnvelope<Unit>
+    @POST("filtering/rules")
+    suspend fun addRule(@Body body: BlockRuleRequest): ApiEnvelope<BlockRuleDto>
 
-    @DELETE("children/{childId}/blocklist/{itemId}")
-    suspend fun delete(
-        @Path("childId") childId: String,
-        @Path("itemId") itemId: String,
-    ): ApiEnvelope<Unit>
+    /** 규칙 id 로 지운다. 자녀 id 는 경로에 들어가지 않는다. */
+    @DELETE("filtering/rules/{ruleId}")
+    suspend fun deleteRule(@Path("ruleId") ruleId: String): ApiEnvelope<Unit>
 
-    @POST("harmful-access/report")
-    suspend fun report(@Body body: HarmfulAccessRequest): ApiEnvelope<Unit>
+    /**
+     * 접속 대상 보고 + 차단 여부 판정.
+     * 서버는 자녀별 규칙에 더해 관리자 전역 유해 키워드까지 함께 본다.
+     */
+    @POST("filtering/visit")
+    suspend fun visit(@Body body: VisitRequest): ApiEnvelope<VisitResponse>
 }
 
 interface ScreenshotApi {
@@ -312,14 +322,15 @@ interface ScreenshotApi {
         @Query("size") size: Int = 20,
     ): ApiEnvelope<PageResponse<ScreenshotDto>>
 
+    /** 서버는 `capturedAt`·`trigger` 를 **쿼리 파라미터로 필수** 요구한다. body 는 파일뿐이다. */
     @Multipart
     @POST("children/{childId}/screenshots")
     suspend fun upload(
         @Path("childId") childId: String,
         @Part file: MultipartBody.Part,
-        @Part("capturedAt") capturedAt: RequestBody,
-        @Part("trigger") trigger: RequestBody,
-    ): ApiEnvelope<ScreenshotDto>
+        @Query("capturedAt") capturedAt: String,
+        @Query("trigger") trigger: String,
+    ): ApiEnvelope<ScreenshotUploadDto>
 
     @POST("children/{childId}/screenshots/request")
     suspend fun requestCapture(@Path("childId") childId: String): ApiEnvelope<Unit>
@@ -503,24 +514,29 @@ interface AllowanceApi {
     ): ApiEnvelope<AllowancePaymentDto>
 }
 
+/** 앱 통제 — 설치 앱 동기화/조회 + 앱별 사용시간 제한 규칙 CRUD. */
 interface AppControlApi {
-    @GET("children/{childId}/installed-apps")
-    suspend fun getInstalledApps(@Path("childId") childId: String): ApiEnvelope<InstalledAppsResponse>
+    @GET("appcontrol/apps/{childId}")
+    suspend fun installedApps(@Path("childId") childId: String): ApiEnvelope<List<InstalledAppDto>>
 
-    @GET("children/{childId}/app-control")
-    suspend fun getAppControlList(@Path("childId") childId: String): ApiEnvelope<List<AppControlDto>>
+    /** 자녀 앱이 설치 목록을 올린다. 반영된 개수를 돌려준다. */
+    @POST("appcontrol/sync")
+    suspend fun syncApps(@Body body: AppSyncRequest): ApiEnvelope<Int>
 
-    @POST("children/{childId}/app-control")
-    suspend fun updateAppControl(
-        @Path("childId") childId: String,
+    @GET("appcontrol/rules/{childId}")
+    suspend fun rules(@Path("childId") childId: String): ApiEnvelope<List<AppControlDto>>
+
+    @POST("appcontrol/rules")
+    suspend fun addRule(@Body body: AppControlCreateRequest): ApiEnvelope<AppControlDto>
+
+    @PATCH("appcontrol/rules/{ruleId}")
+    suspend fun updateRule(
+        @Path("ruleId") ruleId: String,
         @Body body: AppControlUpdateRequest,
     ): ApiEnvelope<AppControlDto>
 
-    @DELETE("children/{childId}/app-control/{packageName}")
-    suspend fun deleteAppControl(
-        @Path("childId") childId: String,
-        @Path("packageName") packageName: String,
-    ): ApiEnvelope<Unit>
+    @DELETE("appcontrol/rules/{ruleId}")
+    suspend fun deleteRule(@Path("ruleId") ruleId: String): ApiEnvelope<Unit>
 }
 
 interface InquiryApi {

@@ -18,7 +18,7 @@ class HarmfulBlockTest {
 
     private fun blacklistOf(vararg categoryIds: String): List<BlocklistItem> =
         categoryIds.flatMap { HarmfulCategories.keywords(it) }
-            .map { BlocklistItem(it, "BLACK", it) }
+            .map { BlocklistItem(id = it, pattern = it) }
 
     @Test
     fun `도박 카테고리는 한글·영문 도박 페이지를 모두 막는다`() {
@@ -47,16 +47,21 @@ class HarmfulBlockTest {
         assertNull(shouldBlock("checksum a3xxx1f", blacklistOf(HarmfulCategories.ADULT)))
     }
 
+    /**
+     * 서버 BlockRuleResponse 는 차단 패턴 하나뿐이라 **허용 목록 예외가 없다.**
+     * 예전에는 화이트리스트가 블랙리스트를 덮었는데, 그 개념이 사라졌으므로
+     * 교육용 도메인이라도 차단 패턴에 걸리면 그대로 막힌다.
+     */
     @Test
-    fun `화이트리스트가 블랙리스트를 덮는다`() {
+    fun `허용 목록 개념이 없어 차단 패턴에 걸리면 그대로 막는다`() {
         val items = blacklistOf(HarmfulCategories.GAMBLING) +
-            BlocklistItem("edu.ac.kr", "WHITE", "edu.ac.kr")
-        assertNull(shouldBlock("카지노 중독 예방 교육 - edu.ac.kr", items))
+            BlocklistItem(id = "edu.ac.kr", pattern = "edu.ac.kr")
+        assertNotNull(shouldBlock("카지노 중독 예방 교육 - edu.ac.kr", items))
     }
 
     @Test
     fun `적중한 키워드를 그대로 돌려준다`() {
-        val items = listOf(BlocklistItem("바카라", "BLACK", "바카라"))
+        val items = listOf(BlocklistItem(id = "바카라", pattern = "바카라"))
         assertEquals("바카라", shouldBlock("실시간 바카라 배팅", items))
     }
 
