@@ -14,6 +14,7 @@ import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.PlaceRepository
 import com.hack.kidhack.domain.repository.LocationRepository
 import java.text.SimpleDateFormat
+import com.hack.kidhack.core.common.todayRange
 import java.time.Instant
 import java.util.Date
 import java.util.Locale
@@ -70,7 +71,8 @@ class ParentChildWatcher(
             checkGeofence(child, location, fences)
             checkLocationFreshness(child, location)
         }
-        val usages = runCatching { appUsageRepository.list(child.id, "APP") }.getOrNull()
+        val (usageFrom, usageTo) = todayRange()
+        val usages = runCatching { appUsageRepository.list(child.id, "APP", usageFrom, usageTo) }.getOrNull()
         if (usages != null) checkUsage(child, usages)
     }
 

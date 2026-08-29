@@ -17,6 +17,7 @@ import com.hack.kidhack.domain.model.Activity
 import com.hack.kidhack.domain.model.ActivityType
 import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.data.local.BlocklistStore
+import com.hack.kidhack.domain.model.InstalledApp
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.childAlertTypeToParent
@@ -394,23 +395,29 @@ class FakeBlocklistRepository(
     private val store: BlocklistStore,
     private val feed: MockNotificationFeed,
 ) : BlocklistRepository {
+    // 서버에 허용 목록 개념이 없어 차단 패턴만 다룬다. 목업 저장소의 blacklist 만 쓴다.
     override suspend fun get(childId: String): List<BlocklistItem> =
-        store.blacklist().map { BlocklistItem(it, "BLACK", it) } +
-            store.whitelist().map { BlocklistItem(it, "WHITE", it) }
-    override suspend fun add(childId: String, listType: String, keyword: String) {
-        store.add(listType, keyword)
+        store.blacklist().map { BlocklistItem(id = it, pattern = it) }
+
+    override suspend fun add(childId: String, pattern: String): BlocklistItem {
+        store.add("BLACK", pattern)
+        return BlocklistItem(id = pattern, pattern = pattern)
     }
-    override suspend fun remove(childId: String, itemId: String) {
-        store.remove(itemId)
+
+    override suspend fun remove(ruleId: String) {
+        store.remove(ruleId)
     }
-    override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) {
+
+    override suspend fun reportVisit(childId: String, target: String): Boolean {
         feed.add(
             type = "HARMFUL",
             title = "유해 사이트 접속 차단",
-            body = matchedText + " 이(가) 포함된 사이트 접속 시도가 차단되었어요.",
-            dedupeKey = "HARMFUL-" + matchedText,
+            body = target + " 이(가) 포함된 사이트 접속 시도가 차단되었어요.",
+            dedupeKey = "HARMFUL-" + target,
             childId = FakeData.loggedInChildProfileId,
         )
+        // 목업은 저장된 패턴에 걸리면 차단으로 판정한다.
+        return store.blacklist().any { target.contains(it, ignoreCase = true) }
     }
 }
 
@@ -773,44 +780,65 @@ class FakeAppUsageRepository(private val feed: MockNotificationFeed) : AppUsageR
 }
 
 class FakeAppControlRepository : AppControlRepository {
+    private var nextId = 4
     private val db = mutableListOf(
-        com.hack.kidhack.domain.model.AppControlItem("com.youtube", "YouTube", "📺", "동영상", false, "1시간 30분", 90),
-        com.hack.kidhack.domain.model.AppControlItem("com.tiktok", "TikTok", "🎵", "소셜", true, "차단"),
-        com.hack.kidhack.domain.model.AppControlItem("com.roblox", "Roblox", "🎮", "게임", false, "무제한")
+        AppControlItem("1", "com.youtube", "YouTube", dailyLimitMinutes = 90),
+        AppControlItem("2", "com.tiktok", "TikTok", dailyLimitMinutes = 0),
+        AppControlItem("3", "com.roblox", "Roblox", dailyLimitMinutes = null),
     )
-    override suspend fun items(childId: String): List<com.hack.kidhack.domain.model.AppControlItem> = db.toList()
-
-    override suspend fun getInstalledApps(childId: String): List<com.hack.kidhack.domain.model.InstalledApp> = listOf(
-        com.hack.kidhack.domain.model.InstalledApp("com.youtube", "YouTube", "동영상"),
-        com.hack.kidhack.domain.model.InstalledApp("com.tiktok", "TikTok", "소셜"),
-        com.hack.kidhack.domain.model.InstalledApp("com.instagram", "Instagram", "소셜"),
-        com.hack.kidhack.domain.model.InstalledApp("com.roblox", "Roblox", "게임"),
-        com.hack.kidhack.domain.model.InstalledApp("com.pubg", "배틀그라운드", "게임")
+    private val installed = mutableListOf(
+        InstalledApp("com.youtube", "YouTube"),
+        InstalledApp("com.tiktok", "TikTok"),
+        InstalledApp("com.instagram", "Instagram"),
+        InstalledApp("com.roblox", "Roblox"),
+        InstalledApp("com.pubg", "배틀그라운드"),
     )
 
-    override suspend fun updateAppControl(
+    override suspend fun items(childId: String): List<AppControlItem> = db.toList()
+
+    override suspend fun getInstalledApps(childId: String): List<InstalledApp> = installed.toList()
+
+    override suspend fun syncInstalledApps(childId: String, apps: List<InstalledApp>): Int {
+        apps.forEach { app ->
+            if (installed.none { it.packageName == app.packageName }) installed += app
+        }
+        return apps.size
+    }
+
+    override suspend fun addRule(
         childId: String,
         packageName: String,
-        blocked: Boolean,
-        limitMinutes: Int?
-    ): com.hack.kidhack.domain.model.AppControlItem {
-        val existing = db.find { it.packageName == packageName }
-        val updated = com.hack.kidhack.domain.model.AppControlItem(
-            packageName = packageName,
-            name = existing?.name ?: "알 수 없는 앱",
-            icon = existing?.icon ?: "📱",
-            category = existing?.category ?: "기타",
-            blocked = blocked,
-            limitMinutes = limitMinutes,
-            limit = if (blocked) "차단" else if (limitMinutes == null || limitMinutes == 0) "무제한" else "${limitMinutes / 60}시간 ${limitMinutes % 60}분"
-        )
+        appName: String,
+        dailyLimitMinutes: Int?,
+    ): AppControlItem {
         db.removeAll { it.packageName == packageName }
-        db.add(updated)
+        val item = AppControlItem(
+            ruleId = (nextId++).toString(),
+            packageName = packageName,
+            name = appName,
+            dailyLimitMinutes = dailyLimitMinutes,
+        )
+        db += item
+        return item
+    }
+
+    override suspend fun updateRule(
+        ruleId: String,
+        dailyLimitMinutes: Int?,
+        enabled: Boolean?,
+    ): AppControlItem {
+        val idx = db.indexOfFirst { it.ruleId == ruleId }
+        require(idx >= 0) { "규칙을 찾을 수 없어요" }
+        val updated = db[idx].copy(
+            dailyLimitMinutes = dailyLimitMinutes ?: db[idx].dailyLimitMinutes,
+            enabled = enabled ?: db[idx].enabled,
+        )
+        db[idx] = updated
         return updated
     }
 
-    override suspend fun deleteAppControl(childId: String, packageName: String) {
-        db.removeAll { it.packageName == packageName }
+    override suspend fun deleteRule(ruleId: String) {
+        db.removeAll { it.ruleId == ruleId }
     }
 }
 

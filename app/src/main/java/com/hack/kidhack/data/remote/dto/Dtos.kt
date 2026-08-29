@@ -283,9 +283,22 @@ data class LocationTrackResponse(
     val updatedAt: String? = null,
 )
 
-/** FCM 토큰 등록 (신규 제안 계약). platform 은 서버가 발송 채널을 고르는 데 쓴다. */
+/**
+ * FCM 토큰 등록·해제. 서버 DeviceTokenRequest 와 1:1.
+ *
+ * 예전에는 `devices/push-token` 에 `{token, platform}` 을 보냈는데 서버 경로는
+ * `devices/fcm-token` 이고 키는 `fcmToken` 이다. 경로가 달라 **토큰 등록이 아예
+ * 되지 않았고** 그래서 푸시가 오지 않았다.
+ */
 @Serializable
-data class PushTokenRequest(val token: String, val platform: String = "ANDROID")
+data class DeviceTokenRequest(val fcmToken: String)
+
+@Serializable
+data class DeviceTokenResponse(
+    val memberId: Long? = null,
+    val token: String? = null,
+    val updatedAt: String? = null,
+)
 
 @Serializable
 data class RealtimeToggleResponse(
@@ -296,6 +309,8 @@ data class RealtimeToggleResponse(
 @Serializable
 data class DeviceEventRequest(
     val childId: Long,
+    /** 기기 식별자. 한 자녀가 기기를 여러 대 쓸 수 있어 서버가 요구한다. */
+    val deviceId: String,
     val type: String, // "POWER_OFF" | "GPS_OFF"
 )
 
@@ -377,24 +392,53 @@ data class ChildAlertDto(
     val occurredAt: String = "",
 )
 
+/**
+ * 차단 규칙 (서버 `BlockRuleResponse`).
+ *
+ * 서버 모델은 자녀별 **차단 패턴 목록** 하나다. 예전 앱은 blacklist/whitelist 두 배열을
+ * 쓰고 있었는데 **서버에 허용 목록 개념이 없다.** 규칙 삭제는 패턴이 아니라 [id] 로 한다.
+ */
 @Serializable
-data class BlocklistResponse(
-    val blacklist: List<String> = emptyList(),
-    val whitelist: List<String> = emptyList(),
+data class BlockRuleDto(
+    @Serializable(with = FlexibleStringSerializer::class)
+    val id: String = "",
+    val childId: Long? = null,
+    val pattern: String = "",
 )
 
 @Serializable
-data class BlocklistAddRequest(val listType: String, val keyword: String)
+data class BlockRuleRequest(val childId: Long, val pattern: String)
+
+/** 자녀 앱이 접속 대상을 올리면 서버가 차단 여부를 판정해 돌려준다. */
+@Serializable
+data class VisitRequest(val childId: Long, val target: String)
 
 @Serializable
-data class HarmfulAccessRequest(val matchedText: String, val accessedAt: String)
+data class VisitResponse(
+    val childId: Long? = null,
+    val target: String? = null,
+    val blocked: Boolean = false,
+)
 
+/**
+ * 캡처 목록 항목 (서버 `ScreenshotResponse`).
+ *
+ * 식별자 키가 `id` 가 아니라 `screenshotId` 다. `description` 은 서버에 없다.
+ */
 @Serializable
 data class ScreenshotDto(
-    val id: String,
-    val capturedAt: String,
-    val description: String = "",
+    @Serializable(with = FlexibleStringSerializer::class)
+    val screenshotId: String = "",
+    val imageUrl: String? = null,
+    val capturedAt: String? = null,
     val trigger: String = "MANUAL",
+)
+
+/** 업로드 응답 (서버 `ScreenshotUploadResponse`). 목록 항목보다 필드가 적다. */
+@Serializable
+data class ScreenshotUploadDto(
+    @Serializable(with = FlexibleStringSerializer::class)
+    val screenshotId: String = "",
     val imageUrl: String? = null,
 )
 
@@ -586,27 +630,51 @@ data class AllowancePaymentDto(
     val merchant: String? = null,
 )
 
+/** 자녀 기기에 설치된 앱 (서버 `AppResponse`). 서버에 category 는 없다. */
+data class InstalledAppDto(
+    @Serializable(with = FlexibleStringSerializer::class)
+    val id: String = "",
+    val childId: Long? = null,
+    val packageName: String = "",
+    val appName: String = "",
+)
+
+/** 자녀 앱이 설치 목록을 올릴 때 쓰는 항목 (서버 `AppItem`). */
 @Serializable
-data class InstalledAppDto(val packageName: String, val appName: String, val category: String?)
+data class AppSyncItemDto(val packageName: String, val appName: String)
 
 @Serializable
-data class InstalledAppsResponse(val apps: List<InstalledAppDto>)
+data class AppSyncRequest(val childId: Long, val apps: List<AppSyncItemDto>)
 
+/**
+  * 앱 사용시간 제한 규칙 (서버 `RuleResponse`).
+  *
+  * 서버 모델에는 **`blocked` 가 없다.** `enabled` + `dailyLimitMinutes` 조합이고,
+  * 「차단」은 하루 한도 0분으로 표현한다. 수정·삭제는 `packageName` 이 아니라 [id] 로 한다.
+  */
 @Serializable
 data class AppControlDto(
+    @Serializable(with = FlexibleStringSerializer::class)
+    val id: String = "",
+    val childId: Long? = null,
+    val packageName: String = "",
+    val appName: String = "",
+    val dailyLimitMinutes: Int? = null,
+    val enabled: Boolean = true,
+)
+
+@Serializable
+data class AppControlCreateRequest(
+    val childId: Long,
     val packageName: String,
     val appName: String,
-    val icon: String? = null,
-    val category: String? = null,
-    val blocked: Boolean,
-    val limitMinutes: Int? = null,
+    val dailyLimitMinutes: Int? = null,
 )
 
 @Serializable
 data class AppControlUpdateRequest(
-    val packageName: String,
-    val blocked: Boolean,
-    val limitMinutes: Int? = null,
+    val dailyLimitMinutes: Int? = null,
+    val enabled: Boolean? = null,
 )
 
 @Serializable

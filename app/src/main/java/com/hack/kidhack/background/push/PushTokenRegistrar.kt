@@ -11,8 +11,9 @@ import com.hack.kidhack.domain.repository.SessionRepository
  * 「이 계정 = 이 기기」가 정해질 때. 어느 쪽이 먼저 와도 되도록 마지막 토큰을 [PushTokenStore]
  * 에 남겨 두고, 로그인 시 그 토큰을 다시 올린다.
  *
- * 서버가 아직 등록 엔드포인트를 구현하지 않았어도 실패를 삼켜 앱은 정상 동작한다
- * (그동안은 WebSocket + 폴링 백업 경로가 알림을 나른다).
+ * 서버 경로는 `POST·DELETE /api/devices/fcm-token` 이다. 한동안 `devices/push-token` 으로
+ * 보내고 있어 등록이 조용히 404 로 실패했다 — 호출 자체는 하고 있었는데 푸시가 오지 않은
+ * 이유다. 실패는 계속 삼킨다(토큰 등록이 안 돼도 앱의 나머지는 동작해야 한다).
  */
 class PushTokenRegistrar(
     private val sessionRepository: SessionRepository,

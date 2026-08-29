@@ -20,6 +20,7 @@ import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
+import com.hack.kidhack.domain.model.InstalledApp
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
@@ -189,9 +190,16 @@ interface ChildAlertRepository {
 
 interface BlocklistRepository {
     suspend fun get(childId: String): List<BlocklistItem>
-    suspend fun add(childId: String, listType: String, keyword: String)
-    suspend fun remove(childId: String, itemId: String)
-    suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String)
+    suspend fun add(childId: String, pattern: String): BlocklistItem
+
+    /** 규칙 id 로 삭제한다. */
+    suspend fun remove(ruleId: String)
+
+    /**
+     * 접속 대상을 서버에 올리고 차단 여부를 돌려받는다.
+     * 서버는 자녀별 규칙 + 관리자 전역 유해 키워드를 함께 본다.
+     */
+    suspend fun reportVisit(childId: String, target: String): Boolean
 }
 
 interface ScreenshotRepository {
@@ -328,15 +336,31 @@ interface AppUsageRepository {
 }
 
 interface AppControlRepository {
+    /** 자녀별 사용시간 제한 규칙 목록. */
     suspend fun items(childId: String): List<AppControlItem>
-    suspend fun getInstalledApps(childId: String): List<com.hack.kidhack.domain.model.InstalledApp>
-    suspend fun updateAppControl(
+
+    /** 자녀 기기에 설치된 앱 목록(서버가 보관 중인 것). */
+    suspend fun getInstalledApps(childId: String): List<InstalledApp>
+
+    /** 자녀 앱이 설치 목록을 서버에 올린다. 반영된 개수를 돌려준다. */
+    suspend fun syncInstalledApps(childId: String, apps: List<InstalledApp>): Int
+
+    /** 규칙 신설. 한도 0분이면 사실상 차단이다. */
+    suspend fun addRule(
         childId: String,
         packageName: String,
-        blocked: Boolean,
-        limitMinutes: Int?
+        appName: String,
+        dailyLimitMinutes: Int?,
     ): AppControlItem
-    suspend fun deleteAppControl(childId: String, packageName: String)
+
+    /** 규칙 수정. 바꿀 값만 넘긴다. */
+    suspend fun updateRule(
+        ruleId: String,
+        dailyLimitMinutes: Int? = null,
+        enabled: Boolean? = null,
+    ): AppControlItem
+
+    suspend fun deleteRule(ruleId: String)
 }
 
 /**

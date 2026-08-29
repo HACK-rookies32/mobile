@@ -45,6 +45,7 @@ import com.hack.kidhack.feature.child.components.ChildScreenScaffold
 import com.hack.kidhack.feature.child.components.RetryCard
 import org.koin.androidx.compose.koinViewModel
 import java.io.File
+import com.hack.kidhack.domain.model.Screenshot
 
 @Composable
 fun ChildScreenshotScreen(
@@ -215,7 +216,7 @@ fun ChildScreenshotScreen(
                         if (localFile != null) {
                             AsyncImage(
                                 model = localFile,
-                                contentDescription = item.description,
+                                contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop,
                             )
@@ -226,7 +227,7 @@ fun ChildScreenshotScreen(
                     Spacer(Modifier.size(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = item.description,
+                            text = stringResource(item.triggerLabelRes()),
                             fontFamily = KidhackFontFamily,
                             fontWeight = FontBold,
                             fontSize = 14.sp,
@@ -257,3 +258,11 @@ fun ChildScreenshotScreen(
         Spacer(Modifier.height(8.dp))
     }
 }
+
+/** 서버는 캡처 설명을 주지 않는다. 트리거를 제목처럼 쓴다. */
+private fun Screenshot.triggerLabelRes(): Int =
+    if (trigger.equals("SCHEDULED", ignoreCase = true)) {
+        R.string.child_screenshot_scheduled
+    } else {
+        R.string.child_screenshot_mom
+    }

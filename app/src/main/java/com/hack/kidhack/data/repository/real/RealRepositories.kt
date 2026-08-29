@@ -4,6 +4,8 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import android.content.Context
+import com.hack.kidhack.core.common.DeviceId
 import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.remote.api.AllowanceApi
 import com.hack.kidhack.data.remote.api.AppControlApi
@@ -33,12 +35,16 @@ import com.hack.kidhack.data.remote.api.UserApi
 import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
 import com.hack.kidhack.data.remote.api.WalletApi
+import com.hack.kidhack.data.remote.dto.AppControlCreateRequest
 import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
+import com.hack.kidhack.data.remote.dto.AppSyncItemDto
+import com.hack.kidhack.data.remote.dto.AppSyncRequest
 import com.hack.kidhack.data.remote.dto.AppUsageReportItemDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
-import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
+import com.hack.kidhack.data.remote.dto.BlockRuleRequest
+import com.hack.kidhack.data.remote.dto.VisitRequest
 import com.hack.kidhack.data.remote.dto.CardRegisterRequest
-import com.hack.kidhack.data.remote.dto.PushTokenRequest
+import com.hack.kidhack.data.remote.dto.DeviceTokenRequest
 import com.hack.kidhack.data.remote.dto.ChargeConfirmRequest
 import com.hack.kidhack.data.remote.dto.ChargePrepareRequest
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
@@ -50,7 +56,6 @@ import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdSendCodeRequest
 import com.hack.kidhack.data.remote.dto.FindIdVerifyRequest
 import com.hack.kidhack.data.remote.dto.DeviceEventRequest
-import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
 import com.hack.kidhack.data.remote.dto.LocationTrackRequest
 import com.hack.kidhack.data.remote.dto.LoginRequest
 import com.hack.kidhack.data.remote.dto.LoginResponse
@@ -93,6 +98,7 @@ import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
+import com.hack.kidhack.domain.model.InstalledApp
 import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
@@ -359,17 +365,26 @@ class RealLocationRepository(private val api: LocationApi) : LocationRepository 
         api.toggleRealtime(childId, enabled).unwrap().realtimeEnabled
 }
 
-class RealDeviceRepository(private val api: DeviceApi) : DeviceRepository {
+class RealDeviceRepository(
+    private val api: DeviceApi,
+    private val context: Context,
+) : DeviceRepository {
     override suspend fun reportEvent(childId: String, type: String) {
-        api.reportEvent(DeviceEventRequest(childId.toServerId(), type)).unwrapOrNull()
+        api.reportEvent(
+            DeviceEventRequest(
+                childId = childId.toServerId(),
+                deviceId = DeviceId.get(context),
+                type = type,
+            ),
+        ).unwrapOrNull()
     }
 
     override suspend fun registerPushToken(token: String) {
-        api.registerPushToken(PushTokenRequest(token)).unwrapOrNull()
+        api.registerPushToken(DeviceTokenRequest(token)).unwrapOrNull()
     }
 
     override suspend fun unregisterPushToken(token: String) {
-        api.unregisterPushToken(PushTokenRequest(token)).unwrapOrNull()
+        api.unregisterPushToken(DeviceTokenRequest(token)).unwrapOrNull()
     }
 }
 
@@ -419,28 +434,25 @@ class RealChildAlertRepository(private val api: ChildAlertApi) : ChildAlertRepos
         api.list(childId).unwrap().map { it.toDomain() }
 }
 /**
- * GAP-04: `GET /children/{childId}/blocklist` 가 문자열 배열만 주므로 응답에 itemId 가 없다.
+ * 유해사이트/앱 차단. 서버는 자녀별 차단 패턴 목록(`/api/filtering/rules`)을 쓴다.
  *
- * 예전에는 인덱스로 `black-0` 같은 id 를 만들어 `DELETE .../blocklist/{itemId}` 에 넘겼는데,
- * 그런 id 는 서버에 존재하지 않아 카테고리 토글을 꺼도 아무것도 지워지지 않았다.
- * 응답에서 유일하게 안정적인 식별자는 **키워드 문자열**이라 그것을 itemId 로 쓴다.
- * 백엔드가 `{ id, listType, keyword }[]` 로 스키마를 고치면 여기만 바꾸면 된다.
+ * 예전에는 `GET /children/{childId}/blocklist` 가 문자열 배열을 준다는 전제로 짜여 있었고,
+ * 응답에 id 가 없어 키워드 문자열을 itemId 로 대신 쓰고 있었다. 실제 서버는 규칙마다
+ * **id 를 주고 삭제도 그 id 로** 받으므로(`DELETE /filtering/rules/{ruleId}`) 그 우회가 필요 없다.
  */
 class RealBlocklistRepository(private val api: BlocklistApi) : BlocklistRepository {
-    override suspend fun get(childId: String): List<BlocklistItem> {
-        val raw = api.get(childId).unwrap()
-        return raw.blacklist.map { BlocklistItem(it, "BLACK", it) } +
-            raw.whitelist.map { BlocklistItem(it, "WHITE", it) }
+    override suspend fun get(childId: String): List<BlocklistItem> =
+        api.rules(childId).unwrap().map { it.toDomain() }
+
+    override suspend fun add(childId: String, pattern: String): BlocklistItem =
+        api.addRule(BlockRuleRequest(childId.toServerId(), pattern)).unwrap().toDomain()
+
+    override suspend fun remove(ruleId: String) {
+        api.deleteRule(ruleId).unwrapOrNull()
     }
-    override suspend fun add(childId: String, listType: String, keyword: String) {
-        api.add(childId, BlocklistAddRequest(listType, keyword)).unwrapOrNull()
-    }
-    override suspend fun remove(childId: String, itemId: String) {
-        api.delete(childId, itemId).unwrapOrNull()
-    }
-    override suspend fun reportHarmfulAccess(matchedText: String, accessedAt: String) {
-        api.report(HarmfulAccessRequest(matchedText, accessedAt)).unwrapOrNull()
-    }
+
+    override suspend fun reportVisit(childId: String, target: String): Boolean =
+        api.visit(VisitRequest(childId.toServerId(), target)).unwrap().blocked
 }
 
 class RealScreenshotRepository(private val api: ScreenshotApi) : ScreenshotRepository {
@@ -462,9 +474,9 @@ class RealScreenshotRepository(private val api: ScreenshotApi) : ScreenshotRepos
     ): Screenshot = api.upload(
         childId = childId,
         file = file.toImagePart(),
-        capturedAt = capturedAt.toPlainBody(),
-        trigger = trigger.toPlainBody(),
-    ).unwrap().toDomain()
+        capturedAt = capturedAt,
+        trigger = trigger,
+    ).unwrap().toDomain(capturedAt = capturedAt, trigger = trigger)
 }
 
 class RealCommunityRepository(private val api: CommunityApi) : CommunityRepository {
@@ -642,23 +654,42 @@ class RealAppUsageRepository(private val api: AppUsageApi) : AppUsageRepository 
 
 class RealAppControlRepository(private val api: AppControlApi) : AppControlRepository {
     override suspend fun items(childId: String): List<AppControlItem> =
-        api.getAppControlList(childId).unwrap().map { it.toDomain() }
+        api.rules(childId).unwrap().map { it.toDomain() }
 
-    override suspend fun getInstalledApps(childId: String): List<com.hack.kidhack.domain.model.InstalledApp> =
-        api.getInstalledApps(childId).unwrap().apps.map { it.toDomain() }
+    override suspend fun getInstalledApps(childId: String): List<InstalledApp> =
+        api.installedApps(childId).unwrap().map { it.toDomain() }
 
-    override suspend fun updateAppControl(
+    override suspend fun syncInstalledApps(childId: String, apps: List<InstalledApp>): Int =
+        api.syncApps(
+            AppSyncRequest(
+                childId = childId.toServerId(),
+                apps = apps.map { AppSyncItemDto(it.packageName, it.appName) },
+            ),
+        ).unwrap()
+
+    override suspend fun addRule(
         childId: String,
         packageName: String,
-        blocked: Boolean,
-        limitMinutes: Int?
-    ): AppControlItem = api.updateAppControl(
-        childId,
-        AppControlUpdateRequest(packageName, blocked, limitMinutes)
+        appName: String,
+        dailyLimitMinutes: Int?,
+    ): AppControlItem = api.addRule(
+        AppControlCreateRequest(
+            childId = childId.toServerId(),
+            packageName = packageName,
+            appName = appName,
+            dailyLimitMinutes = dailyLimitMinutes,
+        ),
     ).unwrap().toDomain()
 
-    override suspend fun deleteAppControl(childId: String, packageName: String) {
-        api.deleteAppControl(childId, packageName).unwrapOrNull()
+    override suspend fun updateRule(
+        ruleId: String,
+        dailyLimitMinutes: Int?,
+        enabled: Boolean?,
+    ): AppControlItem =
+        api.updateRule(ruleId, AppControlUpdateRequest(dailyLimitMinutes, enabled)).unwrap().toDomain()
+
+    override suspend fun deleteRule(ruleId: String) {
+        api.deleteRule(ruleId).unwrapOrNull()
     }
 }
 

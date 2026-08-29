@@ -72,15 +72,16 @@ data class HarmfulUiState(
     /** 오류는 아니지만 알려 줘야 하는 것(예: 카테고리에 이미 들어 있는 키워드). */
     val notice: String? = null,
 ) {
+    // 서버 모델에 목록 종류가 없다. 규칙은 전부 차단 패턴이다.
     val blacklist: List<BlocklistItem>
-        get() = items.filter { it.listType.equals("BLACK", ignoreCase = true) }
+        get() = items
 
     /**
      * 부모가 직접 추가한 키워드만. 카테고리 묶음 키워드(수십 개)는 토글이 대신 보여 주므로
      * 목록에 그대로 쏟아 내지 않는다.
      */
     val customKeywords: List<BlocklistItem>
-        get() = blacklist.filter { HarmfulCategories.categoryOf(it.keyword) == null }
+        get() = blacklist.filter { HarmfulCategories.categoryOf(it.pattern) == null }
 
     /**
      * 묶음 키워드가 **하나라도** 블랙리스트에 있으면 켜진 것으로 본다.
@@ -90,7 +91,7 @@ data class HarmfulUiState(
      */
     fun categoryOn(categoryId: String): Boolean {
         val bundle = HarmfulCategories.keywords(categoryId)
-        return blacklist.any { item -> bundle.any { it.equals(item.keyword, ignoreCase = true) } }
+        return blacklist.any { item -> bundle.any { it.equals(item.pattern, ignoreCase = true) } }
     }
 }
 
@@ -182,7 +183,7 @@ class HarmfulViewModel(
         if (keyword.isBlank()) return
         viewModelScope.launch {
             val id = requireChildId() ?: return@launch
-            if (_state.value.blacklist.any { it.keyword.equals(keyword, ignoreCase = true) }) {
+            if (_state.value.blacklist.any { it.pattern.equals(keyword, ignoreCase = true) }) {
                 _state.update { it.copy(keyword = "", error = null, notice = DUPLICATE) }
                 return@launch
             }
@@ -200,7 +201,7 @@ class HarmfulViewModel(
     fun removeKeyword(item: BlocklistItem) {
         viewModelScope.launch {
             val id = requireChildId() ?: return@launch
-            applyKeywords(id, listOf(item.keyword), enabled = false)
+            applyKeywords(id, listOf(item.pattern), enabled = false)
         }
     }
 
@@ -221,11 +222,11 @@ class HarmfulViewModel(
         var failure: Throwable? = null
         keywords.forEach { keyword ->
             val existing = before.firstOrNull {
-                it.listType.equals("BLACK", ignoreCase = true) && it.keyword.equals(keyword, ignoreCase = true)
+                it.pattern.equals(keyword, ignoreCase = true)
             }
             val call = when {
-                enabled && existing == null -> runCatching { blocklistRepository.add(id, "BLACK", keyword) }
-                !enabled && existing != null -> runCatching { blocklistRepository.remove(id, existing.id) }
+                enabled && existing == null -> runCatching { blocklistRepository.add(id, keyword) }
+                !enabled && existing != null -> runCatching { blocklistRepository.remove(existing.id) }
                 else -> null
             }
             if (failure == null) failure = call?.exceptionOrNull()
@@ -234,7 +235,7 @@ class HarmfulViewModel(
         val server = runCatching { blocklistRepository.get(id) }.getOrNull()
         val notPersisted = server != null && keywords.any { keyword ->
             val present = server.any {
-                it.listType.equals("BLACK", ignoreCase = true) && it.keyword.equals(keyword, ignoreCase = true)
+                it.pattern.equals(keyword, ignoreCase = true)
             }
             present != enabled
         }
@@ -261,14 +262,13 @@ class HarmfulViewModel(
         return if (enabled) {
             val missing = keywords.filter { keyword ->
                 stored.none {
-                    it.listType.equals("BLACK", ignoreCase = true) && it.keyword.equals(keyword, ignoreCase = true)
+                    it.pattern.equals(keyword, ignoreCase = true)
                 }
             }
-            stored + missing.map { BlocklistItem(it, "BLACK", it) }
+            stored + missing.map { BlocklistItem(id = it, pattern = it) }
         } else {
             stored.filterNot { item ->
-                item.listType.equals("BLACK", ignoreCase = true) &&
-                    keywords.any { it.equals(item.keyword, ignoreCase = true) }
+                keywords.any { it.equals(item.pattern, ignoreCase = true) }
             }
         }
     }
@@ -395,7 +395,7 @@ fun ParentHarmfulScreen(
                 custom.forEach { item ->
                     Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "• ${item.keyword}",
+                            "• ${item.pattern}",
                             modifier = Modifier.weight(1f),
                             fontSize = 13.sp,
                             color = colors.text,

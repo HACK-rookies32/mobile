@@ -9,6 +9,7 @@ import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.local.BlocklistStore
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.data.local.HarmfulSettingsStore
+import com.hack.kidhack.data.local.AppUsageReportStore
 import com.hack.kidhack.data.local.PushTokenStore
 import com.hack.kidhack.data.local.ParentWatchStore
 import com.hack.kidhack.data.local.ParentAlertStore
@@ -190,6 +191,7 @@ val appModule = module {
     single { HarmfulSettingsStore(androidContext()) }
     single { ParentWatchStore(androidContext()) }
     single { PushTokenStore(androidContext()) }
+    single { AppUsageReportStore(androidContext()) }
     single { BlocklistStore(androidContext()) }
     single { MockNotificationFeed(androidContext()) }
     single { MockPhotoFeed(androidContext()) }
@@ -272,7 +274,7 @@ val appModule = module {
     single<PairingRepository> { if (useMock) FakePairingRepository() else RealPairingRepository(get()) }
     single<ChildRepository> { if (useMock) FakeChildRepository() else RealChildRepository(get()) }
     single<LocationRepository> { if (useMock) FakeLocationRepository() else RealLocationRepository(get()) }
-    single<DeviceRepository> { if (useMock) FakeDeviceRepository() else RealDeviceRepository(get()) }
+    single<DeviceRepository> { if (useMock) FakeDeviceRepository() else RealDeviceRepository(get(), androidContext()) }
     single<DashboardRepository> { if (useMock) FakeDashboardRepository(get(), get(), get()) else RealDashboardRepository(get()) }
     single<PlaceRepository> { if (useMock) FakePlaceRepository() else RealPlaceRepository(get()) }
     single<LocationEventRepository> {
@@ -333,7 +335,7 @@ val appModule = module {
     viewModel { RegisterViewModel(get(), get(), get(), androidContext()) }
     viewModel { ForgotViewModel(get()) }
 
-    viewModel { DashboardViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { DashboardViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { AppUsageDetailViewModel(get(), get(), get()) }
     viewModel { LocationViewModel(get(), get(), get(), get(), get()) }
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
