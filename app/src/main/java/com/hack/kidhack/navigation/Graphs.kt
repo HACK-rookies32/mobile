@@ -56,6 +56,9 @@ import com.hack.kidhack.feature.parent.ParentEditProfileScreen
 import com.hack.kidhack.feature.parent.ParentGeofenceScreen
 import com.hack.kidhack.feature.parent.ParentHarmfulScreen
 import com.hack.kidhack.feature.parent.ParentLocationScreen
+import com.hack.kidhack.feature.parent.ParentActivityScreen
+import com.hack.kidhack.feature.parent.ParentChildAccountScreen
+import com.hack.kidhack.feature.parent.ParentWithdrawScreen
 import com.hack.kidhack.feature.parent.ParentMypageScreen
 import com.hack.kidhack.feature.parent.ParentNoticeScreen
 import com.hack.kidhack.feature.parent.ParentNotificationsScreen
@@ -108,6 +111,9 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
             ParentMypageScreen(
                 onOpenEditProfile = { navController.navigate(Route.ParentEditProfile.path) },
                 onOpenNotifications = { navController.navigate(Route.ParentNotifications.path) },
+                onOpenActivities = { navController.navigate(Route.ParentActivities.path) },
+                onOpenChildAccount = { navController.navigate(Route.ParentChildAccount.path) },
+                onOpenWithdraw = { navController.navigate(Route.ParentWithdraw.path) },
                 onOpenAppControl = { navController.navigate(Route.ParentAppControl.path) },
                 onOpenScreenshot = { navController.navigate(Route.ParentScreenshot.path) },
                 onOpenCamera = { navController.navigate(Route.ParentCameraRequest.path) },
@@ -123,6 +129,17 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
             )
         }
         composable(Route.ParentEditProfile.path) { ParentShell(navController) { ParentEditProfileScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentChildAccount.path) { ParentShell(navController) { ParentChildAccountScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentWithdraw.path) { ParentShell(navController) { ParentWithdrawScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentActivities.path) {
+            ParentShell(navController) {
+                ParentActivityScreen(
+                    onBack = { navController.popBackStack() },
+                    // 활동 항목을 누르면 해당 커뮤니티 글로 간다.
+                    onOpenPost = { navController.navigate(Route.ParentCommunityDetail.create(it)) },
+                )
+            }
+        }
         composable(Route.ParentAppControl.path) { ParentShell(navController) { ParentAppControlScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentScreenshot.path) { ParentShell(navController) { ParentScreenshotScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentCameraRequest.path) { ParentShell(navController) { ParentCameraRequestScreen(onBack = { navController.popBackStack() }) } }

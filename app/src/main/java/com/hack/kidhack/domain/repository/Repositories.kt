@@ -2,6 +2,8 @@ package com.hack.kidhack.domain.repository
 
 import androidx.paging.PagingData
 import com.hack.kidhack.domain.model.AppControlItem
+import com.hack.kidhack.domain.model.Activity
+import com.hack.kidhack.domain.model.ActivityType
 import com.hack.kidhack.domain.model.Allowance
 import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
@@ -76,15 +78,23 @@ interface AuthRepository {
 
 interface UserRepository {
     suspend fun me(): User
+    /** 서버가 받는 항목만. 실명(username)은 수정 대상이 아니다. */
     suspend fun updateMe(
         nickname: String?,
-        name: String?,
-        phone: String?,
+        phoneNumber: String?,
         email: String?,
+        address: String?,
         profileImageUrl: String?,
     ): User
-    suspend fun changePassword(newPassword: String)
     suspend fun deleteMe()
+
+    /**
+     * 커뮤니티 활동 내역.
+     *
+     * 서버는 `type` 을 **필수**로 받는다(미전달 시 400). 「전체」 조회는 없으므로
+     * 널을 허용하지 않는다. [ActivityType.UNKNOWN] 은 응답 파싱용이라 필터로 쓰지 않는다.
+     */
+    fun pagedActivities(type: ActivityType): Flow<PagingData<Activity>>
     suspend fun notificationSettings(): NotificationSettings
     suspend fun patchNotificationSettings(settings: NotificationSettings): NotificationSettings
 }
@@ -107,8 +117,16 @@ interface ChildRepository {
         alias: String?,
         profileImageUrl: String?,
         birthDate: String?,
-        school: String?
     ): ChildProfile
+
+    /**
+     * 자녀 페어링 해제. **서버가 계정을 소프트 삭제까지 하므로 되돌릴 수 없다.**
+     * 화면에서 「연결만 끊는다」는 인상을 주면 안 된다.
+     */
+    suspend fun unpair(childId: String)
+
+    /** 자녀 기기를 강제 로그아웃시킨다(서버의 refresh token 무효화). */
+    suspend fun forceLogout(childId: String)
 }
 
 interface LocationRepository {

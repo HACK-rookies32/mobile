@@ -78,7 +78,6 @@ data class ChildProfileUiState(
     val name: String = "",
     val alias: String = "",
     val birthDate: String = "",
-    val school: String = "",
     val profileImageUrl: String? = null,
     val showPhotoOptions: Boolean = false,
     val showDatePicker: Boolean = false,
@@ -99,7 +98,6 @@ class ChildProfileViewModel(
 
     fun onName(v: String) = _state.update { it.copy(name = v, saved = false) }
     fun onAlias(v: String) = _state.update { it.copy(alias = v, saved = false) }
-    fun onSchool(v: String) = _state.update { it.copy(school = v, saved = false) }
     
     fun togglePhotoOptions(show: Boolean) = _state.update { it.copy(showPhotoOptions = show) }
     fun toggleDatePicker(show: Boolean) = _state.update { it.copy(showDatePicker = show) }
@@ -139,7 +137,6 @@ class ChildProfileViewModel(
                             name = child.name,
                             alias = child.alias.orEmpty(),
                             birthDate = child.birthDate.orEmpty(),
-                            school = child.school.orEmpty(),
                             profileImageUrl = child.profileImageUrl
                         )
                     }
@@ -162,7 +159,6 @@ class ChildProfileViewModel(
                     alias = _state.value.alias.trim().ifBlank { null },
                     profileImageUrl = _state.value.profileImageUrl,
                     birthDate = _state.value.birthDate.trim().ifBlank { null },
-                    school = _state.value.school.trim().ifBlank { null }
                 )
             }.onSuccess { updated ->
                 _state.update { 
@@ -171,7 +167,6 @@ class ChildProfileViewModel(
                         name = updated.name, 
                         alias = updated.alias.orEmpty(),
                         birthDate = updated.birthDate.orEmpty(),
-                        school = updated.school.orEmpty(),
                         profileImageUrl = updated.profileImageUrl,
                         saved = true 
                     ) 
@@ -249,7 +244,6 @@ fun ParentChildProfileScreen(
                         enabled = false
                     )
                 }
-                KidTextField(state.school, viewModel::onSchool, stringResource(R.string.parent_profile_school), placeholder = "학교명을 입력하세요")
             }
             if (state.saved) {
                 Text("성공적으로 저장되었습니다", color = colors.safe, fontSize = 12.sp, fontWeight = FontBold)

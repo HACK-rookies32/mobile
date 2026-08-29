@@ -17,28 +17,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class GuardianRow(
-    val name: String,
-    val status: String,
-    val emoji: String,
-    val online: Boolean,
-)
-
 data class ChildMypageUiState(
     val name: String = "",
     val email: String = "",
-    val grade: String = DEFAULT_GRADE,
     val screenTime: String = formatDurationSec(0),
     val chatCount: Int = 0,
     val blockedCount: Int = 0,
     val payBalance: Int = 0,
-    val guardians: List<GuardianRow> = emptyList(),
-) {
-    companion object {
-        /** 학년 필드는 자녀가 부를 수 있는 API 에 없다(`children` 은 부모 전용). 서버가 추가하면 대체. */
-        const val DEFAULT_GRADE = "초등학교 6학년"
-    }
-}
+)
 
 class ChildMypageViewModel(
     private val sessionRepository: SessionRepository,
@@ -62,7 +48,8 @@ class ChildMypageViewModel(
             val user = sessionRepository.current()?.user
             val childId = sessionRepository.childId()
 
-            // 보호자 목록은 자녀가 부를 수 있는 채팅방 목록에서 끌어온다.
+            // 채팅 건수용. 「연결된 보호자」 표시는 걷어냈다 — 채팅방 유무로 판단하던 값이라
+            // 부모가 채팅을 한 번도 열지 않으면 페어링이 돼 있어도 「없음」으로 보였다.
             val rooms = runCatching { chatRepository.rooms() }.getOrDefault(emptyList())
             val chatCount = rooms.firstOrNull()
                 ?.let { room -> runCatching { chatRepository.messages(room.id).size }.getOrDefault(0) }
@@ -84,14 +71,6 @@ class ChildMypageViewModel(
                         type.contains("HARMFUL") || type.contains("BLOCK")
                     },
                     payBalance = balance,
-                    guardians = rooms.map { room ->
-                        GuardianRow(
-                            name = room.title,
-                            status = if (room.online) "온라인" else "자리 비움",
-                            emoji = "👩",
-                            online = room.online,
-                        )
-                    },
                 )
             }
         }

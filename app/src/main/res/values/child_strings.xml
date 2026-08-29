@@ -145,8 +145,6 @@
     <string name="child_mypage_stat_blocked">차단됨</string>
     <string name="child_mypage_chat_count">%1$d건</string>
     <string name="child_mypage_blocked_count">%1$d건</string>
-    <string name="child_mypage_guardians">연결된 보호자</string>
-    <string name="child_mypage_guardians_empty">아직 연결된 보호자가 없어요</string>
     <string name="child_mypage_mom">엄마 (김지영)</string>
     <string name="child_mypage_dad">아빠 (김철수)</string>
     <string name="child_mypage_online">온라인</string>
@@ -167,7 +165,6 @@
     <string name="child_profile_save">저장하기</string>
     <string name="child_profile_saving">저장 중...</string>
     <string name="child_profile_cancel">취소</string>
-    <string name="child_mypage_change_password">비밀번호 변경</string>
     <string name="child_mypage_section_service">서비스</string>
     <string name="child_mypage_menu_pay">루키즈 페이</string>
     <string name="child_mypage_menu_pay_balance">잔액 %1$sP</string>
@@ -181,6 +178,7 @@
     <string name="child_terms_title">이용약관</string>
     <string name="child_mypage_version">앱 버전 1.2.0</string>
     <string name="child_mypage_logout">로그아웃</string>
+    <string name="child_mypage_logout_temp_notice">※ 자녀 계정 로그아웃은 원래 부모님만 할 수 있어요. 이 버튼은 테스트 중 계정을 바꾸기 위해 임시로 둔 것입니다.</string>
     <string name="child_mypage_coming_soon">준비 중이에요</string>
 
     <string name="child_onboarding_title">권한을 허용해 주세요</string>

@@ -70,8 +70,15 @@
     <string name="parent_mypage_greeting">%1$s 님</string>
     <string name="parent_mypage_account">계정 설정</string>
     <string name="parent_mypage_edit_profile">내 정보 수정</string>
-    <string name="parent_mypage_change_password">비밀번호 변경</string>
     <string name="parent_mypage_notif_settings">알림 설정</string>
+    <string name="parent_mypage_activities">활동 내역</string>
+    <string name="parent_activity_title">활동 내역</string>
+    <string name="parent_activity_type_unknown">활동</string>
+    <string name="parent_activity_filter_post">작성한 글</string>
+    <string name="parent_activity_filter_comment">댓글</string>
+    <string name="parent_activity_filter_like">좋아요</string>
+    <string name="parent_activity_empty">아직 활동 내역이 없어요</string>
+    <string name="parent_activity_loading_more">불러오는 중...</string>
     <string name="parent_mypage_child_manage">자녀 관리</string>
     <string name="parent_mypage_app_control">앱 통제</string>
     <string name="parent_mypage_screenshot">화면 캡처</string>
@@ -91,22 +98,33 @@
     <string name="parent_mypage_terms">이용약관</string>
     <string name="parent_mypage_version">앱 버전 2.5.0</string>
     <string name="parent_mypage_logout">로그아웃</string>
+    <string name="parent_mypage_child_account">자녀 계정 관리</string>
+    <string name="parent_mypage_withdraw">회원 탈퇴</string>
+
+    <string name="parent_child_account_title">자녀 계정 관리</string>
+    <string name="parent_child_account_empty">연결된 자녀가 없어요</string>
+    <string name="parent_child_account_force_logout">강제 로그아웃</string>
+    <string name="parent_child_account_unpair">연결 해제·탈퇴</string>
+    <string name="parent_child_account_notice">강제 로그아웃은 자녀 기기의 로그인만 풀립니다. 연결 해제는 자녀 계정까지 삭제되며 되돌릴 수 없습니다.</string>
+    <string name="parent_child_account_logout_confirm_title">%1$s 기기를 로그아웃시킬까요?</string>
+    <string name="parent_child_account_logout_confirm_message">자녀 기기에서 로그아웃되고 다시 로그인해야 합니다. 계정은 그대로 유지돼요.</string>
+    <string name="parent_child_account_unpair_confirm_title">%1$s 연결을 해제할까요?</string>
+    <string name="parent_child_account_unpair_confirm_message">연결이 끊기고 자녀 계정이 삭제됩니다. 되돌릴 수 없어요.</string>
+    <string name="parent_child_account_confirm_ok">진행하기</string>
+    <string name="parent_child_account_confirm_cancel">취소</string>
+
+    <string name="parent_withdraw_title">회원 탈퇴</string>
+    <string name="parent_withdraw_heading">정말 탈퇴하시겠어요?</string>
+    <string name="parent_withdraw_desc">탈퇴하면 계정과 연결된 자녀 정보, 위치·사용 기록에 더 이상 접근할 수 없습니다. 되돌릴 수 없어요.</string>
+    <string name="parent_withdraw_action">탈퇴하기</string>
+    <string name="parent_withdraw_processing">처리 중...</string>
+    <string name="parent_withdraw_confirm_title">회원 탈퇴</string>
+    <string name="parent_withdraw_confirm_message">탈퇴 후에는 같은 계정으로 로그인할 수 없습니다. 진행할까요?</string>
+    <string name="parent_withdraw_confirm_ok">탈퇴하기</string>
+    <string name="parent_withdraw_confirm_cancel">취소</string>
     <string name="parent_mypage_name">이름</string>
     <string name="parent_mypage_phone">휴대폰 번호</string>
     <string name="parent_mypage_save">저장</string>
-    <string name="parent_mypage_password_stub">비밀번호를 새로 설정할 수 있어요</string>
-    <string name="parent_mypage_new_password">새 비밀번호</string>
-    <string name="parent_mypage_new_password_confirm">새 비밀번호 확인</string>
-    <string name="parent_mypage_password_placeholder">새 비밀번호를 입력하세요</string>
-    <string name="parent_mypage_password_confirm_placeholder">새 비밀번호를 다시 입력하세요</string>
-    <string name="parent_mypage_password_change">변경</string>
-    <string name="parent_mypage_password_error_empty">비밀번호를 입력해 주세요</string>
-    <string name="parent_mypage_password_error_mismatch">비밀번호가 일치하지 않아요</string>
-    <string name="parent_mypage_password_confirm_title">비밀번호를 변경할까요?</string>
-    <string name="parent_mypage_password_confirm_message">변경 후에는 새 비밀번호로 로그인해야 해요.</string>
-    <string name="parent_mypage_password_confirm_ok">변경하기</string>
-    <string name="parent_mypage_password_confirm_cancel">취소</string>
-    <string name="parent_mypage_password_changed">비밀번호를 변경했어요</string>
     <string name="parent_mypage_saved">저장했어요</string>
 
     <string name="parent_terms_title">이용약관</string>
@@ -164,7 +182,6 @@
     <string name="parent_profile_name">이름</string>
     <string name="parent_profile_alias">별명</string>
     <string name="parent_profile_birth">생년월일</string>
-    <string name="parent_profile_school">학교</string>
     <string name="parent_profile_readonly">이름·별명만 저장돼요. 생년월일·학교·기기는 표시 전용입니다.</string>
     <string name="parent_profile_save">저장</string>
 

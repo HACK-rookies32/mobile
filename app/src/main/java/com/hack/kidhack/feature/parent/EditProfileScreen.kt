@@ -120,9 +120,9 @@ class EditProfileViewModel(
             runCatching {
                 userRepository.updateMe(
                     nickname = s.nickname.trim().ifBlank { null },
-                    name = s.name.trim(),
-                    phone = s.phone.trim(),
+                    phoneNumber = s.phone.trim(),
                     email = s.email.trim().ifBlank { null },
+                    address = null,
                     profileImageUrl = s.profileImageUrl,
                 )
             }.onSuccess { user ->

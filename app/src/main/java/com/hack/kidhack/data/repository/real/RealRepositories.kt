@@ -38,7 +38,6 @@ import com.hack.kidhack.data.remote.dto.AppUsageReportItemDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.CardRegisterRequest
-import com.hack.kidhack.data.remote.dto.ChangePasswordRequest
 import com.hack.kidhack.data.remote.dto.PushTokenRequest
 import com.hack.kidhack.data.remote.dto.ChargeConfirmRequest
 import com.hack.kidhack.data.remote.dto.ChargePrepareRequest
@@ -75,6 +74,8 @@ import com.hack.kidhack.data.repository.toDto
 import com.hack.kidhack.data.ws.ChatWebSocketClient
 import com.hack.kidhack.data.ws.ChatWsEvent
 import com.hack.kidhack.data.ws.ChildCommandSocket
+import com.hack.kidhack.domain.model.Activity
+import com.hack.kidhack.domain.model.ActivityType
 import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.Allowance
 import com.hack.kidhack.domain.model.AllowanceEntry
@@ -283,16 +284,27 @@ class RealUserRepository(private val api: UserApi) : UserRepository {
     override suspend fun me(): User = api.me().unwrap().toDomain()
     override suspend fun updateMe(
         nickname: String?,
-        name: String?,
-        phone: String?,
+        phoneNumber: String?,
         email: String?,
+        address: String?,
         profileImageUrl: String?,
-    ): User =
-        api.updateMe(UserUpdateRequest(nickname, name, phone, email, profileImageUrl)).unwrap().toDomain()
-    override suspend fun changePassword(newPassword: String) {
-        api.changePassword(ChangePasswordRequest(newPassword)).unwrap()
-    }
+    ): User = api.updateMe(
+        UserUpdateRequest(
+            nickname = nickname,
+            phoneNumber = phoneNumber,
+            email = email,
+            address = address,
+            profileImageUrl = profileImageUrl,
+        ),
+    ).unwrap().toDomain()
     override suspend fun deleteMe() { api.deleteMe().unwrapOrNull() }
+
+    override fun pagedActivities(type: ActivityType): Flow<PagingData<Activity>> =
+        Pager(PagingConfig(20)) {
+            PageResponsePagingSource { page, size ->
+                api.activities(type = type.name, page = page, size = size).unwrap()
+            }
+        }.flow.map { paging -> paging.map { it.toDomain() } }
     override suspend fun notificationSettings(): NotificationSettings =
         api.notificationSettings().unwrap().toDomain()
     override suspend fun patchNotificationSettings(settings: NotificationSettings): NotificationSettings =
@@ -319,12 +331,19 @@ class RealChildRepository(private val api: ChildApi) : ChildRepository {
         alias: String?,
         profileImageUrl: String?,
         birthDate: String?,
-        school: String?,
     ): ChildProfile = api.update(
         childId,
-        ChildUpdateRequest(name, alias, profileImageUrl, birthDate, school)
+        ChildUpdateRequest(name, alias, profileImageUrl, birthDate)
     ).unwrap().toDomain()
+    override suspend fun unpair(childId: String) {
+        api.unpair(childId).unwrapOrNull()
+    }
+
+    override suspend fun forceLogout(childId: String) {
+        api.forceLogout(childId).unwrapOrNull()
+    }
 }
+
 
 class RealLocationRepository(private val api: LocationApi) : LocationRepository {
     override suspend fun track(childId: String, latitude: String, longitude: String): LocationPoint =

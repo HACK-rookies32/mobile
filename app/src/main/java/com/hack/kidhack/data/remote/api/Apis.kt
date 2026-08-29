@@ -2,6 +2,7 @@ package com.hack.kidhack.data.remote.api
 
 import com.hack.kidhack.data.remote.ApiEnvelope
 import com.hack.kidhack.data.remote.PageResponse
+import com.hack.kidhack.data.remote.dto.ActivityDto
 import com.hack.kidhack.data.remote.dto.AllowanceDto
 import com.hack.kidhack.data.remote.dto.AllowanceEntryDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentDto
@@ -15,7 +16,6 @@ import com.hack.kidhack.data.remote.dto.BlocklistAddRequest
 import com.hack.kidhack.data.remote.dto.BlocklistResponse
 import com.hack.kidhack.data.remote.dto.CardDto
 import com.hack.kidhack.data.remote.dto.CardRegisterRequest
-import com.hack.kidhack.data.remote.dto.ChangePasswordRequest
 import com.hack.kidhack.data.remote.dto.ChargeCancelRequest
 import com.hack.kidhack.data.remote.dto.ChargeConfirmRequest
 import com.hack.kidhack.data.remote.dto.ChargeConfirmResponse
@@ -125,9 +125,6 @@ interface UserApi {
     @PATCH("users/me")
     suspend fun updateMe(@Body body: UserUpdateRequest): ApiEnvelope<UserDto>
 
-    @PATCH("users/me/password")
-    suspend fun changePassword(@Body body: ChangePasswordRequest): ApiEnvelope<Unit>
-
     @DELETE("users/me")
     suspend fun deleteMe(): ApiEnvelope<Unit>
 
@@ -136,7 +133,7 @@ interface UserApi {
         @Query("type") type: String? = null,
         @Query("page") page: Int = 0,
         @Query("size") size: Int = 20,
-    ): ApiEnvelope<PageResponse<PostDto>>
+    ): ApiEnvelope<PageResponse<ActivityDto>>
 
     @GET("users/me/notification-settings")
     suspend fun notificationSettings(): ApiEnvelope<NotificationSettingsDto>
@@ -177,6 +174,19 @@ interface ChildApi {
         @Path("childId") childId: String,
         @Body body: ChildUpdateRequest,
     ): ApiEnvelope<ChildDto>
+
+    /**
+     * 자녀 페어링 해제 (PARENT).
+     *
+     * ⚠️ 서버는 연결만 끊는 게 아니라 **계정을 소프트 삭제까지** 한다
+     * (`child.setParent(null)` + `setDeleted(true)`). 되돌릴 수 없다.
+     */
+    @DELETE("children/{childId}")
+    suspend fun unpair(@Path("childId") childId: String): ApiEnvelope<Unit>
+
+    /** 자녀 강제 로그아웃 (PARENT). 자녀의 refresh token 을 전부 무효화한다. */
+    @POST("children/{childId}/logout")
+    suspend fun forceLogout(@Path("childId") childId: String): ApiEnvelope<Unit>
 }
 
 interface LocationApi {

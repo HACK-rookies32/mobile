@@ -1,0 +1,221 @@
+package com.hack.kidhack.feature.parent
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import androidx.paging.LoadState
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
+import com.hack.kidhack.R
+import com.hack.kidhack.core.designsystem.component.KidCard
+import com.hack.kidhack.core.designsystem.theme.FontBold
+import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
+import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.domain.model.Activity
+import com.hack.kidhack.domain.model.ActivityType
+import com.hack.kidhack.domain.repository.UserRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.update
+import org.koin.androidx.compose.koinViewModel
+
+/**
+ * 내 활동 내역 (`GET /users/me/activities`).
+ *
+ * 커뮤니티에서 내가 쓴 글 · 단 댓글 · 누른 좋아요를 종류별로 본다.
+ *
+ * 서버는 `type`(`POST` / `COMMENT` / `LIKE`)을 **필수**로 받는다. 미전달 시 400 이라
+ * 「전체」 탭은 만들 수 없다 — 세 종류 중 하나를 항상 고른 상태로 둔다.
+ */
+class ActivityViewModel(
+    userRepository: UserRepository,
+) : ViewModel() {
+
+    // 서버가 type 을 필수로 받아 「전체」 조회가 없다. 기본값은 작성한 글.
+    private val _filter = MutableStateFlow(ActivityType.POST)
+    val filter: StateFlow<ActivityType> = _filter.asStateFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val activities: Flow<PagingData<Activity>> =
+        _filter
+            .flatMapLatest { type -> userRepository.pagedActivities(type) }
+            .cachedIn(viewModelScope)
+
+    fun selectFilter(type: ActivityType) = _filter.update { type }
+}
+
+@Composable
+fun ParentActivityScreen(
+    onBack: () -> Unit = {},
+    onOpenPost: (String) -> Unit = {},
+    viewModel: ActivityViewModel = koinViewModel(),
+) {
+    val colors = LocalKidhackColors.current
+    val filter by viewModel.filter.collectAsStateWithLifecycle()
+    val activities = viewModel.activities.collectAsLazyPagingItems()
+
+    ParentScreenScaffold(
+        header = { ParentHeaderBar(stringResource(R.string.parent_activity_title), onBack) },
+        scrollable = false,
+        contentPadding = PaddingValues(0.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(stringResource(R.string.parent_activity_filter_post), filter == ActivityType.POST) {
+                viewModel.selectFilter(ActivityType.POST)
+            }
+            FilterChip(stringResource(R.string.parent_activity_filter_comment), filter == ActivityType.COMMENT) {
+                viewModel.selectFilter(ActivityType.COMMENT)
+            }
+            FilterChip(stringResource(R.string.parent_activity_filter_like), filter == ActivityType.LIKE) {
+                viewModel.selectFilter(ActivityType.LIKE)
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            val refresh = activities.loadState.refresh
+            when {
+                refresh is LoadState.Loading && activities.itemCount == 0 ->
+                    item { ParentLoadingOrError(true, null) }
+                refresh is LoadState.Error ->
+                    item {
+                        ParentLoadingOrError(
+                            false,
+                            refresh.error.message.orEmpty(),
+                            onRetry = { activities.retry() },
+                        )
+                    }
+                refresh is LoadState.NotLoading && activities.itemCount == 0 ->
+                    item {
+                        Text(
+                            stringResource(R.string.parent_activity_empty),
+                            color = colors.muted,
+                            fontSize = 13.sp,
+                        )
+                    }
+            }
+
+            items(
+                count = activities.itemCount,
+                key = activities.itemKey { it.id },
+            ) { index ->
+                activities[index]?.let { activity ->
+                    ActivityRow(activity, onOpenPost)
+                }
+            }
+
+            if (activities.loadState.append is LoadState.Loading) {
+                item {
+                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                        Text(stringResource(R.string.parent_activity_loading_more), color = colors.muted, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityRow(activity: Activity, onOpenPost: (String) -> Unit) {
+    val colors = LocalKidhackColors.current
+    // 글이 지워졌으면 postId 가 없다. 그때는 눌러도 갈 곳이 없으므로 클릭을 막는다.
+    val postId = activity.postId?.toString()
+    val modifier = if (postId != null) Modifier.clickable { onOpenPost(postId) } else Modifier
+
+    KidCard(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(activity.type.emoji(), fontSize = 16.sp)
+            Text(
+                stringResource(activity.type.labelRes()),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 12.sp,
+                color = colors.brandDark,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(activity.createdAtLabel.toDateLabel(), color = colors.muted, fontSize = 12.sp)
+        }
+        if (activity.preview.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                activity.preview,
+                color = colors.text,
+                fontSize = 14.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val colors = LocalKidhackColors.current
+    Text(
+        label,
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (selected) colors.brand else colors.surface)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        color = if (selected) androidx.compose.ui.graphics.Color.White else colors.muted,
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBold,
+        fontSize = 12.sp,
+    )
+}
+
+private fun ActivityType.emoji(): String = when (this) {
+    ActivityType.POST -> "📝"
+    ActivityType.COMMENT -> "💬"
+    ActivityType.LIKE -> "❤️"
+    ActivityType.UNKNOWN -> "•"
+}
+
+private fun ActivityType.labelRes(): Int = when (this) {
+    ActivityType.POST -> R.string.parent_activity_filter_post
+    ActivityType.COMMENT -> R.string.parent_activity_filter_comment
+    ActivityType.LIKE -> R.string.parent_activity_filter_like
+    // 서버가 새 유형을 추가해도 목록이 깨지지 않도록 둔다. 필터로는 쓰이지 않는다.
+    ActivityType.UNKNOWN -> R.string.parent_activity_type_unknown
+}
+
+/** 서버는 오프셋 없는 ISO LocalDateTime 을 준다. 목록에서는 날짜와 시:분까지만 보여 준다. */
+private fun String.toDateLabel(): String {
+    if (length < 16) return this
+    return substring(0, 10) + " " + substring(11, 16)
+}
