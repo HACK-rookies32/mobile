@@ -29,6 +29,7 @@ import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
 import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.Role
+import com.hack.kidhack.domain.model.SentCode
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.model.User
@@ -55,8 +56,22 @@ interface AuthRepository {
 
     suspend fun login(loginId: String, password: String, preferredRole: Role? = null): Session
     suspend fun logout()
-    suspend fun findId(name: String, phone: String): String
-    suspend fun resetPassword(loginId: String, verifyCode: String, newPassword: String)
+    /**
+     * 아이디 찾기 1단계 — 실명 + 이메일로 인증코드 발송.
+     *
+     * 서버가 mock 메일러를 써서 코드를 응답에 실어 주므로 [SentCode.code] 가 채워져 올 수 있다.
+     * 운영에서는 화면에 노출하지 않는다.
+     */
+    suspend fun sendFindIdCode(username: String, email: String): SentCode
+
+    /** 아이디 찾기 2단계 — 코드 검증 후 로그인 아이디 반환. */
+    suspend fun verifyFindId(email: String, code: String): String
+
+    /** 비밀번호 재설정 1단계 — 아이디 + 이메일로 인증코드 발송. */
+    suspend fun sendResetPasswordCode(loginId: String, email: String): SentCode
+
+    /** 비밀번호 재설정 2단계 — 코드 검증과 동시에 새 비밀번호 적용. */
+    suspend fun resetPassword(email: String, code: String, newPassword: String)
 }
 
 interface UserRepository {
@@ -76,6 +91,10 @@ interface UserRepository {
 
 interface PairingRepository {
     suspend fun issueCode(): PairingCode
+
+    /** 아직 만료되지 않은 내 코드 목록. 연결에 쓰인 코드는 서버가 지우므로 목록에서 빠진다. */
+    suspend fun activeCodes(): List<PairingCode>
+
     suspend fun connect(pairingCode: String)
 }
 

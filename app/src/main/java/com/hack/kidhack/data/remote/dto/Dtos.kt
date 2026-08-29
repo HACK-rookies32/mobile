@@ -94,18 +94,36 @@ data class SignupRequest(
 @Serializable
 data class RefreshRequest(val refreshToken: String)
 
+/**
+ * 인증코드 발송 결과. 아이디 찾기·비밀번호 재설정이 같은 형태를 쓴다.
+ *
+ * `code` 는 서버가 mock 메일 발송(`MockEmailSender`) 대신 응답에 그대로 실어 주는 값이라
+ * 운영 화면에 노출하면 안 된다. 디버그 빌드에서만 보여 준다. (ForgotViewModel 참고)
+ */
 @Serializable
-data class FindIdRequest(val name: String, val phone: String)
-
-@Serializable
-data class ResetPasswordRequest(
-    val loginId: String,
-    val verifyCode: String,
-    val newPassword: String,
+data class SendCodeResponse(
+    val message: String? = null,
+    val code: String? = null,
 )
 
 @Serializable
-data class FindIdResponse(val loginId: String)
+data class FindIdSendCodeRequest(val username: String, val email: String)
+
+@Serializable
+data class FindIdVerifyRequest(val email: String, val code: String)
+
+@Serializable
+data class FindIdVerifyResponse(val loginId: String)
+
+@Serializable
+data class ResetPasswordSendCodeRequest(val loginId: String, val email: String)
+
+@Serializable
+data class ResetPasswordRequest(
+    val email: String,
+    val code: String,
+    val newPassword: String,
+)
 
 @Serializable
 data class UserDto(
@@ -145,11 +163,21 @@ data class NotificationSettingsDto(
     val notice: Boolean,
 )
 
+/**
+ * 페어링 코드 발급 결과.
+ *
+ * 서버는 남은 초가 아니라 **만료 시각**을 준다. 타임존 오프셋이 없는 LocalDateTime
+ * 문자열(예: `2026-08-29T21:34:00.123`)이고 서버 시간대는 KST 다.
+ * 화면이 쓰는 「남은 초」로는 매퍼에서 환산한다.
+ */
 @Serializable
-data class PairingCodeDto(val pairingCode: String, val expiresIn: Int)
+data class PairingCodeDto(
+    val code: String,
+    val expiresAt: String? = null,
+)
 
 @Serializable
-data class PairingConnectRequest(val pairingCode: String)
+data class PairingConnectRequest(val code: String)
 
 @Serializable
 data class ChildDto(
@@ -164,7 +192,6 @@ data class ChildDto(
     val profileImageUrl: String? = null,
     val school: String? = null,
     val birthDate: String? = null,
-    val deviceModel: String? = null,
     val ageLabel: String? = null,
     val online: Boolean = false,
 )

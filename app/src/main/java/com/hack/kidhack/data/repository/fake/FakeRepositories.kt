@@ -45,6 +45,7 @@ import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
+import com.hack.kidhack.domain.model.SentCode
 import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AllowanceRepository
@@ -115,9 +116,7 @@ class FakeAuthRepository(
         if (role != Role.CHILD) {
             require(!email.isNullOrBlank()) { "이메일을 입력해 주세요" }
         }
-        if (role == Role.CHILD) {
-            require(parentId != null && parentId > 0) { "연결할 부모님 회원 번호를 입력해 주세요" }
-        }
+        // 자녀는 가입 시 부모를 지정하지 않는다. 로그인 후 페어링 코드로 연결한다.
         // 채팅 등 API가 member id를 Long으로 쓰므로 목업도 숫자 id를 쓴다.
         val numericId = when (role) {
             Role.CHILD -> if (loginId.equals("minjun", ignoreCase = true)) "101" else "102"
@@ -164,8 +163,35 @@ class FakeAuthRepository(
         sessionEvents.emitLogout()
     }
 
-    override suspend fun findId(name: String, phone: String): String = "parent01"
-    override suspend fun resetPassword(loginId: String, verifyCode: String, newPassword: String) {}
+    /** 목업은 서버처럼 6자리 코드를 응답에 실어 준다. 검증은 [FAKE_CODE] 로만 통과한다. */
+    override suspend fun sendFindIdCode(username: String, email: String): SentCode {
+        delay(300)
+        require(username.isNotBlank()) { "이름을 입력해 주세요" }
+        require(email.contains("@")) { "이메일 형식이 올바르지 않아요" }
+        return SentCode(message = "인증코드가 발송되었습니다.", code = FAKE_CODE)
+    }
+
+    override suspend fun verifyFindId(email: String, code: String): String {
+        delay(300)
+        require(code.trim() == FAKE_CODE) { "인증코드가 올바르지 않습니다." }
+        return "parent01"
+    }
+
+    override suspend fun sendResetPasswordCode(loginId: String, email: String): SentCode {
+        delay(300)
+        require(loginId.isNotBlank()) { "아이디를 입력해 주세요" }
+        require(email.contains("@")) { "이메일 형식이 올바르지 않아요" }
+        return SentCode(message = "인증코드가 발송되었습니다.", code = FAKE_CODE)
+    }
+
+    override suspend fun resetPassword(email: String, code: String, newPassword: String) {
+        delay(300)
+        require(code.trim() == FAKE_CODE) { "인증코드가 올바르지 않습니다." }
+    }
+
+    private companion object {
+        const val FAKE_CODE = "123456"
+    }
 }
 
 /**
@@ -211,8 +237,18 @@ class FakeUserRepository(
 }
 
 class FakePairingRepository : PairingRepository {
-    override suspend fun issueCode(): PairingCode = FakeData.pairing
-    override suspend fun connect(pairingCode: String) {}
+    // 서버는 연결 성공 시 코드를 지운다. 목업도 같은 관찰 가능한 동작을 흉내 내야
+    // 「코드가 아직 살아 있으면 아무도 안 쓴 것」이라는 판정을 화면에서 검증할 수 있다.
+    private val active = mutableListOf<PairingCode>()
+
+    override suspend fun issueCode(): PairingCode =
+        FakeData.pairing.also { active += it }
+
+    override suspend fun activeCodes(): List<PairingCode> = active.toList()
+
+    override suspend fun connect(pairingCode: String) {
+        active.removeAll { it.pairingCode == pairingCode }
+    }
 }
 
 class FakeChildRepository : ChildRepository {

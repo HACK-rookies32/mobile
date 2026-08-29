@@ -48,7 +48,8 @@ import com.hack.kidhack.data.remote.dto.CommentRequest
 import com.hack.kidhack.data.remote.dto.CreateChatRoomRequest
 import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
-import com.hack.kidhack.data.remote.dto.FindIdRequest
+import com.hack.kidhack.data.remote.dto.FindIdSendCodeRequest
+import com.hack.kidhack.data.remote.dto.FindIdVerifyRequest
 import com.hack.kidhack.data.remote.dto.DeviceEventRequest
 import com.hack.kidhack.data.remote.dto.HarmfulAccessRequest
 import com.hack.kidhack.data.remote.dto.LocationTrackRequest
@@ -59,6 +60,7 @@ import com.hack.kidhack.data.remote.dto.PlaceRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
 import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
+import com.hack.kidhack.data.remote.dto.ResetPasswordSendCodeRequest
 import com.hack.kidhack.data.remote.dto.SignupRequest
 import com.hack.kidhack.data.remote.dto.TransferRequest
 import com.hack.kidhack.data.remote.dto.TransferResponse
@@ -102,6 +104,7 @@ import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
+import com.hack.kidhack.domain.model.SentCode
 import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AllowanceRepository
@@ -211,11 +214,23 @@ class RealAuthRepository(
         sessionEvents.emitLogout()
     }
 
-    override suspend fun findId(name: String, phone: String): String =
-        api.findId(FindIdRequest(name, phone)).unwrap().loginId
+    override suspend fun sendFindIdCode(username: String, email: String): SentCode =
+        api.sendFindIdCode(FindIdSendCodeRequest(username = username, email = email))
+            .unwrap()
+            .let { SentCode(message = it.message, code = it.code) }
 
-    override suspend fun resetPassword(loginId: String, verifyCode: String, newPassword: String) {
-        api.resetPassword(ResetPasswordRequest(loginId, verifyCode, newPassword)).unwrapOrNull()
+    override suspend fun verifyFindId(email: String, code: String): String =
+        api.verifyFindId(FindIdVerifyRequest(email = email, code = code)).unwrap().loginId
+
+    override suspend fun sendResetPasswordCode(loginId: String, email: String): SentCode =
+        api.sendResetPasswordCode(ResetPasswordSendCodeRequest(loginId = loginId, email = email))
+            .unwrap()
+            .let { SentCode(message = it.message, code = it.code) }
+
+    override suspend fun resetPassword(email: String, code: String, newPassword: String) {
+        api.resetPassword(
+            ResetPasswordRequest(email = email, code = code, newPassword = newPassword),
+        ).unwrapOrNull()
     }
 
     /**
@@ -286,8 +301,12 @@ class RealUserRepository(private val api: UserApi) : UserRepository {
 
 class RealPairingRepository(private val api: PairingApi) : PairingRepository {
     override suspend fun issueCode(): PairingCode = api.issueCode().unwrap().toDomain()
+
+    override suspend fun activeCodes(): List<PairingCode> =
+        api.activeCodes().unwrap().map { it.toDomain() }
     override suspend fun connect(pairingCode: String) {
-        api.connect(PairingConnectRequest(pairingCode)).unwrap()
+        // 성공 응답의 data 가 null 이라 unwrap() 을 쓰면 "응답 데이터가 없습니다" 로 터진다.
+        api.connect(PairingConnectRequest(code = pairingCode)).unwrapOrNull()
     }
 }
 

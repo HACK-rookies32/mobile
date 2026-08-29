@@ -165,7 +165,6 @@
     <string name="parent_profile_alias">별명</string>
     <string name="parent_profile_birth">생년월일</string>
     <string name="parent_profile_school">학교</string>
-    <string name="parent_profile_device">기기 모델</string>
     <string name="parent_profile_readonly">이름·별명만 저장돼요. 생년월일·학교·기기는 표시 전용입니다.</string>
     <string name="parent_profile_save">저장</string>
 
@@ -203,6 +202,7 @@
     <string name="parent_pairing_done_title">연결 완료!</string>
     <string name="parent_pairing_done_desc">아이의 기기가 성공적으로 연결되었어요</string>
     <string name="parent_pairing_connected">● 연결됨</string>
+    <string name="parent_pairing_not_connected">아직 연결된 자녀가 없어요. 자녀 기기에서 코드를 입력했는지 확인해 주세요.</string>
     <string name="parent_pairing_to_dashboard">대시보드로 이동</string>
 
     <string name="parent_community_title">부모 커뮤니티</string>
