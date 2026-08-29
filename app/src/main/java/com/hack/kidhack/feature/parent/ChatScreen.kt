@@ -144,10 +144,9 @@ class ParentChatViewModel(
                         val cached = roomByChildId[child.id]
                         val room = cached ?: chatRepository.getOrCreateRoom(parentId, childId)
                             .also { roomByChildId[child.id] = it }
-                        room.copy(
-                            title = child.name,
-                            online = child.online,
-                        )
+                        // 서버가 자녀 접속 여부를 주지 않는다(ChildSummaryResponse 에 없음).
+                        // 방 자체의 상태를 그대로 쓰고 자녀 정보로는 이름만 덮는다.
+                        room.copy(title = child.name)
                     }
                 }
             }.onSuccess { rooms ->

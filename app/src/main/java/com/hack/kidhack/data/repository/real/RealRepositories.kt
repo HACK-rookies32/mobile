@@ -327,13 +327,11 @@ class RealChildRepository(private val api: ChildApi) : ChildRepository {
     override suspend fun child(childId: String): ChildProfile = api.child(childId).unwrap().toDomain()
     override suspend fun updateChild(
         childId: String,
-        name: String?,
-        alias: String?,
+        nickname: String?,
         profileImageUrl: String?,
-        birthDate: String?,
     ): ChildProfile = api.update(
         childId,
-        ChildUpdateRequest(name, alias, profileImageUrl, birthDate)
+        ChildUpdateRequest(nickname = nickname, profileImageUrl = profileImageUrl)
     ).unwrap().toDomain()
     override suspend fun unpair(childId: String) {
         api.unpair(childId).unwrapOrNull()
@@ -348,8 +346,15 @@ class RealChildRepository(private val api: ChildApi) : ChildRepository {
 class RealLocationRepository(private val api: LocationApi) : LocationRepository {
     override suspend fun track(childId: String, latitude: String, longitude: String): LocationPoint =
         api.track(LocationTrackRequest(childId.toServerId(), latitude, longitude)).unwrap().toDomain()
+    /**
+     * 서버는 시간 **오름차순**으로 주는데 화면들은 첫 항목을 현재 위치로 쓴다.
+     * 여기서 뒤집어 최신순으로 맞춘다 — 호출부마다 정렬을 신경 쓰게 두면 또 어긋난다.
+     */
     override suspend fun history(childId: String): List<LocationPoint> =
-        api.history(childId).unwrap().map { it.toDomain() }
+        api.history(childId).unwrap().points.asReversed().map { it.toDomain() }
+    override suspend fun realtimeEnabled(childId: String): Boolean =
+        api.realtime(childId).unwrap().realtimeEnabled
+
     override suspend fun toggleRealtime(childId: String, enabled: Boolean): Boolean =
         api.toggleRealtime(childId, enabled).unwrap().realtimeEnabled
 }

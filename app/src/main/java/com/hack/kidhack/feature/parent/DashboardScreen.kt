@@ -357,9 +357,15 @@ fun ParentDashboardScreen(
                             Spacer(Modifier.size(16.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(child.name, fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 18.sp, color = colors.text)
+                                // 서버 ChildSummaryResponse 에 접속 여부(online)가 없다.
+                                // 목록이 실제로 주는 값은 실시간 추적 on/off 라 그걸 보여 준다.
                                 Text(
-                                    if (child.online) stringResource(R.string.parent_dashboard_online) else stringResource(R.string.parent_dashboard_offline),
-                                    color = if (child.online) colors.safe else colors.muted,
+                                    if (child.realtimeEnabled) {
+                                        stringResource(R.string.parent_dashboard_tracking_on)
+                                    } else {
+                                        stringResource(R.string.parent_dashboard_tracking_off)
+                                    },
+                                    color = if (child.realtimeEnabled) colors.safe else colors.muted,
                                     fontFamily = KidhackFontFamily,
                                     fontWeight = FontBold,
                                     fontSize = 12.sp,

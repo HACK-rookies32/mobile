@@ -211,16 +211,36 @@ data class ChildDto(
     val alias: String? = null,
     val profileImageUrl: String? = null,
     val birthDate: String? = null,
-    val ageLabel: String? = null,
-    val online: Boolean = false,
+    /** 목록(ChildSummaryResponse)에만 온다. 실시간 위치 추적 on/off. */
+    val realtimeEnabled: Boolean = false,
+)
+
+/**
+ * 자녀 상세 (`GET /children/{childId}` → ChildDetailResponse).
+ *
+ * 목록(ChildSummaryResponse)과 필드가 달라 DTO 를 나눈다. 예전에는 목록 DTO 로 받아
+ * loginId·email·phoneNumber·address·paired 를 전부 버렸다.
+ */
+@Serializable
+data class ChildDetailDto(
+    @Serializable(with = FlexibleStringSerializer::class)
+    val id: String,
+    val loginId: String? = null,
+    val username: String? = null,
+    val nickname: String? = null,
+    val email: String? = null,
+    val phoneNumber: String? = null,
+    val birthDate: String? = null,
+    val address: String? = null,
+    val profileImageUrl: String? = null,
+    /** 부모와 연결돼 있는지. */
+    val paired: Boolean = false,
 )
 
 @Serializable
 data class ChildUpdateRequest(
-    val name: String? = null,
-    val alias: String? = null,
+    val nickname: String? = null,
     val profileImageUrl: String? = null,
-    val birthDate: String? = null,
 )
 
 /** POST /location/track 요청. 명세상 좌표가 문자열이다(places는 숫자). */
@@ -229,6 +249,27 @@ data class LocationTrackRequest(
     val childId: Long,
     val latitude: String,
     val longitude: String,
+)
+
+/**
+ * 동선 조회 응답 (`GET /location/track/{childId}`).
+ *
+ * 배열이 아니라 래퍼 객체이고, 항목도 세그먼트가 아니라 **단순 좌표**다.
+ * 예전에는 `List<LocationTrackResponse>` 로 받아 역직렬화 단계에서 터졌다.
+ * Swagger: "위·경도 포인트 리스트를 시간 **오름차순**으로 반환한다."
+ */
+@Serializable
+data class TrackResponse(
+    val points: List<TrackPointDto> = emptyList(),
+    val count: Int = 0,
+)
+
+@Serializable
+data class TrackPointDto(
+    val lat: Double,
+    val lng: Double,
+    /** 기록 시각(ISO, 오프셋 없음). */
+    val at: String? = null,
 )
 
 @Serializable
@@ -264,7 +305,13 @@ data class DashboardResponse(
     val childId: Long,
     val currentLocation: LocationTrackResponse? = null,
     val realtimeEnabled: Boolean,
-    val recentNotifications: List<NotificationDto> = emptyList(),
+    /**
+     * 서버는 알림을 자녀 것과 부모 것으로 **나눠서** 준다.
+     * 예전에는 `recentNotifications` 하나로 받았는데 서버에 그런 키가 없어
+     * 기본값 emptyList() 로 조용히 비워졌다 — 대시보드 「최근 알림」이 늘 비어 보였다.
+     */
+    val childNotifications: List<NotificationDto> = emptyList(),
+    val parentNotifications: List<NotificationDto> = emptyList(),
     val blockRules: List<DashboardBlockRuleDto> = emptyList(),
     val places: List<PlaceResponse> = emptyList(),
 )
