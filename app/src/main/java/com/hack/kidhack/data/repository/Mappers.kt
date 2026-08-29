@@ -70,6 +70,8 @@ import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
+import java.time.Duration
+import java.time.LocalDateTime
 
 fun UserDto.toDomain(): User {
     val resolvedLogin = loginId?.takeIf { it.isNotBlank() }.orEmpty()
@@ -124,7 +126,6 @@ fun ChildDto.toDomain(): ChildProfile = ChildProfile(
     ageLabel = ageLabel,
     school = school,
     birthDate = birthDate,
-    deviceModel = deviceModel,
     profileImageUrl = profileImageUrl,
     online = online,
 )
@@ -269,7 +270,25 @@ fun PointHistoryDto.toDomain(): PointHistory = PointHistory(id, description, poi
 
 fun AppUsageStatDto.toDomain(): AppUsageStat = AppUsageStat(key, durationSec)
 
-fun PairingCodeDto.toDomain(): PairingCode = PairingCode(pairingCode, expiresIn)
+/**
+ * 서버가 주는 만료 시각을 화면이 쓰는 「남은 초」로 바꾼다.
+ *
+ * `expiresAt` 은 오프셋 없는 LocalDateTime 이고 서버 시간대는 KST 다. 기기 시계도 KST 라는
+ * 전제로 그대로 뺀다. 파싱이 안 되거나 필드가 비어 있으면 서버 기본값(발급 + 5분)을 쓴다 —
+ * 카운트다운이 0 으로 시작해 코드가 즉시 만료된 것처럼 보이는 것보다 낫다.
+ */
+fun PairingCodeDto.toDomain(): PairingCode {
+    val seconds = expiresAt
+        ?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() }
+        ?.let { Duration.between(LocalDateTime.now(), it).seconds }
+        ?.coerceIn(0L, Int.MAX_VALUE.toLong())
+        ?.toInt()
+        ?: DEFAULT_PAIRING_TTL_SECONDS
+    return PairingCode(pairingCode = code, expiresIn = seconds)
+}
+
+/** 서버 스펙상 페어링 코드 유효기간(발급 + 5분). */
+private const val DEFAULT_PAIRING_TTL_SECONDS = 300
 
 /** 서버/소켓이 쓸 법한 이름들을 넉넉하게 받아 준다. 모르는 값은 UNKNOWN 으로 떨어뜨린다. */
 fun String?.toRemoteCommandType(): RemoteCommandType = when (this?.uppercase()) {

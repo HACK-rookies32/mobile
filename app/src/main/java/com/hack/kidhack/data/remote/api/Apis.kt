@@ -151,8 +151,9 @@ interface PairingApi {
     @POST("pairing/code")
     suspend fun issueCode(): ApiEnvelope<PairingCodeDto>
 
+    /** 서버는 ApiResponse<Void> 를 준다 — data 가 null 이므로 UserDto 로 받으면 안 된다. */
     @POST("pairing/connect")
-    suspend fun connect(@Body body: PairingConnectRequest): ApiEnvelope<UserDto>
+    suspend fun connect(@Body body: PairingConnectRequest): ApiEnvelope<Unit>
 }
 
 interface ChildApi {

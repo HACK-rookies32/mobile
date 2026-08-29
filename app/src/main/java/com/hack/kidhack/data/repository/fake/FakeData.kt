@@ -55,7 +55,6 @@ object FakeData {
         ageLabel = "12세 · 초등학교 6학년",
         school = "강남 초등학교",
         birthDate = "2014년 3월 15일",
-        deviceModel = "Samsung Galaxy A54",
         online = true,
     )
 
@@ -66,7 +65,6 @@ object FakeData {
         ageLabel = "9세 · 초등학교 3학년",
         school = "강남 초등학교",
         birthDate = "2017년 6월 2일",
-        deviceModel = "Samsung Galaxy A15",
         online = false,
     )
 

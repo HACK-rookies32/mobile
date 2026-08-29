@@ -30,7 +30,6 @@ data class RegisterUiState(
     val address: String = "",
     val password: String = "",
     val passwordConfirm: String = "",
-    val parentId: String = "",
     val agreedAge: Boolean = false,
     val agreedTerms: Boolean = false,
     val agreedPrivacy: Boolean = false,
@@ -74,7 +73,6 @@ class RegisterViewModel(
     fun onAddress(v: String) = _state.update { it.copy(address = v) }
     fun onPassword(v: String) = _state.update { it.copy(password = v) }
     fun onPasswordConfirm(v: String) = _state.update { it.copy(passwordConfirm = v) }
-    fun onParentId(v: String) = _state.update { it.copy(parentId = v.filter { ch -> ch.isDigit() }) }
     fun onAgreedAge(v: Boolean) = _state.update { it.copy(agreedAge = v) }
     fun onAgreedTerms(v: Boolean) = _state.update { it.copy(agreedTerms = v) }
     fun onAgreedPrivacy(v: Boolean) = _state.update { it.copy(agreedPrivacy = v) }
@@ -96,7 +94,6 @@ class RegisterViewModel(
         val s = _state.value
         val role = s.role ?: return
         val birthOk = s.birthDate.matches(Regex("""\d{4}-\d{2}-\d{2}"""))
-        val parentIdValue = s.parentId.toLongOrNull()
         when {
             s.loginId.isBlank() -> _state.update { it.copy(error = "아이디를 입력해 주세요") }
             s.realName.isBlank() -> _state.update { it.copy(error = "이름을 입력해 주세요") }
@@ -105,8 +102,6 @@ class RegisterViewModel(
             role != Role.CHILD && s.email.isBlank() ->
                 _state.update { it.copy(error = "이메일을 입력해 주세요") }
             !birthOk -> _state.update { it.copy(error = "생년월일을 선택해 주세요") }
-            role == Role.CHILD && (parentIdValue == null || parentIdValue <= 0) ->
-                _state.update { it.copy(error = "연결할 부모님 회원 번호를 입력해 주세요") }
             s.password.length < 8 -> _state.update { it.copy(error = "비밀번호는 8자 이상이어야 해요") }
             s.password != s.passwordConfirm -> _state.update { it.copy(error = "비밀번호가 일치하지 않아요") }
             else -> _state.update { it.copy(step = 2, error = null) }
@@ -146,7 +141,9 @@ class RegisterViewModel(
                         birthDate = s.birthDate.trim(),
                         address = s.address.trim().ifBlank { null },
                         role = role,
-                        parentId = s.parentId.toLongOrNull()?.takeIf { role == Role.CHILD },
+                        // 부모 연결은 가입이 아니라 로그인 후 페어링 코드로 한다.
+                        // 서버도 signup 의 parentId 는 선택이고 검증하지 않는다([VULN-8]).
+                        parentId = null,
                     )
                 }.onSuccess { session ->
                     if (role == Role.CHILD) {

@@ -136,7 +136,6 @@ fun RegisterScreen(
                 nicknameLabel = "닉네임",
                 nicknamePlaceholder = if (role == Role.PARENT) "홍길동" else "나의 이름",
                 emailRequired = role != Role.CHILD,
-                showParentId = role == Role.CHILD,
                 state = state,
                 viewModel = viewModel,
             )
@@ -147,9 +146,8 @@ fun RegisterScreen(
                 onStart = { viewModel.startApp(onRegistered) },
             )
         }
-        if (state.error != null) {
-            Text(state.error.orEmpty(), color = colors.danger, fontSize = 13.sp)
-        }
+        // 에러는 각 단계의 버튼 바로 위(StepError)에서 보여 준다.
+        // 예전에는 여기, 즉 버튼보다 아래에 그려서 폼이 길면 화면 밖으로 밀려 보이지 않았다.
     }
 }
 
@@ -208,7 +206,6 @@ private fun InfoStep(
     nicknameLabel: String,
     nicknamePlaceholder: String,
     emailRequired: Boolean,
-    showParentId: Boolean,
     state: RegisterUiState,
     viewModel: RegisterViewModel,
 ) {
@@ -255,19 +252,10 @@ private fun InfoStep(
         placeholder = "달력에서 선택하세요",
     )
     KidTextField(state.address, viewModel::onAddress, "주소 (선택)", placeholder = "서울시 강남구")
-    if (showParentId) {
-        KidCard {
-            Text("👪  부모님 연결", color = colors.brandDark, fontWeight = FontBold, fontSize = 14.sp)
-            Text("부모님이 가입할 때 발급된 회원 번호를 입력해요", color = colors.muted, fontSize = 12.sp)
-        }
-        KidTextField(
-            state.parentId,
-            viewModel::onParentId,
-            "부모님 회원 번호",
-            placeholder = "예: 1001",
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        )
-    }
+    // 부모 연결은 가입이 아니라 로그인 후 페어링 코드로 한다(POST /pairing/connect).
+    // 예전에는 여기서 「부모님 회원 번호」를 필수로 받았는데, 그 값은 부모 계정의 DB id 라
+    // 자녀가 알 방법이 없었다. 서버도 signup 의 parentId 는 선택으로 두고 검증하지 않는다.
+    StepError(state.error)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         KidButton("← 이전", viewModel::back, Modifier.weight(1f), KidButtonVariant.Ghost)
         KidButton("다음 →", viewModel::nextFromInfo, Modifier.weight(1f))
@@ -321,6 +309,7 @@ private fun TermsStep(state: RegisterUiState, viewModel: RegisterViewModel) {
         )
     }
     val isChild = state.role == Role.CHILD
+    StepError(state.error)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         KidButton("← 이전", viewModel::back, Modifier.weight(1f), KidButtonVariant.Ghost)
         KidButton(
@@ -406,4 +395,11 @@ private fun DoneStep(session: Session, loading: Boolean, onStart: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         enabled = !loading,
     )
+}
+
+/** 단계별 에러 문구. 버튼 바로 위에 두어 스크롤 없이 보이게 한다. */
+@Composable
+private fun StepError(error: String?) {
+    if (error == null) return
+    Text(error, color = LocalKidhackColors.current.danger, fontSize = 13.sp)
 }

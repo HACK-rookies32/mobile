@@ -163,11 +163,21 @@ data class NotificationSettingsDto(
     val notice: Boolean,
 )
 
+/**
+ * 페어링 코드 발급 결과.
+ *
+ * 서버는 남은 초가 아니라 **만료 시각**을 준다. 타임존 오프셋이 없는 LocalDateTime
+ * 문자열(예: `2026-08-29T21:34:00.123`)이고 서버 시간대는 KST 다.
+ * 화면이 쓰는 「남은 초」로는 매퍼에서 환산한다.
+ */
 @Serializable
-data class PairingCodeDto(val pairingCode: String, val expiresIn: Int)
+data class PairingCodeDto(
+    val code: String,
+    val expiresAt: String? = null,
+)
 
 @Serializable
-data class PairingConnectRequest(val pairingCode: String)
+data class PairingConnectRequest(val code: String)
 
 @Serializable
 data class ChildDto(
@@ -182,7 +192,6 @@ data class ChildDto(
     val profileImageUrl: String? = null,
     val school: String? = null,
     val birthDate: String? = null,
-    val deviceModel: String? = null,
     val ageLabel: String? = null,
     val online: Boolean = false,
 )

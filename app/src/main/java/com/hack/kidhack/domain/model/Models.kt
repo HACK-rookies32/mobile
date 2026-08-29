@@ -39,7 +39,6 @@ data class ChildProfile(
     val ageLabel: String? = null,
     val school: String? = null,
     val birthDate: String? = null,
-    val deviceModel: String? = null,
     val profileImageUrl: String? = null,
     val online: Boolean = false,
 )

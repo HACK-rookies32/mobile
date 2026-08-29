@@ -116,9 +116,7 @@ class FakeAuthRepository(
         if (role != Role.CHILD) {
             require(!email.isNullOrBlank()) { "이메일을 입력해 주세요" }
         }
-        if (role == Role.CHILD) {
-            require(parentId != null && parentId > 0) { "연결할 부모님 회원 번호를 입력해 주세요" }
-        }
+        // 자녀는 가입 시 부모를 지정하지 않는다. 로그인 후 페어링 코드로 연결한다.
         // 채팅 등 API가 member id를 Long으로 쓰므로 목업도 숫자 id를 쓴다.
         val numericId = when (role) {
             Role.CHILD -> if (loginId.equals("minjun", ignoreCase = true)) "101" else "102"

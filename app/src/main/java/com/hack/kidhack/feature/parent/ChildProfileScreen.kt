@@ -250,7 +250,6 @@ fun ParentChildProfileScreen(
                     )
                 }
                 KidTextField(state.school, viewModel::onSchool, stringResource(R.string.parent_profile_school), placeholder = "학교명을 입력하세요")
-                ProfileReadRow(stringResource(R.string.parent_profile_device), child.deviceModel.orEmpty(), showDivider = false)
             }
             if (state.saved) {
                 Text("성공적으로 저장되었습니다", color = colors.safe, fontSize = 12.sp, fontWeight = FontBold)
@@ -311,12 +310,3 @@ private fun PhotoOptionRow(icon: String, label: String, onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun ProfileReadRow(label: String, value: String, showDivider: Boolean = true) {
-    val colors = LocalKidhackColors.current
-    Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, modifier = Modifier.weight(1f), color = colors.muted, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 12.sp)
-        Text(value, color = colors.text, fontSize = 12.sp)
-    }
-    if (showDivider) HorizontalDivider(color = colors.border)
-}

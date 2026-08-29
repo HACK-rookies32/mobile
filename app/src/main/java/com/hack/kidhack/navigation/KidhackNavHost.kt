@@ -33,10 +33,21 @@ fun KidhackNavHost() {
     val navController = rememberNavController()
     val colors = LocalKidhackColors.current
 
+    /**
+     * 로그인·가입 직후 이동.
+     *
+     * 자녀 계정은 **가입 시점에 부모가 정해지지 않는다.** 부모가 발급한 6자리 코드를
+     * `POST /pairing/connect` 로 입력해야 서버가 `parent` 를 채운다. 그래서 아직 연결되지
+     * 않은 자녀(`parentId == null`)는 홈 대신 페어링 화면부터 보여 준다.
+     * (`GET /users/me` 의 `parentId` 로 판별한다.)
+     */
     fun goAuthed(session: Session) {
         val dest = if (session.user.role == Role.PARENT) Route.ParentGraph.path else Route.ChildGraph.path
         navController.navigate(dest) {
             popUpTo(navController.graph.id) { inclusive = true }
+        }
+        if (session.user.role == Role.CHILD && session.user.parentId == null) {
+            navController.navigate(Route.ChildPairing.path)
         }
     }
 
