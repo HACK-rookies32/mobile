@@ -301,6 +301,9 @@ class RealUserRepository(private val api: UserApi) : UserRepository {
 
 class RealPairingRepository(private val api: PairingApi) : PairingRepository {
     override suspend fun issueCode(): PairingCode = api.issueCode().unwrap().toDomain()
+
+    override suspend fun activeCodes(): List<PairingCode> =
+        api.activeCodes().unwrap().map { it.toDomain() }
     override suspend fun connect(pairingCode: String) {
         // 성공 응답의 data 가 null 이라 unwrap() 을 쓰면 "응답 데이터가 없습니다" 로 터진다.
         api.connect(PairingConnectRequest(code = pairingCode)).unwrapOrNull()

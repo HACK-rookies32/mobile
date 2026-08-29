@@ -91,6 +91,10 @@ interface UserRepository {
 
 interface PairingRepository {
     suspend fun issueCode(): PairingCode
+
+    /** 아직 만료되지 않은 내 코드 목록. 연결에 쓰인 코드는 서버가 지우므로 목록에서 빠진다. */
+    suspend fun activeCodes(): List<PairingCode>
+
     suspend fun connect(pairingCode: String)
 }
 

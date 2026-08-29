@@ -151,6 +151,15 @@ interface PairingApi {
     @POST("pairing/code")
     suspend fun issueCode(): ApiEnvelope<PairingCodeDto>
 
+    /**
+     * 아직 만료되지 않은 내 페어링 코드 목록.
+     *
+     * 서버는 연결이 성공하면 그 코드를 삭제한다. 그래서 발급한 코드가 이 목록에 아직
+     * 남아 있으면 「아무도 쓰지 않았다」는 뜻이다.
+     */
+    @GET("pairing/code")
+    suspend fun activeCodes(): ApiEnvelope<List<PairingCodeDto>>
+
     /** 서버는 ApiResponse<Void> 를 준다 — data 가 null 이므로 UserDto 로 받으면 안 된다. */
     @POST("pairing/connect")
     suspend fun connect(@Body body: PairingConnectRequest): ApiEnvelope<Unit>

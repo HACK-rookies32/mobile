@@ -237,8 +237,18 @@ class FakeUserRepository(
 }
 
 class FakePairingRepository : PairingRepository {
-    override suspend fun issueCode(): PairingCode = FakeData.pairing
-    override suspend fun connect(pairingCode: String) {}
+    // 서버는 연결 성공 시 코드를 지운다. 목업도 같은 관찰 가능한 동작을 흉내 내야
+    // 「코드가 아직 살아 있으면 아무도 안 쓴 것」이라는 판정을 화면에서 검증할 수 있다.
+    private val active = mutableListOf<PairingCode>()
+
+    override suspend fun issueCode(): PairingCode =
+        FakeData.pairing.also { active += it }
+
+    override suspend fun activeCodes(): List<PairingCode> = active.toList()
+
+    override suspend fun connect(pairingCode: String) {
+        active.removeAll { it.pairingCode == pairingCode }
+    }
 }
 
 class FakeChildRepository : ChildRepository {
