@@ -17,22 +17,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -50,16 +41,15 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.hack.kidhack.R
+import com.hack.kidhack.core.common.RemoteUrl
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.KidTextField
-import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
-import com.hack.kidhack.core.designsystem.theme.FontSemibold
-import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.Inquiry
+import com.hack.kidhack.domain.model.InquiryDetail
 import com.hack.kidhack.domain.repository.InquiryRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -68,90 +58,186 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
-enum class ContactPane { GRID, INQUIRY_LIST, INQUIRY_CREATE, INQUIRY_DETAIL, FAQ }
+/**
+ * 화면 상태.
+ *
+ * 예전에는 이메일·전화·FAQ 타일이 깔린 시작 화면(GRID)이 있었는데, 이메일 주소·전화번호가
+ * 가짜였고 FAQ 도 상수 두 줄이었다. 실제로 서버와 오가는 건 1:1 문의뿐이라 목록을
+ * 첫 화면으로 둔다.
+ */
+enum class ContactPane { INQUIRY_LIST, INQUIRY_CREATE, INQUIRY_DETAIL }
 
 data class ContactUiState(
-    val pane: ContactPane = ContactPane.GRID,
+    val pane: ContactPane = ContactPane.INQUIRY_LIST,
     val inquiries: List<Inquiry> = emptyList(),
-    val selectedInquiry: Inquiry? = null,
+    val page: Int = 0,
+    val hasMore: Boolean = false,
+    /** 펼친 문의. 목록 항목에는 본문·첨부·답변이 없어 서버에서 따로 받아온다. */
+    val detail: InquiryDetail? = null,
     val title: String = "",
-    val body: String = "",
-    val imageUrls: List<String> = emptyList(),
-    val links: List<String> = emptyList(),
-    val showLinkDialog: Boolean = false,
+    val content: String = "",
+    /** 업로드를 마친 첨부의 **공개 경로**. 갤러리 URI 가 아니다. */
+    val attachments: List<String> = emptyList(),
+    /** 서버는 링크를 하나만 받는다. */
+    val linkUrl: String = "",
+    /** 수정 중인 문의 id. null 이면 새 문의다. */
+    val editingId: String? = null,
+    val uploading: Boolean = false,
     val loading: Boolean = false,
     val error: String? = null,
 )
 
+/**
+ * 고객센터 — 1:1 문의 (명세 21).
+ *
+ * 첨부는 `POST /inquiries/upload` 로 **먼저 올려** 공개 경로를 받고, 그 경로만 문의
+ * 본문에 실어 보낸다. 예전에는 갤러리에서 고른 `content://` URI 를 그대로 보냈는데
+ * 서버에는 그런 파일이 없다.
+ *
+ * 답변이 달린 문의는 서버가 수정·삭제를 400 으로 막으므로 버튼도 감춘다.
+ */
 class ContactViewModel(
-    private val inquiryRepository: InquiryRepository
+    private val inquiryRepository: InquiryRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ContactUiState())
     val state: StateFlow<ContactUiState> = _state.asStateFlow()
 
+    init { loadInquiries(page = 0, append = false) }
+
     fun open(pane: ContactPane) {
         _state.update { it.copy(pane = pane, error = null) }
-        if (pane == ContactPane.INQUIRY_LIST) loadInquiries()
+        if (pane == ContactPane.INQUIRY_LIST) loadInquiries(page = 0, append = false)
     }
 
+    /** 목록 항목을 누르면 본문을 받으러 간다. */
     fun openDetail(inquiry: Inquiry) {
-        _state.update { it.copy(pane = ContactPane.INQUIRY_DETAIL, selectedInquiry = inquiry) }
+        _state.update { it.copy(pane = ContactPane.INQUIRY_DETAIL, detail = null, loading = true, error = null) }
+        viewModelScope.launch {
+            runCatching { inquiryRepository.get(inquiry.id) }
+                .onSuccess { detail -> _state.update { it.copy(detail = detail, loading = false) } }
+                .onFailure { t -> _state.update { it.copy(loading = false, error = t.message) } }
+        }
     }
 
-    private fun loadInquiries() {
+    fun loadMore() {
+        val current = _state.value
+        if (current.loading || !current.hasMore) return
+        loadInquiries(page = current.page + 1, append = true)
+    }
+
+    private fun loadInquiries(page: Int, append: Boolean) {
         viewModelScope.launch {
             _state.update { it.copy(loading = true) }
-            runCatching { inquiryRepository.list() }
-                .onSuccess { list -> _state.update { it.copy(inquiries = list, loading = false) } }
+            runCatching { inquiryRepository.list(page) }
+                .onSuccess { result ->
+                    _state.update {
+                        it.copy(
+                            inquiries = if (append) it.inquiries + result.items else result.items,
+                            page = result.page,
+                            hasMore = result.hasMore,
+                            loading = false,
+                        )
+                    }
+                }
                 .onFailure { t -> _state.update { it.copy(error = t.message, loading = false) } }
         }
     }
 
     fun onTitle(v: String) = _state.update { it.copy(title = v) }
-    fun onBody(v: String) = _state.update { it.copy(body = v) }
+    fun onContent(v: String) = _state.update { it.copy(content = v) }
+    fun onLinkUrl(v: String) = _state.update { it.copy(linkUrl = v) }
 
-    fun addImage(uri: Uri?) {
+    /** 새 문의 작성 화면. 이전에 쓰던 내용이 남지 않도록 폼을 비운다. */
+    fun startCreate() {
+        _state.update {
+            it.copy(
+                pane = ContactPane.INQUIRY_CREATE,
+                editingId = null,
+                title = "",
+                content = "",
+                attachments = emptyList(),
+                linkUrl = "",
+                error = null,
+            )
+        }
+    }
+
+    /** 상세에서 수정으로. 답변 전에만 부른다. */
+    fun startEdit() {
+        val detail = _state.value.detail ?: return
+        _state.update {
+            it.copy(
+                pane = ContactPane.INQUIRY_CREATE,
+                editingId = detail.id,
+                title = detail.title,
+                content = detail.content,
+                attachments = detail.attachments,
+                linkUrl = detail.linkUrl.orEmpty(),
+                error = null,
+            )
+        }
+    }
+
+    /** 고른 파일을 곧바로 업로드하고 공개 경로만 들고 있는다. */
+    fun addAttachment(uri: Uri?) {
         if (uri == null) return
-        _state.update { it.copy(imageUrls = it.imageUrls + uri.toString()) }
+        viewModelScope.launch {
+            _state.update { it.copy(uploading = true, error = null) }
+            runCatching { inquiryRepository.uploadAttachment(uri.toString()) }
+                .onSuccess { url -> _state.update { it.copy(attachments = it.attachments + url, uploading = false) } }
+                .onFailure { t ->
+                    _state.update { it.copy(uploading = false, error = t.message ?: "첨부 업로드에 실패했어요") }
+                }
+        }
     }
 
-    fun removeImage(url: String) {
-        _state.update { it.copy(imageUrls = it.imageUrls - url) }
-    }
-
-    fun toggleLinkDialog(show: Boolean) = _state.update { it.copy(showLinkDialog = show) }
-
-    fun addLink(url: String) {
-        if (url.isBlank()) return
-        _state.update { it.copy(links = it.links + url, showLinkDialog = false) }
-    }
-
-    fun removeLink(url: String) {
-        _state.update { it.copy(links = it.links - url) }
-    }
+    /** 목록에서만 뺀다. 서버의 실물은 문의를 저장할 때 정리된다. */
+    fun removeAttachment(url: String) = _state.update { it.copy(attachments = it.attachments - url) }
 
     fun submit() {
-        if (_state.value.title.isBlank() || _state.value.body.isBlank()) return
+        val current = _state.value
+        if (current.title.isBlank() || current.content.isBlank()) return
         viewModelScope.launch {
             _state.update { it.copy(loading = true) }
             runCatching {
-                inquiryRepository.create(
-                    _state.value.title,
-                    _state.value.body,
-                    _state.value.imageUrls,
-                    _state.value.links
-                )
+                val id = current.editingId
+                if (id == null) {
+                    inquiryRepository.create(current.title, current.content, current.attachments, current.linkUrl)
+                } else {
+                    inquiryRepository.update(id, current.title, current.content, current.attachments, current.linkUrl)
+                }
             }.onSuccess {
-                _state.update { it.copy(loading = false, title = "", body = "", imageUrls = emptyList(), links = emptyList()) }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        title = "",
+                        content = "",
+                        attachments = emptyList(),
+                        linkUrl = "",
+                        editingId = null,
+                    )
+                }
                 open(ContactPane.INQUIRY_LIST)
             }.onFailure { t ->
                 _state.update { it.copy(loading = false, error = t.message) }
             }
         }
     }
+
+    fun delete() {
+        val id = _state.value.detail?.id ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true) }
+            runCatching { inquiryRepository.delete(id) }
+                .onSuccess {
+                    _state.update { it.copy(loading = false, detail = null) }
+                    open(ContactPane.INQUIRY_LIST)
+                }
+                .onFailure { t -> _state.update { it.copy(loading = false, error = t.message) } }
+        }
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParentContactScreen(
     onBack: () -> Unit = {},
@@ -160,36 +246,29 @@ fun ParentContactScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
     val context = LocalContext.current
-    var linkInput by remember { mutableStateOf("") }
 
-    val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        viewModel.addImage(uri)
+    val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        viewModel.addAttachment(uri)
     }
 
     ParentScreenScaffold(
         header = {
             val title = when (state.pane) {
-                ContactPane.INQUIRY_LIST -> "1:1 문의 내역"
-                ContactPane.INQUIRY_CREATE -> "1:1 문의하기"
+                ContactPane.INQUIRY_LIST -> stringResource(R.string.parent_contact_title)
+                ContactPane.INQUIRY_CREATE ->
+                    if (state.editingId == null) "1:1 문의하기" else "문의 수정"
                 ContactPane.INQUIRY_DETAIL -> "문의 상세"
-                ContactPane.FAQ -> stringResource(R.string.parent_contact_faq)
-                else -> stringResource(R.string.parent_contact_title)
             }
             ParentHeaderBar(title) {
-                if (state.pane == ContactPane.GRID) {
+                // 목록이 첫 화면이라 여기서는 화면을 닫고, 안쪽에서는 목록으로 돌아간다.
+                if (state.pane == ContactPane.INQUIRY_LIST) {
                     IconButton(onClick = onBack) { Text("✕", color = Color.White) }
                 } else {
                     Text(
                         "←",
                         Modifier
                             .clip(CircleShape)
-                            .clickable {
-                                when (state.pane) {
-                                    ContactPane.INQUIRY_DETAIL -> viewModel.open(ContactPane.INQUIRY_LIST)
-                                    ContactPane.INQUIRY_CREATE -> viewModel.open(ContactPane.INQUIRY_LIST)
-                                    else -> viewModel.open(ContactPane.GRID)
-                                }
-                            }
+                            .clickable { viewModel.open(ContactPane.INQUIRY_LIST) }
                             .padding(8.dp),
                         color = Color.White,
                         fontSize = 20.sp
@@ -198,29 +277,12 @@ fun ParentContactScreen(
             }
         },
     ) {
+        if (state.error != null) {
+            KidCard { Text(state.error.orEmpty(), color = colors.danger, fontSize = 13.sp) }
+        }
         when (state.pane) {
-            ContactPane.GRID -> {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ContactTile("📋", "1:1 문의 게시판", "문의 내역 및 답변 확인", Modifier.weight(1f)) {
-                        viewModel.open(ContactPane.INQUIRY_LIST)
-                    }
-                    ContactTile("📧", stringResource(R.string.parent_contact_email), stringResource(R.string.parent_contact_email_desc), Modifier.weight(1f)) {
-                        val email = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:support@rookies.example.com"))
-                        runCatching { context.startActivity(email) }
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ContactTile("📞", stringResource(R.string.parent_contact_phone), stringResource(R.string.parent_contact_phone_desc), Modifier.weight(1f)) {
-                        val dial = Intent(Intent.ACTION_DIAL, Uri.parse("tel:15880000"))
-                        runCatching { context.startActivity(dial) }
-                    }
-                    ContactTile("❓", stringResource(R.string.parent_contact_faq), stringResource(R.string.parent_contact_faq_desc), Modifier.weight(1f)) {
-                        viewModel.open(ContactPane.FAQ)
-                    }
-                }
-            }
             ContactPane.INQUIRY_LIST -> {
-                KidButton("+ 새로운 문의하기", { viewModel.open(ContactPane.INQUIRY_CREATE) }, Modifier.fillMaxWidth())
+                KidButton("+ 새로운 문의하기", viewModel::startCreate, Modifier.fillMaxWidth())
                 Spacer(Modifier.height(16.dp))
                 if (state.inquiries.isEmpty() && !state.loading) {
                     Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
@@ -232,156 +294,157 @@ fun ParentContactScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(inquiry.title, fontWeight = FontBold, fontSize = 14.sp)
-                                Text(inquiry.createdAt, color = colors.muted, fontSize = 12.sp)
+                                Text(inquiry.createdAt.toDisplayDate(), color = colors.muted, fontSize = 12.sp)
                             }
-                            val isAnswered = inquiry.status == "ANSWERED"
                             Text(
-                                if (isAnswered) "답변완료" else "답변대기",
+                                if (inquiry.answered) "답변완료" else "답변대기",
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(4.dp))
-                                    .background(if (isAnswered) colors.safe.copy(0.1f) else colors.surface)
+                                    .background(if (inquiry.answered) colors.safe.copy(0.1f) else colors.surface)
                                     .padding(horizontal = 6.dp, vertical = 2.dp),
-                                color = if (isAnswered) colors.safe else colors.muted,
+                                color = if (inquiry.answered) colors.safe else colors.muted,
                                 fontWeight = FontBold,
                                 fontSize = 11.sp
                             )
                         }
                     }
                 }
+                if (state.hasMore) {
+                    KidButton("더 보기", viewModel::loadMore, Modifier.fillMaxWidth(), KidButtonVariant.Secondary)
+                }
             }
+
             ContactPane.INQUIRY_CREATE -> {
                 KidTextField(state.title, viewModel::onTitle, "문의 제목", placeholder = "제목을 입력하세요")
                 KidTextField(
-                    value = state.body,
-                    onValueChange = viewModel::onBody,
+                    value = state.content,
+                    onValueChange = viewModel::onContent,
                     label = "문의 내용",
                     placeholder = "문의하실 내용을 상세히 적어주세요",
                     singleLine = false,
                     minLines = 6
                 )
-                
+
                 Spacer(Modifier.height(16.dp))
                 Text("첨부파일", fontWeight = FontBold, fontSize = 14.sp)
+                if (state.uploading) {
+                    Text("올리는 중…", color = colors.muted, fontSize = 12.sp)
+                }
                 Spacer(Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     item {
                         Box(
-                            Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(colors.surface).clickable { imageLauncher.launch("image/*") },
+                            Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(colors.surface)
+                                .clickable(enabled = !state.uploading) { fileLauncher.launch("image/*") },
                             contentAlignment = Alignment.Center
                         ) { Text("📷") }
                     }
-                    items(state.imageUrls) { url ->
+                    items(state.attachments) { path ->
                         Box(Modifier.size(60.dp)) {
+                            // 서버가 준 상대 경로라 그대로는 못 연다. origin 을 붙여 띄운다.
                             AsyncImage(
-                                model = url, contentDescription = null, contentScale = ContentScale.Crop,
+                                model = ImageRequest.Builder(context)
+                                    .data(RemoteUrl.absolute(path))
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
                             )
-                            IconButton({ viewModel.removeImage(url) }, Modifier.align(Alignment.TopEnd).size(20.dp)) {
+                            IconButton({ viewModel.removeAttachment(path) }, Modifier.align(Alignment.TopEnd).size(20.dp)) {
                                 Text("✕", color = Color.White, fontSize = 10.sp, modifier = Modifier.background(Color.Black.copy(0.5f), CircleShape))
                             }
                         }
                     }
                 }
-                
+
                 Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("링크", Modifier.weight(1f), fontSize = 13.sp)
-                    Text("추가", Modifier.clickable { viewModel.toggleLinkDialog(true) }, color = colors.brand, fontSize = 13.sp, fontWeight = FontBold)
-                }
-                state.links.forEach { link ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("🔗", fontSize = 12.sp)
-                        Text(link, Modifier.weight(1f).padding(horizontal = 4.dp), fontSize = 12.sp, maxLines = 1)
-                        Text("삭제", Modifier.clickable { viewModel.removeLink(link) }, color = colors.danger, fontSize = 12.sp)
-                    }
-                }
+                // 서버가 링크를 하나만 받는다. 여러 개를 담던 예전 UI 는 저장되지 않았다.
+                KidTextField(state.linkUrl, viewModel::onLinkUrl, "관련 링크", placeholder = "https://…")
 
                 Spacer(Modifier.height(24.dp))
-                KidButton("문의 제출하기", viewModel::submit, Modifier.fillMaxWidth(), enabled = !state.loading)
+                KidButton(
+                    if (state.editingId == null) "문의 제출하기" else "수정 저장하기",
+                    viewModel::submit,
+                    Modifier.fillMaxWidth(),
+                    enabled = !state.loading && !state.uploading,
+                )
             }
+
             ContactPane.INQUIRY_DETAIL -> {
-                state.selectedInquiry?.let { inquiry ->
+                val detail = state.detail
+                if (detail == null) {
+                    Text(
+                        if (state.loading) "불러오는 중…" else "문의를 불러오지 못했어요",
+                        color = colors.muted,
+                        fontSize = 13.sp,
+                    )
+                } else {
                     KidCard {
-                        Text(inquiry.title, fontWeight = FontBold, fontSize = 16.sp)
-                        Text(inquiry.createdAt, color = colors.muted, fontSize = 12.sp)
+                        Text(detail.title, fontWeight = FontBold, fontSize = 16.sp)
+                        Text(detail.createdAt.toDisplayDate(), color = colors.muted, fontSize = 12.sp)
                         Spacer(Modifier.height(12.dp))
-                        Text(inquiry.body, fontSize = 14.sp)
-                        
-                        if (inquiry.imageUrls.isNotEmpty()) {
+                        Text(detail.content, fontSize = 14.sp)
+
+                        if (detail.attachments.isNotEmpty()) {
                             Spacer(Modifier.height(12.dp))
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(inquiry.imageUrls) { url ->
-                                    AsyncImage(model = url, contentDescription = null, Modifier.size(100.dp).clip(RoundedCornerShape(8.dp)))
+                                items(detail.attachments) { path ->
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(RemoteUrl.absolute(path))
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(100.dp).clip(RoundedCornerShape(8.dp))
+                                    )
                                 }
                             }
                         }
+                        if (!detail.linkUrl.isNullOrBlank()) {
+                            Spacer(Modifier.height(12.dp))
+                            Row(
+                                Modifier.fillMaxWidth().clickable {
+                                    val url = RemoteUrl.absolute(detail.linkUrl.filterNot { ch -> ch.isWhitespace() })
+                                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                                },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("🔗", fontSize = 12.sp)
+                                Spacer(Modifier.width(6.dp))
+                                Text(detail.linkUrl, color = colors.brand, fontSize = 13.sp, maxLines = 1)
+                            }
+                        }
                     }
-                    
+
+                    // 답변이 달리면 서버가 수정·삭제를 막는다(400). 그때는 버튼을 감춘다.
+                    if (!detail.answered) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            KidButton("수정", viewModel::startEdit, Modifier.weight(1f), KidButtonVariant.Secondary)
+                            KidButton("삭제", viewModel::delete, Modifier.weight(1f), KidButtonVariant.Danger)
+                        }
+                    }
+
                     Text("관리자 답변", Modifier.padding(vertical = 12.dp), fontWeight = FontBold, fontSize = 14.sp)
-                    if (inquiry.answers.isEmpty()) {
+                    val answer = detail.answer
+                    if (answer == null) {
                         KidCard { Text("답변을 기다리는 중입니다.", color = colors.muted, fontSize = 13.sp) }
-                    }
-                    inquiry.answers.forEach { ans ->
+                    } else {
                         KidCard {
                             Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(ans.author, fontWeight = FontBold, fontSize = 13.sp, color = colors.brand)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(ans.createdAt, color = colors.muted, fontSize = 11.sp)
-                                }
+                                Text(answer.createdAt.toDisplayDate(), color = colors.muted, fontSize = 11.sp)
                                 Spacer(Modifier.height(6.dp))
-                                Text(ans.body, fontSize = 14.sp)
+                                Text(answer.content, fontSize = 14.sp)
                             }
                         }
                     }
                 }
-            }
-            ContactPane.FAQ -> {
-                KidCard {
-                    Text(stringResource(R.string.parent_contact_faq_q1), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
-                    Spacer(Modifier.height(6.dp))
-                    Text(stringResource(R.string.parent_contact_faq_a1), color = colors.muted, fontSize = 13.sp)
-                }
-                KidCard {
-                    Text(stringResource(R.string.parent_contact_faq_q2), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
-                    Spacer(Modifier.height(6.dp))
-                    Text(stringResource(R.string.parent_contact_faq_a2), color = colors.muted, fontSize = 13.sp)
-                }
-                KidButton("←", { viewModel.open(ContactPane.GRID) }, Modifier.fillMaxWidth(), com.hack.kidhack.core.designsystem.component.KidButtonVariant.Ghost)
             }
         }
         Spacer(Modifier.height(8.dp))
     }
-
-    if (state.showLinkDialog) {
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.toggleLinkDialog(false) },
-            sheetState = rememberModalBottomSheetState()
-        ) {
-            Column(Modifier.fillMaxWidth().padding(24.dp)) {
-                Text("링크 추가", fontWeight = FontBold, fontSize = 18.sp)
-                Spacer(Modifier.height(16.dp))
-                KidTextField(linkInput, { linkInput = it }, "URL", placeholder = "https://...")
-                Spacer(Modifier.height(24.dp))
-                KidButton("추가", {
-                    viewModel.addLink(linkInput)
-                    linkInput = ""
-                }, Modifier.fillMaxWidth())
-                Spacer(Modifier.height(32.dp))
-            }
-        }
-    }
 }
 
-@Composable
-private fun ContactTile(icon: String, label: String, desc: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val colors = LocalKidhackColors.current
-    KidCard(modifier.clickable(onClick = onClick)) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(icon, fontSize = 28.sp)
-            Spacer(Modifier.height(8.dp))
-            Text(label, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text, textAlign = TextAlign.Center)
-            Text(desc, color = colors.muted, fontSize = 12.sp, textAlign = TextAlign.Center)
-        }
-    }
-}
+/** 서버는 ISO-8601 로만 준다. 목록·상세 모두 날짜 부분만 보여 준다. */
+private fun String.toDisplayDate(): String = take(10).replace('-', '.').ifBlank { this }

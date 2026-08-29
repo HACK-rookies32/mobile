@@ -17,7 +17,10 @@ import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.CommentDto
 import com.hack.kidhack.data.remote.dto.InquiryAnswerDto
+import com.hack.kidhack.data.remote.dto.InquiryDetailDto
 import com.hack.kidhack.data.remote.dto.InquiryDto
+import com.hack.kidhack.data.remote.dto.NoticeDetailDto
+import com.hack.kidhack.data.remote.dto.NoticeDto
 import com.hack.kidhack.data.remote.dto.InstalledAppDto
 import com.hack.kidhack.data.remote.dto.LocationEventDto
 import com.hack.kidhack.data.remote.dto.LocationTrackResponse
@@ -63,6 +66,9 @@ import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.InstalledApp
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryAnswer
+import com.hack.kidhack.domain.model.InquiryDetail
+import com.hack.kidhack.domain.model.Notice
+import com.hack.kidhack.domain.model.NoticeDetail
 import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationEventType
 import com.hack.kidhack.domain.model.LocationPoint
@@ -425,21 +431,45 @@ fun AllowancePaymentDto.toDomain(): AllowancePayment = AllowancePayment(
  )
 
 fun InquiryDto.toDomain(): Inquiry = Inquiry(
-    id = id,
+    id = id.toString(),
     title = title,
-    body = body,
-    status = status,
+    answered = answered,
     createdAt = createdAt,
-    imageUrls = imageUrls,
-    links = links,
-    answers = answers.map { it.toDomain() }
+    authorNickname = memberNickname,
+)
+
+fun InquiryDetailDto.toDomain(): InquiryDetail = InquiryDetail(
+    id = id.toString(),
+    title = title,
+    content = content,
+    attachments = attachments,
+    linkUrl = linkUrl?.takeIf { it.isNotBlank() },
+    answered = answered,
+    createdAt = createdAt,
+    answer = answer?.toDomain(),
 )
 
 fun InquiryAnswerDto.toDomain(): InquiryAnswer = InquiryAnswer(
-    id = id,
-    author = author,
-    body = body,
-    createdAt = createdAt
+    id = id.toString(),
+    content = content,
+    createdAt = createdAt,
+)
+
+fun NoticeDto.toDomain(): Notice = Notice(
+    id = id.toString(),
+    title = title,
+    createdAt = createdAt,
+    attachmentCount = attachmentCount,
+    linkCount = linkCount,
+)
+
+fun NoticeDetailDto.toDomain(): NoticeDetail = NoticeDetail(
+    id = id.toString(),
+    title = title,
+    content = content,
+    attachments = attachments,
+    links = links,
+    createdAt = createdAt,
 )
 
 fun WalletDto.toDomain(): Wallet = Wallet(

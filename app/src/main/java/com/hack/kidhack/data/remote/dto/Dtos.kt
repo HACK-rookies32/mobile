@@ -733,32 +733,80 @@ data class AppControlUpdateRequest(
     val enabled: Boolean? = null,
 )
 
+/**
+ * 문의 목록·등록 응답. **본문과 첨부는 없다** — 상세([InquiryDetailDto])에만 있다.
+ */
 @Serializable
 data class InquiryDto(
-    val id: String,
-    val title: String,
-    val body: String,
-    val status: String,
-    val createdAt: String,
-    val imageUrls: List<String> = emptyList(),
-    val links: List<String> = emptyList(),
-    val answers: List<InquiryAnswerDto> = emptyList(),
+    val id: Long,
+    val memberId: Long = 0,
+    val memberNickname: String = "",
+    val title: String = "",
+    val answered: Boolean = false,
+    val createdAt: String = "",
+)
+
+@Serializable
+data class InquiryDetailDto(
+    val id: Long,
+    val memberId: Long = 0,
+    val memberNickname: String = "",
+    val title: String = "",
+    val content: String = "",
+    /** 첨부 공개 경로. `/api/files/inquiry/{filename}` 형태의 상대 경로다. */
+    val attachments: List<String> = emptyList(),
+    /** 서버는 링크를 하나만 받는다. 없으면 null. */
+    val linkUrl: String? = null,
+    val answered: Boolean = false,
+    val createdAt: String = "",
+    val updatedAt: String? = null,
+    /** 관리자 답변. 아직 없으면 null. */
+    val answer: InquiryAnswerDto? = null,
 )
 
 @Serializable
 data class InquiryAnswerDto(
-    val id: String,
-    val author: String,
-    val body: String,
-    val createdAt: String,
+    val id: Long,
+    val content: String = "",
+    val createdAt: String = "",
+    val updatedAt: String? = null,
+)
+
+/** 등록·수정 공용. 수정은 통째로 교체하는 PUT 이라 같은 모양이다. */
+@Serializable
+data class InquiryRequest(
+    val title: String,
+    val content: String,
+    val attachments: List<String> = emptyList(),
+    val linkUrl: String? = null,
+)
+
+/** 첨부 업로드 응답. 이 `url` 을 [InquiryRequest.attachments] 에 담아 보낸다. */
+@Serializable
+data class UploadedFileDto(val url: String)
+
+/** 공지 목록 항목. 본문·첨부 실물은 상세에만 있고 여기엔 개수만 온다. */
+@Serializable
+data class NoticeDto(
+    val id: Long,
+    val title: String = "",
+    val authorId: Long = 0,
+    val attachmentCount: Int = 0,
+    val linkCount: Int = 0,
+    val createdAt: String = "",
+    val updatedAt: String? = null,
 )
 
 @Serializable
-data class CreateInquiryRequest(
-    val title: String,
-    val body: String,
-    val imageUrls: List<String>? = null,
-    val links: List<String>? = null,
+data class NoticeDetailDto(
+    val id: Long,
+    val title: String = "",
+    val content: String = "",
+    val attachments: List<String> = emptyList(),
+    val links: List<String> = emptyList(),
+    val authorId: Long = 0,
+    val createdAt: String = "",
+    val updatedAt: String? = null,
 )
 
 @Serializable

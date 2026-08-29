@@ -29,84 +29,119 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.hack.kidhack.R
+import com.hack.kidhack.core.common.RemoteUrl
+import com.hack.kidhack.core.designsystem.component.KidButton
+import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
-import com.hack.kidhack.core.designsystem.theme.FontBlack
+import com.hack.kidhack.core.designsystem.component.KidTextField
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.domain.model.Notice
+import com.hack.kidhack.domain.model.NoticeDetail
+import com.hack.kidhack.domain.repository.NoticeRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
- * 공지 첨부 링크를 외부 브라우저로 연다.
+ * 공지 첨부·링크를 외부 브라우저로 연다.
  *
- * 공지 본문은 운영자가 넣는 값이라 앞뒤 공백이나 `https:// example.com` 처럼
+ * 공지 본문은 운영자가 넣는 값이라 앞뒤 공백이나 "https:// example.com" 처럼
  * 스킴 뒤에 공백이 낀 문자열이 들어올 수 있다. 그대로 [Uri.parse] 하면 처리할 앱을
  * 못 찾아 조용히 실패하므로 공백을 먼저 걷어낸다.
  *
- * 브라우저가 없는 기기에서는 `ActivityNotFoundException` 이 나므로 삼킨다
- * (`ContactScreen` 의 메일·전화 인텐트와 같은 처리).
+ * 첨부는 상대 경로로 오므로 [RemoteUrl.absolute] 로 origin 을 붙인다.
+ *
+ * 브라우저가 없는 기기에서는 ActivityNotFoundException 이 나므로 삼킨다
+ * ([ContactScreen] 의 메일·전화 인텐트와 같은 처리).
  */
 private fun Context.openLink(rawUrl: String) {
-    val url = rawUrl.filterNot { it.isWhitespace() }
+    val url = RemoteUrl.absolute(rawUrl.filterNot { it.isWhitespace() })
     if (url.isBlank()) return
     runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
 }
 
-data class NoticeItem(
-    val title: String,
-    val date: String,
-    val important: Boolean,
-    val body: String,
-    val imageUrls: List<String> = emptyList(),
-    val links: List<String> = emptyList(),
+/** 서버는 ISO-8601 로만 준다. 날짜 부분만 잘라 보여 준다. */
+private fun String.toDisplayDate(): String = take(10).replace('-', '.').ifBlank { this }
+
+data class NoticeUiState(
+    val items: List<Notice> = emptyList(),
+    /** 펼친 공지의 상세. 목록 항목에는 본문이 없어 서버에서 따로 받아온다. */
+    val opened: NoticeDetail? = null,
+    val keyword: String = "",
+    val page: Int = 0,
+    val hasMore: Boolean = false,
+    val loading: Boolean = true,
+    val error: String? = null,
 )
 
 /**
- * 공지 목록.
+ * 공지 목록·상세 (명세 23).
  *
- * 모바일용 `GET /notices` 가 명세에 없어(GAP-08) 서버에서 받아오지 않는다.
- * 관리자 경로(`/admin/notices`)는 관리자 토큰이 필요하므로 재사용하지 않는다.
- * 백엔드가 모바일 공지 GET 을 열면 여기를 리포지토리 호출로 바꾸면 된다.
+ * 부모·자녀 화면이 같은 뷰모델을 쓴다. 목적지마다 별도 인스턴스를 받으므로 펼침 상태는
+ * 섞이지 않는다. 조회에 로그인이 필요 없어 자녀 계정에서도 그대로 동작한다.
  *
- * 부모·자녀가 같은 목록을 본다. 역할별로 다른 공지를 노출해야 하면
- * 이 값을 화면별로 넘기도록 [NoticeViewModel] 을 고친다.
+ * 예전에는 이 파일에 공지 3건이 상수로 박혀 있었다. 서버에 목록 API 가 없던 때의
+ * 잔재였고, 지금은 `GET /notices` 가 열려 있다.
  */
-private val DEFAULT_NOTICES = listOf(
-    NoticeItem(
-        title = "[필독] 개인정보처리방침 개정 안내",
-        date = "2024.08.20",
-        important = true,
-        body = "안녕하세요. 루키즈 서비스 개인정보처리방침이 개정되었습니다. 자세한 내용은 아래 첨부된 이미지와 링크를 참고해 주시기 바랍니다.",
-        imageUrls = listOf("https://api.childsafe.example.com/notices/policy.png"),
-        links = listOf("https:// rookiekids.com/privacy-v2")
-    ),
-    NoticeItem(
-        title = "루키즈 2.5.0 업데이트 - AI 유해사이트 감지 강화",
-        date = "2024.08.15",
-        important = false,
-        body = "키워드 기반 유해사이트 차단이 강화되었습니다. AI 필터링 기술이 도입되어 더욱 안전한 환경을 제공합니다.",
-        imageUrls = listOf("https://api.childsafe.example.com/notices/update250.png")
-    ),
-    NoticeItem("자녀 기기 원격 잠금 기능 추가 안내", "2024.08.10", false, "원격 잠금은 준비 중인 안내 문구입니다. 모바일 API는 없습니다."),
-)
+class NoticeViewModel(private val repository: NoticeRepository) : ViewModel() {
 
-data class NoticeUiState(
-    val items: List<NoticeItem> = DEFAULT_NOTICES,
-    val opened: NoticeItem? = null,
-)
-
-/** 부모·자녀 공지 화면이 함께 쓴다. 목적지마다 별도 인스턴스를 받으므로 펼침 상태는 섞이지 않는다. */
-class NoticeViewModel : ViewModel() {
     private val _state = MutableStateFlow(NoticeUiState())
     val state: StateFlow<NoticeUiState> = _state.asStateFlow()
-    fun open(item: NoticeItem) = _state.update { it.copy(opened = item) }
+
+    init { refresh() }
+
+    fun onKeyword(value: String) = _state.update { it.copy(keyword = value) }
+
+    /** 첫 페이지부터 다시 읽는다. 검색어를 바꿨거나 실패 후 재시도할 때. */
+    fun refresh() = load(page = 0, append = false)
+
+    fun loadMore() {
+        val current = _state.value
+        if (current.loading || !current.hasMore) return
+        load(page = current.page + 1, append = true)
+    }
+
+    private fun load(page: Int, append: Boolean) {
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null) }
+            runCatching { repository.list(_state.value.keyword, page) }
+                .onSuccess { result ->
+                    _state.update {
+                        it.copy(
+                            loading = false,
+                            items = if (append) it.items + result.items else result.items,
+                            page = result.page,
+                            hasMore = result.hasMore,
+                        )
+                    }
+                }
+                .onFailure { t ->
+                    _state.update { it.copy(loading = false, error = t.message ?: "공지를 불러오지 못했어요") }
+                }
+        }
+    }
+
+    /** 목록 항목에는 본문이 없어서 누를 때 상세를 받아온다. */
+    fun open(notice: Notice) {
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null) }
+            runCatching { repository.get(notice.id) }
+                .onSuccess { detail -> _state.update { it.copy(loading = false, opened = detail) } }
+                .onFailure { t ->
+                    _state.update { it.copy(loading = false, error = t.message ?: "공지를 불러오지 못했어요") }
+                }
+        }
+    }
+
     fun close() = _state.update { it.copy(opened = null) }
 }
 
@@ -118,97 +153,180 @@ class NoticeViewModel : ViewModel() {
 @Composable
 fun ColumnScope.NoticeBody(
     state: NoticeUiState,
-    onOpen: (NoticeItem) -> Unit,
+    onKeyword: (String) -> Unit,
+    onSearch: () -> Unit,
+    onOpen: (Notice) -> Unit,
     onClose: () -> Unit,
+    onLoadMore: () -> Unit,
 ) {
     val colors = LocalKidhackColors.current
     val opened = state.opened
 
     if (opened != null) {
+        NoticeDetailCard(opened)
+        KidButton(
+            text = stringResource(R.string.notice_back_to_list),
+            onClick = onClose,
+            modifier = Modifier.fillMaxWidth(),
+            variant = KidButtonVariant.Secondary,
+        )
+        Spacer(Modifier.height(8.dp))
+        return
+    }
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        KidTextField(
+            value = state.keyword,
+            onValueChange = onKeyword,
+            label = stringResource(R.string.notice_search_label),
+            placeholder = stringResource(R.string.notice_search_hint),
+            modifier = Modifier.weight(1f),
+        )
+        KidButton(
+            text = stringResource(R.string.notice_search_action),
+            onClick = onSearch,
+            variant = KidButtonVariant.Secondary,
+        )
+    }
+    Spacer(Modifier.height(4.dp))
+
+    if (state.error != null) {
         KidCard {
-            Text(opened.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 16.sp, color = colors.text)
-            Text(opened.date, color = colors.muted, fontSize = 12.sp)
-            Spacer(Modifier.height(12.dp))
-            Text(opened.body, fontSize = 14.sp, color = colors.text)
-
-            // 이미지 첨부 표시
-            if (opened.imageUrls.isNotEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(opened.imageUrls) { url ->
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(url)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(width = 200.dp, height = 120.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(colors.surface)
-                        )
-                    }
-                }
-            }
-
-            // 링크 첨부 표시
-            if (opened.links.isNotEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                val context = LocalContext.current
-                opened.links.forEach { link ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(colors.surface)
-                            .clickable { context.openLink(link) }
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("🔗", fontSize = 14.sp)
-                        Spacer(Modifier.width(8.dp))
-                        Text(link, fontSize = 13.sp, color = colors.brand, maxLines = 1)
-                    }
-                    Spacer(Modifier.height(4.dp))
-                }
-            }
+            Text(state.error, color = colors.danger, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            KidButton(
+                text = stringResource(R.string.notice_retry),
+                onClick = onSearch,
+                modifier = Modifier.fillMaxWidth(),
+                variant = KidButtonVariant.Secondary,
+            )
         }
-        KidCard(Modifier.clickable(onClick = onClose)) {
-            Text("← 목록으로 돌아가기", color = colors.brand, fontWeight = FontBold, fontSize = 14.sp)
-        }
-    } else {
-        state.items.forEach { n ->
-            KidCard(Modifier.clickable { onOpen(n) }) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (n.important) {
-                        Text(
-                            stringResource(R.string.notice_badge),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(colors.brandLight)
-                                .padding(horizontal = 8.dp, vertical = 2.dp),
-                            color = colors.brand,
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontBlack,
-                            fontSize = 11.sp,
-                        )
-                        Spacer(Modifier.padding(6.dp))
+    }
+
+    state.items.forEach { notice ->
+        KidCard(Modifier.clickable { onOpen(notice) }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        notice.title,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 14.sp,
+                        color = colors.text,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(notice.createdAt.toDisplayDate(), color = colors.muted, fontSize = 12.sp)
+                        // 첨부·링크는 목록에 개수만 온다. 실물은 상세에서 받는다.
+                        if (notice.attachmentCount > 0) {
+                            Spacer(Modifier.width(8.dp))
+                            Text("📎 " + notice.attachmentCount, color = colors.muted, fontSize = 12.sp)
+                        }
+                        if (notice.linkCount > 0) {
+                            Spacer(Modifier.width(8.dp))
+                            Text("🔗 " + notice.linkCount, color = colors.muted, fontSize = 12.sp)
+                        }
                     }
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            n.title,
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontBold,
-                            fontSize = 14.sp,
-                            color = if (n.important) colors.brandDark else colors.text,
-                        )
-                        Text(n.date, color = colors.muted, fontSize = 12.sp)
-                    }
-                    Text("›", color = colors.border, fontSize = 16.sp)
                 }
+                Text("›", color = colors.border, fontSize = 16.sp)
             }
         }
     }
+
+    if (state.items.isEmpty() && !state.loading && state.error == null) {
+        Text(
+            stringResource(R.string.notice_empty),
+            color = colors.muted,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(vertical = 16.dp),
+        )
+    }
+
+    if (state.loading) {
+        Text(
+            stringResource(R.string.notice_loading),
+            color = colors.muted,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+    }
+
+    if (state.hasMore) {
+        KidButton(
+            text = stringResource(R.string.notice_load_more),
+            onClick = onLoadMore,
+            modifier = Modifier.fillMaxWidth(),
+            variant = KidButtonVariant.Secondary,
+        )
+    }
     Spacer(Modifier.height(8.dp))
+}
+
+@Composable
+private fun NoticeDetailCard(notice: NoticeDetail) {
+    val colors = LocalKidhackColors.current
+    val context = LocalContext.current
+
+    KidCard {
+        Text(notice.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 16.sp, color = colors.text)
+        Text(notice.createdAt.toDisplayDate(), color = colors.muted, fontSize = 12.sp)
+        Spacer(Modifier.height(12.dp))
+        Text(notice.content, fontSize = 14.sp, color = colors.text)
+
+        // 서버는 첨부가 이미지인지 알려주지 않는다. 확장자로 갈라 이미지만 미리보기로 띄운다.
+        val images = notice.attachments.filter { RemoteUrl.isImage(it) }
+        val files = notice.attachments - images.toSet()
+
+        if (images.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(images) { path ->
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(RemoteUrl.absolute(path))
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(width = 200.dp, height = 120.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(colors.surface),
+                    )
+                }
+            }
+        }
+
+        if (files.isNotEmpty() || notice.links.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            files.forEach { path ->
+                AttachmentRow("📎", path.substringAfterLast('/')) { context.openLink(path) }
+            }
+            notice.links.forEach { link ->
+                AttachmentRow("🔗", link) { context.openLink(link) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttachmentRow(icon: String, label: String, onClick: () -> Unit) {
+    val colors = LocalKidhackColors.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(colors.surface)
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(icon, fontSize = 14.sp)
+        Spacer(Modifier.width(8.dp))
+        Text(label, fontSize = 13.sp, color = colors.brand, maxLines = 1)
+    }
+    Spacer(Modifier.height(4.dp))
 }
