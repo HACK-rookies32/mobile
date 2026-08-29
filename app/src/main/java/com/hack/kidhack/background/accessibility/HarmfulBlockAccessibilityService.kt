@@ -13,6 +13,7 @@ import android.widget.Toast
 import com.hack.kidhack.R
 import com.hack.kidhack.background.ChildAlertUploadWorker
 import com.hack.kidhack.core.common.HarmfulKeywordMatcher
+import com.hack.kidhack.background.usage.ScreenTimeWatcher
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.repository.BlocklistRepository
@@ -42,6 +43,7 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
     private val blocklistRepository: BlocklistRepository by inject()
     private val sessionRepository: SessionRepository by inject()
     private val alertStore: ChildAlertStore by inject()
+    private val screenTimeWatcher: ScreenTimeWatcher by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
@@ -56,6 +58,10 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
     @Volatile
     private var lastScanAt: Long = 0L
 
+    /** 한도 차단 안내가 연달아 뜨지 않게. 홈으로 보낸 뒤에도 이벤트가 계속 들어온다. */
+    @Volatile
+    private var lastScreenTimeBlockAt: Long = 0L
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         scope.launch { refreshBlocklist(force = true) }
@@ -69,6 +75,14 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
         // 제외하지 않으면 자기 UI 를 유해 콘텐츠로 오탐해 스스로를 튕겨 낸다.
         val source = event.packageName?.toString().orEmpty()
         if (source.isBlank() || isExempt(source)) return
+
+        // 스크린타임 한도에 닿았으면 다른 앱을 열지 못하게 홈으로 돌려보낸다.
+        // 우리 앱·런처·설정은 isExempt 로 이미 걸러져 있다 — 자녀가 앱을 못 열면
+        // 페어링·채팅까지 막혀 버리므로 예외가 반드시 필요하다.
+        if (screenTimeWatcher.limitReached) {
+            blockForScreenTime()
+            return
+        }
 
         // typeWindowContentChanged 는 초당 수십 번 올 수 있다. 전체 노드 트리 스캔은 비싸므로
         // 최소 간격을 둔다.
@@ -166,6 +180,26 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
             .onSuccess { items = it }
     }
 
+    /**
+     * 한도 도달 상태에서 다른 앱을 열었을 때. 유해차단과 같은 방식으로 홈으로 보낸다.
+     *
+     * 안드로이드에서 일반 앱은 다른 앱 실행을 막거나 기기를 잠글 수 없다. 접근성 서비스로
+     * 홈으로 돌려보내는 것이 앱이 할 수 있는 최대치다.
+     */
+    private fun blockForScreenTime() {
+        val now = System.currentTimeMillis()
+        if (now - lastScreenTimeBlockAt < SCREEN_TIME_BLOCK_THROTTLE_MS) return
+        lastScreenTimeBlockAt = now
+
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        val message = getString(R.string.screen_time_block_toast)
+        if (Settings.canDrawOverlays(this)) {
+            showOverlay(message)
+        } else {
+            Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun showBlock(keyword: String) {
         val message = getString(R.string.harmful_block_toast, keyword)
         if (Settings.canDrawOverlays(this)) {
@@ -204,6 +238,9 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
     companion object {
         private const val THROTTLE_MS = 10_000L
         private const val SCAN_INTERVAL_MS = 800L
+
+        /** 홈으로 보낸 직후 같은 안내가 쏟아지지 않도록 두는 최소 간격. */
+        private const val SCREEN_TIME_BLOCK_THROTTLE_MS = 3_000L
 
         private val EXEMPT_PACKAGES = setOf(
             "com.android.systemui",

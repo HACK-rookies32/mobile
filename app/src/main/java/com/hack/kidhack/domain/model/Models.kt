@@ -83,6 +83,8 @@ data class LocationEvent(
 data class AppNotification(
     val id: String,
     val type: String,
+    /** 푸시 알림창에 떴던 제목. 서버가 안 주면 null 이라 화면이 유형 라벨로 대신한다. */
+    val title: String? = null,
     val message: String,
     val createdAt: String,
     val read: Boolean,
@@ -96,12 +98,20 @@ data class AppNotification(
     val childId: String? = null,
 )
 
-/** ingyu 알림 경로가 쓰던 title/body. 서버 계약의 message를 첫 줄/나머지로 나눈다. */
-val AppNotification.title: String
-    get() = message.substringBefore('\n').ifBlank { message }
+/**
+ * 화면·푸시에 쓸 제목.
+ *
+ * 서버가 `title` 을 주기 시작했으므로 그걸 우선 쓰고(백엔드 #150 이후), 없으면 예전처럼
+ * message 첫 줄을 제목으로 삼는다. 로컬 보관함에 남아 있는 옛 알림이 그 경우다.
+ */
+val AppNotification.displayTitle: String
+    get() = title?.takeIf { it.isNotBlank() }
+        ?: message.lineSequence().first().ifBlank { message }
 
+/** 제목을 뺀 본문. 서버 title 이 있으면 message 가 통째로 본문이다. */
 val AppNotification.body: String
-    get() = message.substringAfter('\n', missingDelimiterValue = "")
+    get() = if (!title.isNullOrBlank()) message
+    else message.lineSequence().drop(1).joinToString(separator = System.lineSeparator())
 
 /** GET /children/{childId}/dashboard 통합 조회 결과. */
 data class ChildDashboard(
@@ -186,10 +196,13 @@ data class InquiryAnswer(
 
 data class ChatRoom(
     val id: String,
+    /** 요청자 기준 상대방 이름. 부모가 보면 자녀, 자녀가 보면 부모다. */
     val title: String,
     val lastMessage: String,
     val lastAt: String,
-    val online: Boolean,
+    /** 안 읽은 메시지 수. 목록 배지에 쓴다. */
+    val unreadCount: Int = 0,
+    val counterpartProfileImageUrl: String? = null,
     /** 서버 방 소유자. 계정 전환 시 잘못된 room 재사용 방지용. */
     val parentId: Long? = null,
     val childId: Long? = null,

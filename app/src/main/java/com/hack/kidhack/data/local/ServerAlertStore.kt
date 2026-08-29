@@ -3,7 +3,7 @@ package com.hack.kidhack.data.local
 import com.hack.kidhack.core.common.KidhackJson
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.body
-import com.hack.kidhack.domain.model.title
+import com.hack.kidhack.domain.model.displayTitle
 import com.hack.kidhack.domain.repository.SessionRepository
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
@@ -33,7 +33,7 @@ import java.util.Locale
  *
  * 자녀 기기 사건을 남기는 [ChildAlertStore] 의 부모 버전이다.
  */
-class ParentAlertStore(
+class ServerAlertStore(
     context: Context,
     private val sessionRepository: SessionRepository,
 ) {
@@ -101,7 +101,7 @@ class ParentAlertStore(
                         val entry = Entry(
                             id = id,
                             type = item.type,
-                            title = item.title,
+                            title = item.displayTitle,
                             body = item.body,
                             createdAt = item.createdAt,
                             receivedAtMillis = now - index,

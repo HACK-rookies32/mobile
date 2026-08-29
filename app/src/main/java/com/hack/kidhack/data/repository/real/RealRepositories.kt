@@ -39,6 +39,7 @@ import com.hack.kidhack.data.remote.dto.AppControlCreateRequest
 import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
 import com.hack.kidhack.data.remote.dto.AppSyncItemDto
 import com.hack.kidhack.data.remote.dto.AppSyncRequest
+import com.hack.kidhack.data.remote.dto.ScreenTimeRequest
 import com.hack.kidhack.data.remote.dto.AppUsageReportItemDto
 import com.hack.kidhack.data.remote.dto.AppUsageReportRequest
 import com.hack.kidhack.data.remote.dto.BlockRuleRequest
@@ -417,12 +418,24 @@ class RealLocationEventRepository(private val api: LocationEventApi) : LocationE
 }
 
 class RealNotificationRepository(private val api: NotificationApi) : NotificationRepository {
+    /**
+     * 서버는 자녀별 필터를 지원하지 않아 전체를 받아 앱에서 거른다.
+     * 자녀 맥락이 없는 알림(childId == null)은 어느 자녀를 골라도 함께 보여 준다.
+     */
     override suspend fun list(recipientId: String, childId: String?): List<AppNotification> =
-        api.list(recipientId, childId).unwrap().map { it.toDomain() }
+        api.list(recipientId).unwrap().content
+            .map { it.toDomain() }
+            .filter { childId == null || it.childId == null || it.childId == childId }
 
     override suspend fun markRead(notificationId: String) {
         api.markRead(notificationId).unwrapOrNull()
     }
+
+    override suspend fun markAllRead(recipientId: String): Int =
+        api.markAllRead(recipientId).unwrapOrNull() ?: 0
+
+    override suspend fun unreadCount(recipientId: String): Int =
+        api.unreadCount(recipientId).unwrapOrNull() ?: 0
 }
 
 class RealChildAlertRepository(private val api: ChildAlertApi) : ChildAlertRepository {
@@ -569,17 +582,23 @@ class RealChatRepository(
     override suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom =
         api.createOrGetRoom(CreateChatRoomRequest(parentId, childId)).unwrap().toDomain()
 
+    /** 서버가 요청자 기준 상대방 정보와 안 읽음 수까지 담아 준다. */
     override suspend fun rooms(): List<ChatRoom> =
-        // 백엔드에 방 목록 API 없음. ViewModel에서 children + getOrCreate 사용.
-        emptyList()
+        api.rooms().unwrap().map { it.toDomain() }
 
     override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> {
         val session = sessionRepository.current()
         val myId = session?.user?.id?.toLongOrNull()
         val myRole = session?.user?.role ?: Role.PARENT
-        return api.messages(roomId, before, size).unwrap().content.map {
-            it.toDomain(myUserId = myId, myRole = myRole)
-        }
+        // 커서 페이징이라 응답이 { messages, hasMore, oldestSentAt } 다.
+        // 다음 페이지는 호출자가 oldestSentAt 을 before 로 넘긴다.
+        //
+        // 서버는 **최신 → 과거** 순으로 주는데 화면은 LazyColumn 에 순서대로 그리고 마지막
+        // 항목으로 스크롤한다(= 아래가 최신). 그대로 쓰면 대화가 거꾸로 쌓이고, 새로 보낸
+        // 메시지만 아래에 붙어 순서가 뒤섞인다. 여기서 뒤집어 「오래된 → 최신」으로 통일한다.
+        return api.messages(roomId, before, size).unwrap().messages
+            .asReversed()
+            .map { it.toDomain(myUserId = myId, myRole = myRole) }
     }
 
     override fun observeMessages(roomId: String): Flow<ChatMessage> =
@@ -609,8 +628,9 @@ class RealChatRepository(
         )
     }
 
+    /** 서버는 "지금 시점까지" 읽음으로 표시한다. 개별 메시지 id 는 받지 않는다. */
     override suspend fun markRead(roomId: String, lastMessageId: String?) {
-        // 백엔드 미지원
+        api.markRead(roomId).unwrapOrNull()
     }
 }
 
@@ -691,6 +711,15 @@ class RealAppControlRepository(private val api: AppControlApi) : AppControlRepos
     override suspend fun deleteRule(ruleId: String) {
         api.deleteRule(ruleId).unwrapOrNull()
     }
+
+    override suspend fun screenTimeLimit(childId: String): Int? =
+        api.screenTime(childId).unwrap().dailyLimitMinutes
+
+    override suspend fun setScreenTimeLimit(childId: String, dailyLimitMinutes: Int?): Int? =
+        api.setScreenTime(childId, ScreenTimeRequest(dailyLimitMinutes)).unwrap().dailyLimitMinutes
+
+    override suspend fun reportScreenTimeReached(childId: String, usedMinutes: Int): Boolean =
+        api.reportScreenTimeReached(childId, usedMinutes).unwrapOrNull() ?: false
 }
 
 class RealPhotoRepository(private val api: PhotoApi) : PhotoRepository {

@@ -15,12 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Typeface
-import android.graphics.Color as AndroidColor
 import android.view.MotionEvent
-import androidx.core.graphics.createBitmap
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,10 +37,7 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -165,34 +157,6 @@ class LocationViewModel(
     }
 }
 
-/** 등록 장소 표시색. 아이 위치(빨강)와 겹치지 않도록 브랜드색 대신 파랑을 쓴다. */
-private val PLACE_BLUE = Color(0xFF2563EB)
-
-/** 장소 이름을 항상 띄우기 위한 텍스트 비트맵 마커 아이콘. 이름이 바뀔 때만 다시 만든다. */
-@Composable
-private fun rememberPlaceLabelIcon(text: String): BitmapDescriptor {
-    val density = LocalDensity.current.density
-    return remember(text, density) {
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = AndroidColor.WHITE
-            textSize = 11f * density
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        val padH = 6f * density
-        val padV = 3f * density
-        val metrics = textPaint.fontMetrics
-        val width = (textPaint.measureText(text) + padH * 2).toInt().coerceAtLeast(1)
-        val height = ((metrics.descent - metrics.ascent) + padV * 2).toInt().coerceAtLeast(1)
-        val bitmap = createBitmap(width, height)
-        val canvas = Canvas(bitmap)
-        val radius = 6f * density
-        val background = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = PLACE_BLUE.toArgb() }
-        canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), radius, radius, background)
-        canvas.drawText(text, padH, padV - metrics.ascent, textPaint)
-        BitmapDescriptorFactory.fromBitmap(bitmap)
-    }
-}
-
 /** 작은 지도와 전체화면 지도가 같은 내용을 그리도록 한 곳에 모아둔다. */
 @Composable
 @GoogleMapComposable
@@ -211,33 +175,7 @@ private fun LocationMapContent(
             icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
         )
     }
-    places.forEach { place ->
-        val lat = place.lat.toDoubleOrNull()
-        val lng = place.lng.toDoubleOrNull()
-        if (lat != null && lng != null) {
-            val center = LatLng(lat, lng)
-            Circle(
-                center = center,
-                radius = place.radius.toDouble(),
-                strokeColor = PLACE_BLUE,
-                strokeWidth = 2f,
-                fillColor = PLACE_BLUE.copy(alpha = 0.15f),
-            )
-            Marker(
-                state = rememberMarkerState(key = place.id, position = center),
-                title = place.name,
-                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
-            )
-            // 이름은 탭해야 뜨는 InfoWindow 대신 항상 보이도록 별도 마커로 그린다.
-            Marker(
-                state = rememberMarkerState(key = "${place.id}_label", position = center),
-                title = place.name,
-                icon = rememberPlaceLabelIcon(place.name),
-                anchor = Offset(0.5f, -0.2f),
-                zIndex = 1f,
-            )
-        }
-    }
+    SavedPlacesOverlay(places)
     if (routePoints.size >= 2) {
         Polyline(points = routePoints, color = colors.brand, width = 6f)
     }
@@ -431,12 +369,6 @@ fun ParentLocationScreen(
                         }
                     }
                     KidButton(
-                        text = stringResource(R.string.parent_geofence_manage),
-                        onClick = onOpenGeofence,
-                        modifier = Modifier.fillMaxWidth(),
-                        variant = KidButtonVariant.Secondary,
-                    )
-                    KidButton(
                         text = if (state.showRoute) stringResource(R.string.parent_location_route_hide)
                         else stringResource(R.string.parent_location_route_show),
                         onClick = viewModel::toggleRoute,
@@ -444,6 +376,18 @@ fun ParentLocationScreen(
                         variant = KidButtonVariant.Secondary,
                         // 이을 점이 둘은 있어야 선이 된다.
                         enabled = state.history.size >= 2,
+                    )
+                }
+                // 「지정 장소 관리」는 자녀 위치가 아직 없어도 열려 있어야 한다.
+                // 예전에는 current != null 블록 안에 있어서, 자녀가 위치를 한 번도 올리지
+                // 않으면 장소를 등록할 방법이 아예 없었다 — 오히려 그때 미리 집·학교를
+                // 넣어 두는 게 자연스럽다.
+                if (state.hasChildren) {
+                    KidButton(
+                        text = stringResource(R.string.parent_geofence_manage),
+                        onClick = onOpenGeofence,
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = KidButtonVariant.Secondary,
                     )
                 }
                 if (state.events.isNotEmpty()) {

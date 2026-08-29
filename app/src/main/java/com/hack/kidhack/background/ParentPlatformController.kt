@@ -1,7 +1,7 @@
 package com.hack.kidhack.background
 
 import android.content.Context
-import com.hack.kidhack.background.alert.ParentAlertPollWorker
+import com.hack.kidhack.background.alert.ServerAlertPollWorker
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.repository.SessionRepository
 import kotlinx.coroutines.CoroutineScope
@@ -29,10 +29,10 @@ class ParentPlatformController(
                 .distinctUntilChanged()
                 .collect { isParent ->
                     if (isParent) {
-                        ParentAlertPollWorker.enqueuePeriodic(context)
-                        ParentAlertPollWorker.enqueueNow(context)
+                        ServerAlertPollWorker.enqueuePeriodic(context)
+                        ServerAlertPollWorker.enqueueNow(context)
                     } else {
-                        ParentAlertPollWorker.cancel(context)
+                        ServerAlertPollWorker.cancel(context)
                     }
                 }
         }

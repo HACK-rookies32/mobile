@@ -304,8 +304,14 @@ fun ParentChatScreen(viewModel: ParentChatViewModel = koinViewModel()) {
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(room.lastAt, color = colors.muted, fontSize = 11.sp)
-                                    if (room.online) {
-                                        Text(stringResource(R.string.parent_chat_online), color = colors.safe, fontSize = 10.sp, fontWeight = FontBold)
+                                    // 서버가 접속 여부를 주지 않는다. 실제로 주는 값은 안 읽음 수다.
+                                    if (room.unreadCount > 0) {
+                                        Text(
+                                            room.unreadCount.toString(),
+                                            color = colors.danger,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontBold,
+                                        )
                                     }
                                 }
                             }

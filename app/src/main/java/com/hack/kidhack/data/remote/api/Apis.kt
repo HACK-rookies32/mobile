@@ -25,6 +25,8 @@ import com.hack.kidhack.data.remote.dto.ChargeConfirmResponse
 import com.hack.kidhack.data.remote.dto.ChargePrepareRequest
 import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
+import com.hack.kidhack.data.remote.dto.ChatMessagePageDto
+import com.hack.kidhack.data.remote.dto.ChatRoomCreatedDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.CheckoutRequest
 import com.hack.kidhack.data.remote.dto.CreateChatRoomRequest
@@ -68,6 +70,8 @@ import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordSendCodeRequest
 import com.hack.kidhack.data.remote.dto.SendCodeResponse
+import com.hack.kidhack.data.remote.dto.ScreenTimeDto
+import com.hack.kidhack.data.remote.dto.ScreenTimeRequest
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.ScreenshotUploadDto
 import com.hack.kidhack.data.remote.dto.SignupRequest
@@ -89,6 +93,7 @@ import retrofit2.http.HTTP
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -263,15 +268,29 @@ interface LocationEventApi {
 }
 
 interface NotificationApi {
-    /** 명세 4.5. childId는 서버가 지원하면 자녀별로 걸러 받는다. */
+    /**
+     * 알림 목록. 서버는 **배열이 아니라 페이지 래퍼**를 준다.
+     *
+     * 자녀별 필터 파라미터는 없다 — 응답의 `childId` 로 앱에서 거른다.
+     */
     @GET("notifications/{recipientId}")
     suspend fun list(
         @Path("recipientId") recipientId: String,
-        @Query("childId") childId: String? = null,
-    ): ApiEnvelope<List<NotificationDto>>
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 50,
+    ): ApiEnvelope<PageResponse<NotificationDto>>
 
-    @PATCH("notifications/{notificationId}")
-    suspend fun markRead(@Path("notificationId") notificationId: String): ApiEnvelope<Unit>
+    /** 1건 읽음. 경로 끝의 `/read` 가 빠지면 404 다. */
+    @PATCH("notifications/{id}/read")
+    suspend fun markRead(@Path("id") id: String): ApiEnvelope<Unit>
+
+    /** 안 읽은 알림을 전부 읽음 처리하고 처리 건수를 돌려준다. */
+    @PATCH("notifications/{recipientId}/read-all")
+    suspend fun markAllRead(@Path("recipientId") recipientId: String): ApiEnvelope<Int>
+
+    /** 배지용 안 읽음 개수. */
+    @GET("notifications/{recipientId}/unread-count")
+    suspend fun unreadCount(@Path("recipientId") recipientId: String): ApiEnvelope<Int>
 }
 
 /**
@@ -387,19 +406,24 @@ interface CommunityApi {
 }
 
 interface ChatApi {
+    /** PARENT 전용. 부모–자녀 조합의 방이 있으면 반환하고 없으면 생성한다(멱등). */
     @POST("chat/rooms")
-    suspend fun createOrGetRoom(@Body body: CreateChatRoomRequest): ApiEnvelope<ChatRoomDto>
+    suspend fun createOrGetRoom(@Body body: CreateChatRoomRequest): ApiEnvelope<ChatRoomCreatedDto>
 
     @GET("chat/rooms")
     suspend fun rooms(): ApiEnvelope<List<ChatRoomDto>>
 
+    /** 커서 페이징. `page` 파라미터는 서버가 받지 않는다. size 최대 100. */
     @GET("chat/rooms/{roomId}/messages")
     suspend fun messages(
         @Path("roomId") roomId: String,
         @Query("before") before: String? = null,
         @Query("size") size: Int = 30,
-        @Query("page") page: Int = 0,
-    ): ApiEnvelope<PageResponse<ChatMessageDto>>
+    ): ApiEnvelope<ChatMessagePageDto>
+
+    /** 이 방을 지금 시점까지 읽음 처리. 참여자(부모/자녀) 모두 호출 가능. */
+    @POST("chat/rooms/{roomId}/read")
+    suspend fun markRead(@Path("roomId") roomId: String): ApiEnvelope<Unit>
 }
 
 interface PaymentApi {
@@ -537,6 +561,27 @@ interface AppControlApi {
 
     @DELETE("appcontrol/rules/{ruleId}")
     suspend fun deleteRule(@Path("ruleId") ruleId: String): ApiEnvelope<Unit>
+
+    /** 하루 총 스크린타임 한도. 부모·자녀 모두 조회할 수 있다. */
+    @GET("appcontrol/screentime/{childId}")
+    suspend fun screenTime(@Path("childId") childId: String): ApiEnvelope<ScreenTimeDto>
+
+    /** 한도 설정(부모). null 이면 제한 해제. */
+    @PUT("appcontrol/screentime/{childId}")
+    suspend fun setScreenTime(
+        @Path("childId") childId: String,
+        @Body body: ScreenTimeRequest,
+    ): ApiEnvelope<ScreenTimeDto>
+
+    /**
+     * 한도 도달 보고(자녀 앱). 서버가 부모·자녀 양쪽에 알림을 발행한다.
+     * 한도가 설정돼 있지 않으면 서버가 무시하고 false 를 준다.
+     */
+    @POST("appcontrol/screentime/{childId}/reached")
+    suspend fun reportScreenTimeReached(
+        @Path("childId") childId: String,
+        @Query("usedMinutes") usedMinutes: Int,
+    ): ApiEnvelope<Boolean>
 }
 
 interface InquiryApi {

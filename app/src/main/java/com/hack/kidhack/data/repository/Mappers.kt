@@ -9,6 +9,7 @@ import com.hack.kidhack.data.remote.dto.AppUsageStatDto
 import com.hack.kidhack.data.remote.dto.CardDto
 import com.hack.kidhack.data.remote.dto.ChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.ChatMessageDto
+import com.hack.kidhack.data.remote.dto.ChatRoomCreatedDto
 import com.hack.kidhack.data.remote.dto.ChatRoomDto
 import com.hack.kidhack.data.remote.dto.BlockRuleDto
 import com.hack.kidhack.data.remote.dto.ChildDetailDto
@@ -195,6 +196,7 @@ fun ChildAlertEvent.toDto(): ChildAlertDto = ChildAlertDto(id, type, title, body
 fun NotificationDto.toDomain(): AppNotification = AppNotification(
     id = id,
     type = type,
+    title = title?.takeIf { it.isNotBlank() },
     message = message,
     createdAt = createdAt,
     read = read,
@@ -309,11 +311,26 @@ fun CommentDto.toDomain(): Comment = Comment(
 )
 
 fun ChatRoomDto.toDomain(titleOverride: String? = null): ChatRoom = ChatRoom(
+    id = roomId,
+    // 서버는 제목 대신 「요청자 기준 상대방」을 준다 — 부모가 보면 자녀, 자녀가 보면 부모.
+    title = titleOverride?.takeIf { it.isNotBlank() }
+        ?: counterpartNickname?.takeIf { it.isNotBlank() }
+        ?: counterpartName?.takeIf { it.isNotBlank() }
+        ?: "채팅",
+    lastMessage = lastMessage.orEmpty(),
+    lastAt = lastMessageAt.orEmpty(),
+    unreadCount = unreadCount,
+    counterpartProfileImageUrl = counterpartProfileImageUrl,
+    parentId = parentId,
+    childId = childId,
+)
+
+/** 방 생성 응답에는 상대방 정보가 없다. 목록을 다시 부르기 전까지 쓸 최소 형태. */
+fun ChatRoomCreatedDto.toDomain(titleOverride: String? = null): ChatRoom = ChatRoom(
     id = id,
-    title = titleOverride?.takeIf { it.isNotBlank() } ?: title.ifBlank { "채팅" },
-    lastMessage = lastMessage,
-    lastAt = lastAt,
-    online = online,
+    title = titleOverride?.takeIf { it.isNotBlank() } ?: "채팅",
+    lastMessage = "",
+    lastAt = "",
     parentId = parentId,
     childId = childId,
 )

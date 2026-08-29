@@ -78,8 +78,19 @@ class ChatMessageStore(context: Context) {
 
     suspend fun saveRooms(rooms: List<ChatRoom>) = withContext(Dispatchers.IO) {
         mutex.withLock {
+            // 서버 계약(ChatRoomSummaryResponse)과 같은 모양으로 캐시한다.
+            // 제목은 서버가 counterpart* 로 주므로 그 자리에 담아 두면 복원 시 그대로 살아난다.
             val dtos = rooms.map {
-                ChatRoomDto(it.id, it.title, it.lastMessage, it.lastAt, it.online)
+                ChatRoomDto(
+                    roomId = it.id,
+                    parentId = it.parentId,
+                    childId = it.childId,
+                    counterpartName = it.title,
+                    counterpartProfileImageUrl = it.counterpartProfileImageUrl,
+                    lastMessage = it.lastMessage,
+                    lastMessageAt = it.lastAt,
+                    unreadCount = it.unreadCount,
+                )
             }
             runCatching {
                 root.mkdirs()

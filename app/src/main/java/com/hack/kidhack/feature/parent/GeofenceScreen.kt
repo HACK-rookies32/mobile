@@ -196,11 +196,11 @@ private fun PickedPlaceMarker(picked: LatLng, onPicked: (Double, Double) -> Unit
             .drop(1)
             .collect { onPicked(it.latitude, it.longitude) }
     }
-    // 등록될 장소라 위치 화면의 장소 마커와 같은 파란색으로 맞춘다.
+    // 이미 등록된 장소(파랑)와 섞이지 않도록 아직 저장 안 된 이 마커만 초록으로 둔다.
     Marker(
         state = markerState,
         draggable = true,
-        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
+        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
     )
 }
 
@@ -246,13 +246,18 @@ fun ParentGeofenceScreen(
             KidTextField(state.name, viewModel::onName, stringResource(R.string.parent_geofence_name), placeholder = stringResource(R.string.parent_geofence_name_hint))
             Spacer(Modifier.height(12.dp))
             val picked = state.pickedLat?.let { lat -> state.pickedLng?.let { lng -> LatLng(lat, lng) } }
-            val camera = LatLng(state.hintLat ?: DEFAULT_LAT, state.hintLng ?: DEFAULT_LNG)
+            // 자녀 좌표 > 이미 등록한 장소 > 서울시청 순으로 지도를 띄운다.
+            // 자녀가 아직 위치를 안 올렸다고 서울시청을 비추면, 등록해 둔 장소가 화면
+            // 밖에 있어 지도에 아무것도 없는 것처럼 보인다.
+            val camera = state.hintLat?.let { lat -> state.hintLng?.let { lng -> LatLng(lat, lng) } }
+                ?: state.items.firstNotNullOfOrNull { it.latLngOrNull() }
+                ?: LatLng(DEFAULT_LAT, DEFAULT_LNG)
             val cameraPositionState = rememberCameraPositionState {
                 position = CameraPosition.fromLatLngZoom(camera, 15f)
             }
-            // 자녀 좌표가 늦게 도착해도 아직 아무 곳도 안 골랐다면 그쪽으로 카메라를 옮긴다.
-            LaunchedEffect(state.hintLat, state.hintLng) {
-                if (picked == null && state.hintLat != null && state.hintLng != null) {
+            // 자녀 좌표·장소 목록이 늦게 도착해도 아직 아무 곳도 안 골랐다면 그쪽으로 옮긴다.
+            LaunchedEffect(camera) {
+                if (picked == null) {
                     cameraPositionState.position = CameraPosition.fromLatLngZoom(camera, 15f)
                 }
             }
@@ -273,6 +278,7 @@ fun ParentGeofenceScreen(
                     cameraPositionState = cameraPositionState,
                     onMapClick = { latLng -> viewModel.onMapPicked(latLng.latitude, latLng.longitude) },
                 ) {
+                    SavedPlacesOverlay(state.items)
                     if (picked != null) PickedPlaceMarker(picked, viewModel::onMapPicked)
                 }
                 MapChipButton(
@@ -300,6 +306,7 @@ fun ParentGeofenceScreen(
                             cameraPositionState = fullCameraState,
                             onMapClick = { latLng -> viewModel.onMapPicked(latLng.latitude, latLng.longitude) },
                         ) {
+                            SavedPlacesOverlay(state.items)
                             if (picked != null) PickedPlaceMarker(picked, viewModel::onMapPicked)
                         }
                         MapChipButton(

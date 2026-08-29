@@ -172,9 +172,22 @@ interface LocationEventRepository {
 }
 
 interface NotificationRepository {
-    /** 명세 4.5 GET /notifications/{recipientId} — page/size 없이 배열 그대로 반환. */
+    /**
+     * 알림 목록.
+     *
+     * 서버에는 자녀별 필터 파라미터가 없다. [childId] 를 주면 **앱에서** 거른다.
+     * 자녀 맥락이 없는 알림(문의 답변·전체 발송)은 childId 가 null 인데, 감춰서 놓치는 것보다
+     * 낫기 때문에 필터를 걸어도 함께 보여 준다.
+     */
     suspend fun list(recipientId: String, childId: String? = null): List<AppNotification>
+
     suspend fun markRead(notificationId: String)
+
+    /** 안 읽은 알림을 전부 읽음 처리한다. 처리 건수를 돌려준다. */
+    suspend fun markAllRead(recipientId: String): Int
+
+    /** 배지용 안 읽음 개수. */
+    suspend fun unreadCount(recipientId: String): Int
 }
 
 /**
@@ -308,6 +321,12 @@ interface ChatRepository {
     /** 부모–자녀 1:1 방. 없으면 서버가 생성한다. */
     suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom
     suspend fun rooms(): List<ChatRoom>
+    /**
+     * 방의 메시지를 **오래된 → 최신** 순으로. 화면이 아래를 최신으로 그린다.
+     * (서버는 최신순으로 주고 구현에서 뒤집는다.)
+     *
+     * 커서 페이징이라 [before] 에 직전 응답의 가장 오래된 시각을 넘기면 그 이전을 준다.
+     */
     suspend fun messages(roomId: String, before: String? = null, size: Int = 30): List<ChatMessage>
     fun observeMessages(roomId: String): Flow<ChatMessage>
     suspend fun send(roomId: String, content: String): ChatMessage
@@ -361,6 +380,21 @@ interface AppControlRepository {
     ): AppControlItem
 
     suspend fun deleteRule(ruleId: String)
+
+    /**
+     * 자녀 하루 총 스크린타임 한도(분). **null 이면 제한 없음.**
+     * 0 은 "한도 0분"이라 의미가 다르다.
+     */
+    suspend fun screenTimeLimit(childId: String): Int?
+
+    /** 한도 설정(부모). null 이면 제한 해제. */
+    suspend fun setScreenTimeLimit(childId: String, dailyLimitMinutes: Int?): Int?
+
+    /**
+     * 한도 도달 보고(자녀 앱). 서버가 부모·자녀 양쪽에 알림을 발행한다.
+     * 한도가 설정돼 있지 않으면 서버가 무시하므로 false 가 온다.
+     */
+    suspend fun reportScreenTimeReached(childId: String, usedMinutes: Int): Boolean
 }
 
 /**
@@ -414,3 +448,12 @@ interface ChildOnboardingStore {
 
 /** 자녀 앱에서 "내 childId". 서버 리소스 경로에 그대로 들어간다. */
 suspend fun SessionRepository.childId(): String = current()?.user?.id.orEmpty()
+
+/**
+ * 알림 조회에 쓰는 수신자 id — 로그인한 본인.
+ *
+ * 서버 경로가 `/notifications/{recipientId}` 인데 소유권 검증이 없는 IDOR 이고
+ * (`[VULN-NOTI-1]`, 의도적), 백엔드 2단계에서 `/notifications/me` 형태로 바뀔 가능성이 높다.
+ * **조립을 여기 한 곳에만 두어** 그때 이 함수만 고치면 되게 한다.
+ */
+suspend fun SessionRepository.notificationRecipientId(): String = current()?.user?.id.orEmpty()

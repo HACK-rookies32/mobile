@@ -43,7 +43,7 @@ class KidhackApplication : Application() {
             // FCM 토큰을 로그인한 계정에 묶는다. 세션이 생기면 등록, 사라지면 해제.
             val pushRegistrar = koin.get<PushTokenRegistrar>()
             // 채팅과 사진은 계정이 바뀔 때 비운다.
-            // 알림 보관함(ChildAlertStore/ParentAlertStore)은 계정별 파일로 나뉘어 있어
+            // 알림 보관함(ChildAlertStore/ServerAlertStore)은 계정별 파일로 나뉘어 있어
             // 여기서 지우지 않는다. 지우면 부모와 자녀를 오갈 때마다 최근 알림이 비워진다.
             val chatStore = koin.get<ChatMessageStore>()
             val photoStore = koin.get<ChildPhotoStore>()

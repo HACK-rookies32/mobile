@@ -43,7 +43,7 @@ import kotlin.math.sqrt
  * 보호자가 그 사건을 **읽을 수 있는 경로가 명세에 없다**. 그건 서버가 알림을 만들어 줘야 한다.
  *
  * 서버가 나중에 알림을 제대로 만들어 주더라도 중복되지 않는다.
- * [ParentAlertStore][com.hack.kidhack.data.local.ParentAlertStore] 가 id 로 합치고,
+ * [ServerAlertStore][com.hack.kidhack.data.local.ServerAlertStore] 가 id 로 합치고,
  * 여기서 만든 알림은 상태가 **바뀐 순간에만** 나오기 때문이다.
  */
 class ParentChildWatcher(
@@ -53,7 +53,7 @@ class ParentChildWatcher(
     private val appUsageRepository: AppUsageRepository,
     private val childAlertRepository: ChildAlertRepository,
     private val store: ParentWatchStore,
-    private val alertSync: ParentAlertSync,
+    private val alertSync: ServerAlertSync,
 ) {
 
     suspend fun evaluateAll() {

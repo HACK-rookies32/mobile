@@ -247,7 +247,8 @@ fun ChildServicesScreen(
                 title = stringResource(R.string.child_services_limits),
                 subtitle = stringResource(R.string.child_services_limits_desc),
             )
-            LimitRow("⏱️", stringResource(R.string.child_services_screentime_limit), stringResource(R.string.child_services_screentime_value))
+            // 「하루 3시간」은 서버 근거가 없는 상수였다. 앱 통제는 앱별 한도만 제공하고
+            // 자녀 전체 스크린타임 한도라는 개념이 서버에 없다.
             LimitRow("🌙", stringResource(R.string.child_services_bedtime), stringResource(R.string.child_services_bedtime_value))
             LimitRow("✅", stringResource(R.string.child_services_status), stringResource(R.string.child_services_available), showDivider = false)
             Spacer(Modifier.height(8.dp))

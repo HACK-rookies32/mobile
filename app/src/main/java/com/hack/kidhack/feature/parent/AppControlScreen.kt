@@ -64,6 +64,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import com.hack.kidhack.data.remote.userMessage
 
 enum class AppControlFilter { ALL, BLOCKED, ALLOWED, LIMITED }
 
@@ -74,6 +75,9 @@ data class AppControlUiState(
     val filter: AppControlFilter = AppControlFilter.ALL,
     val showAppSelection: Boolean = false,
     val showControlSettings: Boolean = false,
+    /** 자녀 하루 총 사용 한도(분). null 이면 제한 없음 — 0("한도 0분")과 의미가 다르다. */
+    val dailyLimitMinutes: Int? = null,
+    val savingLimit: Boolean = false,
     val loading: Boolean = true,
     val error: String? = null,
 )
@@ -108,10 +112,13 @@ class AppControlViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
-                val id = selectedChildRepository.resolveId(childRepository.children()) ?: return@runCatching emptyList()
-                appControlRepository.items(id)
-            }.onSuccess { items ->
-                _state.update { it.copy(loading = false, items = items) }
+                val id = selectedChildRepository.resolveId(childRepository.children())
+                    ?: return@runCatching emptyList<AppControlItem>() to null
+                // 총 한도는 부가 정보라 실패해도 규칙 목록은 그대로 보여 준다.
+                val limit = runCatching { appControlRepository.screenTimeLimit(id) }.getOrNull()
+                appControlRepository.items(id) to limit
+            }.onSuccess { (items, limit) ->
+                _state.update { it.copy(loading = false, items = items, dailyLimitMinutes = limit) }
             }.onFailure { t ->
                 _state.update { it.copy(loading = false, error = t.message) }
             }
@@ -173,6 +180,25 @@ class AppControlViewModel(
         }
     }
 
+    /**
+     * 하루 총 사용 한도 저장. 빈 값이면 제한을 푼다(서버에 null 을 보낸다).
+     *
+     * 앱 통제 규칙의 한도는 **앱별**이고 이 값은 **하루 전체**다. 서버에서도 별개 개념이다.
+     */
+    fun saveDailyLimit(minutes: Int?) {
+        viewModelScope.launch {
+            _state.update { it.copy(savingLimit = true, error = null) }
+            runCatching {
+                val id = selectedChildRepository.current() ?: return@runCatching null
+                appControlRepository.setScreenTimeLimit(id, minutes)
+            }.onSuccess { applied ->
+                _state.update { it.copy(savingLimit = false, dailyLimitMinutes = applied) }
+            }.onFailure { t ->
+                _state.update { it.copy(savingLimit = false, error = t.userMessage("한도를 저장하지 못했어요")) }
+            }
+        }
+    }
+
     fun removeControl(ruleId: String) {
         viewModelScope.launch {
             runCatching { appControlRepository.deleteRule(ruleId) }
@@ -212,6 +238,12 @@ fun ParentAppControlScreen(
             }
         },
     ) {
+        DailyLimitCard(
+            current = state.dailyLimitMinutes,
+            saving = state.savingLimit,
+            onSave = viewModel::saveDailyLimit,
+        )
+
         ParentLoadingOrError(state.loading && state.items.isEmpty(), state.error, viewModel::load)
         
         filtered.forEach { app ->
@@ -363,4 +395,58 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
         fontWeight = FontBold,
         fontSize = 12.sp,
     )
+}
+
+/**
+ * 자녀 하루 총 사용 한도.
+ *
+ * 아래 목록의 앱별 한도와는 별개다 — 이건 하루 전체 사용 시간이고, 자녀 앱이 이 값을 받아
+ * 도달하면 다른 앱을 열지 못하게 막는다. 비워 두면 제한 없음이다.
+ */
+@Composable
+private fun DailyLimitCard(current: Int?, saving: Boolean, onSave: (Int?) -> Unit) {
+    val colors = LocalKidhackColors.current
+    var input by remember(current) { mutableStateOf(current?.toString().orEmpty()) }
+
+    KidCard {
+        Text(
+            stringResource(R.string.parent_appcontrol_daily_limit),
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 14.sp,
+            color = colors.text,
+        )
+        Text(
+            stringResource(R.string.parent_appcontrol_daily_limit_desc),
+            color = colors.muted,
+            fontSize = 12.sp,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            KidTextField(
+                value = input,
+                onValueChange = { v -> input = v.filter { it.isDigit() }.take(4) },
+                label = stringResource(R.string.parent_appcontrol_daily_limit_label),
+                placeholder = stringResource(R.string.parent_appcontrol_daily_limit_hint),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f),
+            )
+            KidButton(
+                text = if (saving) {
+                    stringResource(R.string.parent_appcontrol_daily_limit_saving)
+                } else {
+                    stringResource(R.string.parent_appcontrol_daily_limit_save)
+                },
+                onClick = { onSave(input.toIntOrNull()) },
+                enabled = !saving,
+            )
+        }
+        if (current == null) {
+            Text(
+                stringResource(R.string.parent_appcontrol_daily_limit_none),
+                color = colors.muted,
+                fontSize = 12.sp,
+            )
+        }
+    }
 }

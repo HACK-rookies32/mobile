@@ -20,4 +20,7 @@
 
     <!-- 공지 목록. 부모·자녀 화면이 같은 본문을 쓴다. -->
     <string name="notice_badge">필독</string>
+    <string name="screen_time_block_toast">오늘 사용 시간이 끝났어요. 내일 다시 만나요!</string>
+    <string name="server_alert_channel">알림</string>
+    <string name="server_alert_channel_desc">채팅·안전 알림처럼 바로 확인해야 하는 알림</string>
 </resources>

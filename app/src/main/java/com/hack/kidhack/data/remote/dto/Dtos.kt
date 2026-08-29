@@ -372,13 +372,21 @@ data class LocationEventDto(
 
 @Serializable
 data class NotificationDto(
-    val id: String,
-    val recipientId: String,
-    val type: String,
-    val message: String,
+    @Serializable(with = FlexibleStringSerializer::class)
+    val id: String = "",
+    @Serializable(with = FlexibleStringSerializer::class)
+    val recipientId: String = "",
+    val type: String = "",
+    /** 푸시 알림창에 떴던 제목과 같은 값. */
+    val title: String? = null,
+    val message: String = "",
     val read: Boolean = false,
-    val createdAt: String,
-    /** 명세에는 없지만 서버가 주면 자녀별로 나눠 보여 준다. */
+    val createdAt: String = "",
+    /**
+     * 알림의 대상 자녀. 자녀 맥락이 없는 알림(문의 답변·전체 발송)은 null 이다.
+     * 백엔드 #150 에서 추가됐다.
+     */
+    @Serializable(with = FlexibleStringSerializer::class)
     val childId: String? = null,
 )
 
@@ -479,17 +487,50 @@ data class CommentRequest(val body: String)
 @Serializable
 data class ReportRequest(val reason: String, val detail: String? = null)
 
+/**
+ * 방 목록 항목 (서버 `ChatRoomSummaryResponse`).
+ *
+ * 예전에는 `id`·`lastAt`·`title` 로 받았는데 서버 키는 `roomId`·`lastMessageAt` 이고
+ * 제목 대신 **`counterpart*`(요청자 기준 상대방)** 를 준다. 키가 달라 값이 안 채워졌다.
+ * `online` 은 서버에 없다.
+ */
 @Serializable
 data class ChatRoomDto(
     @Serializable(with = FlexibleStringSerializer::class)
-    val id: String,
-    val title: String = "",
-    val lastMessage: String = "",
-    val lastAt: String = "",
-    val online: Boolean = false,
+    val roomId: String = "",
+    val parentId: Long? = null,
+    val childId: Long? = null,
+    val counterpartId: Long? = null,
+    val counterpartNickname: String? = null,
+    val counterpartName: String? = null,
+    val counterpartProfileImageUrl: String? = null,
+    val lastMessage: String? = null,
+    val lastMessageAt: String? = null,
+    val unreadCount: Int = 0,
+    val createdAt: String? = null,
+)
+
+/** 방 생성 응답 (서버 `ChatRoomResponse`). 목록과 형태가 다르다. */
+@Serializable
+data class ChatRoomCreatedDto(
+    @Serializable(with = FlexibleStringSerializer::class)
+    val id: String = "",
     val parentId: Long? = null,
     val childId: Long? = null,
     val createdAt: String? = null,
+)
+
+/**
+ * 메시지 커서 페이지 (서버 `ChatMessagePageResponse`).
+ *
+ * 다른 도메인은 전부 슬림 페이지(`content`/`page`/…)인데 **채팅만 커서**다.
+ * 다음 페이지는 [oldestSentAt] 을 `before` 로 넘긴다. 최신 → 과거 순.
+ */
+@Serializable
+data class ChatMessagePageDto(
+    val messages: List<ChatMessageDto> = emptyList(),
+    val hasMore: Boolean = false,
+    val oldestSentAt: String? = null,
 )
 
 @Serializable
@@ -662,6 +703,21 @@ data class AppControlDto(
     val dailyLimitMinutes: Int? = null,
     val enabled: Boolean = true,
 )
+
+/**
+ * 자녀 하루 총 스크린타임 한도.
+ *
+ * `dailyLimitMinutes` 가 null 이면 **제한 없음**이다. 0 은 "한도 0분"(사실상 사용 금지)이라
+ * 의미가 다르다 — 둘을 구분해야 해서 nullable 이다.
+ */
+@Serializable
+data class ScreenTimeDto(
+    val childId: Long? = null,
+    val dailyLimitMinutes: Int? = null,
+)
+
+@Serializable
+data class ScreenTimeRequest(val dailyLimitMinutes: Int? = null)
 
 @Serializable
 data class AppControlCreateRequest(

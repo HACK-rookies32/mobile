@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.asSharedFlow
  * `MainActivity` 가 인텐트를 여기로 흘려 보내고 `KidhackNavHost` 가 구독한다.
  * replay = 1 이라 앱이 꺼져 있다 켜지는 콜드 스타트에서도 이동을 놓치지 않는다.
  */
-class ParentAlertBus {
+class ServerAlertBus {
     private val _pending = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 8)
     val pending: SharedFlow<String> = _pending.asSharedFlow()
 

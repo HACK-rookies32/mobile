@@ -12,7 +12,7 @@ import com.hack.kidhack.data.local.HarmfulSettingsStore
 import com.hack.kidhack.data.local.AppUsageReportStore
 import com.hack.kidhack.data.local.PushTokenStore
 import com.hack.kidhack.data.local.ParentWatchStore
-import com.hack.kidhack.data.local.ParentAlertStore
+import com.hack.kidhack.data.local.ServerAlertStore
 import com.hack.kidhack.data.local.ChildPhotoStore
 import com.hack.kidhack.data.local.ProfileScopeStore
 import com.hack.kidhack.data.local.ChildOnboardingStoreImpl
@@ -187,7 +187,7 @@ val appModule = module {
     single<ChildOnboardingStore> { ChildOnboardingStoreImpl(androidContext()) }
     single { ChatMessageStore(androidContext()) }
     single { ChildAlertStore(androidContext(), get()) }
-    single { ParentAlertStore(androidContext(), get()) }
+    single { ServerAlertStore(androidContext(), get()) }
     single { HarmfulSettingsStore(androidContext()) }
     single { ParentWatchStore(androidContext()) }
     single { PushTokenStore(androidContext()) }

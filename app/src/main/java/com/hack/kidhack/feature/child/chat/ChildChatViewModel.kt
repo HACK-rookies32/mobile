@@ -21,14 +21,14 @@ data class ChildChatUiState(
     val draft: String = "",
     val error: String? = null,
 ) {
-    val online: Boolean get() = room?.online == true
     val canSend: Boolean get() = room != null && draft.isNotBlank()
 }
 
 /**
  * 자녀 ↔ 부모 채팅.
  *
- * 채팅 탭 첫 로드 시 [ChatRepository.getOrCreateRoom]으로 roomId를 확보한다.
+ * 채팅 탭 첫 로드 시 [ChatRepository.rooms] 에서 자기 방을 찾는다. 방 생성은 부모만 할 수
+ * 있으므로(서버 제약) 부모가 먼저 대화를 열기 전까지는 방이 없다.
  * 계정 전환 후에도 이전 room을 쓰지 않도록 [boundChildUserId]로 세션을 검증한다.
  */
 class ChildChatViewModel(
@@ -70,13 +70,12 @@ class ChildChatViewModel(
                     ?: error("로그인 정보가 없어요")
                 val childId = user.id.toLongOrNull()
                     ?: error("회원 번호가 올바르지 않아요")
-                val parentId = user.parentId
-                    ?: error("연결된 보호자가 없어요")
-                val room = chatRepository.getOrCreateRoom(parentId, childId)
-                val roomChildId = room.childId
-                if (roomChildId != null && roomChildId != childId) {
-                    error("채팅방 정보가 계정과 맞지 않아요")
-                }
+                // 방 생성(POST /chat/rooms)은 서버에서 PARENT 전용이라 자녀가 부르면 403 이다.
+                // 자녀는 목록(GET /chat/rooms)에서 자기 방을 찾는다. 세션의 parentId 에 기대지도
+                // 않는다 — 로그인 시점에 저장된 값이라 그 뒤에 페어링하면 계속 null 로 남는다.
+                val room = chatRepository.rooms()
+                    .firstOrNull { it.childId == null || it.childId == childId }
+                    ?: error("부모님이 아직 대화를 시작하지 않았어요")
                 cachedRoom = room
                 boundChildUserId = user.id
                 val messages = chatRepository.messages(room.id)
