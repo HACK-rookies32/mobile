@@ -260,25 +260,6 @@
     <string name="parent_notice_title">공지사항</string>
 
     <string name="parent_contact_title">관리자 문의</string>
-    <string name="parent_contact_chat">1:1 채팅 문의</string>
-    <string name="parent_contact_chat_desc">빠른 답변</string>
-    <string name="parent_contact_email">이메일 문의</string>
-    <string name="parent_contact_email_desc">1~2일 이내</string>
-    <string name="parent_contact_phone">전화 상담</string>
-    <string name="parent_contact_phone_desc">평일 9~18시</string>
-    <string name="parent_contact_faq">FAQ</string>
-    <string name="parent_contact_faq_desc">자주 묻는 질문</string>
-    <string name="parent_contact_inquiry_title">문의 제목</string>
-    <string name="parent_contact_inquiry_body">문의 내용</string>
-    <string name="parent_contact_submit">문의 보내기</string>
-    <string name="parent_contact_submitted">문의가 접수되었어요. (로컬 저장, 전송 API 없음)</string>
-    <string name="parent_contact_coming">준비 중이에요</string>
-    <string name="parent_contact_email_address">support@rookies.example.com</string>
-    <string name="parent_contact_phone_number">tel:15880000</string>
-    <string name="parent_contact_faq_q1">페어링 코드는 어디서 받나요?</string>
-    <string name="parent_contact_faq_a1">부모 앱의 자녀 페어링 화면에서 6자리 코드가 표시됩니다. 만료되면 다시 받으세요.</string>
-    <string name="parent_contact_faq_q2">위치는 얼마나 자주 갱신되나요?</string>
-    <string name="parent_contact_faq_a2">자녀 기기가 권한을 허용한 경우 주기적으로 위치가 보고됩니다.</string>
 
     <string name="parent_pay_title">루키즈 페이</string>
     <string name="parent_pay_balance_label">현재 잔액</string>

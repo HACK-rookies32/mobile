@@ -35,7 +35,11 @@ import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
-import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
+import com.hack.kidhack.data.remote.dto.InquiryDetailDto
+import com.hack.kidhack.data.remote.dto.InquiryRequest
+import com.hack.kidhack.data.remote.dto.NoticeDetailDto
+import com.hack.kidhack.data.remote.dto.NoticeDto
+import com.hack.kidhack.data.remote.dto.UploadedFileDto
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdSendCodeRequest
 import com.hack.kidhack.data.remote.dto.FindIdVerifyRequest
@@ -584,15 +588,51 @@ interface AppControlApi {
     ): ApiEnvelope<Boolean>
 }
 
+/**
+ * 1:1 문의 (명세 21) — 본인 문의만 보인다.
+ *
+ * 첨부는 [upload] 로 먼저 올려 받은 `url` 을 [InquiryRequest.attachments] 에 담는다.
+ * 갤러리 URI 를 그대로 보내면 서버에 그 파일이 없다.
+ */
 interface InquiryApi {
     @GET("inquiries")
-    suspend fun getInquiries(): ApiEnvelope<List<InquiryDto>>
+    suspend fun list(
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20,
+    ): ApiEnvelope<PageResponse<InquiryDto>>
 
     @POST("inquiries")
-    suspend fun createInquiry(@Body body: CreateInquiryRequest): ApiEnvelope<InquiryDto>
+    suspend fun create(@Body body: InquiryRequest): ApiEnvelope<InquiryDto>
 
+    /** 본문·첨부·답변은 여기에만 있다. 목록 항목에는 없다. */
     @GET("inquiries/{id}")
-    suspend fun getInquiry(@Path("id") id: String): ApiEnvelope<InquiryDto>
+    suspend fun detail(@Path("id") id: Long): ApiEnvelope<InquiryDetailDto>
+
+    /** 통째로 교체한다. 답변이 달린 문의는 400. */
+    @PUT("inquiries/{id}")
+    suspend fun update(@Path("id") id: Long, @Body body: InquiryRequest): ApiEnvelope<InquiryDto>
+
+    /** 첨부 실물·답변까지 함께 지운다. 답변이 달린 문의는 400. */
+    @DELETE("inquiries/{id}")
+    suspend fun delete(@Path("id") id: Long): ApiEnvelope<Unit>
+
+    @Multipart
+    @POST("inquiries/upload")
+    suspend fun upload(@Part file: MultipartBody.Part): ApiEnvelope<UploadedFileDto>
+}
+
+/** 공지사항 (명세 23) — 열람에 인증이 필요 없다(비로그인 포함 누구나). */
+interface NoticeApi {
+    /** @param keyword 제목 부분 검색(대소문자 무시). 비우면 전체. */
+    @GET("notices")
+    suspend fun list(
+        @Query("keyword") keyword: String? = null,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 10,
+    ): ApiEnvelope<PageResponse<NoticeDto>>
+
+    @GET("notices/{id}")
+    suspend fun detail(@Path("id") id: Long): ApiEnvelope<NoticeDetailDto>
 }
 
 interface PaymentChargeApi {

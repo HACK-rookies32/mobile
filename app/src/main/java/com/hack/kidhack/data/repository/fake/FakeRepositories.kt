@@ -35,6 +35,10 @@ import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryAnswer
+import com.hack.kidhack.domain.model.InquiryDetail
+import com.hack.kidhack.domain.model.Notice
+import com.hack.kidhack.domain.model.NoticeDetail
+import com.hack.kidhack.domain.model.Paged
 import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
 import com.hack.kidhack.domain.model.NotificationSettings
@@ -64,6 +68,7 @@ import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
+import com.hack.kidhack.domain.repository.NoticeRepository
 import com.hack.kidhack.domain.repository.LocationEventRepository
 import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.DeviceRepository
@@ -551,48 +556,105 @@ class FakeCommunityRepository : CommunityRepository {
 
 class FakeInquiryRepository : InquiryRepository {
     private val items = mutableListOf(
-        Inquiry(
-            id = "i1",
+        InquiryDetail(
+            id = "1",
             title = "페어링 코드가 안 나와요",
-            body = "부모 앱에서 버튼을 눌러도 코드가 생성되지 않습니다.",
-            status = "ANSWERED",
-            createdAt = "2024.08.20",
-            answers = listOf(
-                InquiryAnswer("a1", "관리자", "안녕하세요. 앱을 최신 버전으로 업데이트하신 후 다시 시도해 주세요.", "2024.08.21")
-            )
+            content = "부모 앱에서 버튼을 눌러도 코드가 생성되지 않습니다.",
+            answered = true,
+            createdAt = "2024-08-20T10:12:00",
+            answer = InquiryAnswer("1", "안녕하세요. 앱을 최신 버전으로 업데이트하신 후 다시 시도해 주세요.", "2024-08-21T09:00:00"),
         ),
-        Inquiry(
-            id = "i2",
+        InquiryDetail(
+            id = "2",
             title = "위치 추적 간격 설정 문의",
-            body = "위치 추적 간격을 10분보다 짧게 설정할 수 있나요?",
-            status = "PENDING",
-            createdAt = "2024.08.24"
-        )
+            content = "위치 추적 간격을 10분보다 짧게 설정할 수 있나요?",
+            answered = false,
+            createdAt = "2024-08-24T18:30:00",
+        ),
     )
 
-    override suspend fun list(): List<Inquiry> = items.toList()
+    private fun InquiryDetail.summary() = Inquiry(id, title, answered, createdAt, "나")
+
+    override suspend fun list(page: Int): Paged<Inquiry> =
+        Paged(items.map { it.summary() }, page = 0, totalPages = 1)
+
+    override suspend fun get(id: String): InquiryDetail = items.first { it.id == id }
 
     override suspend fun create(
         title: String,
-        body: String,
-        imageUrls: List<String>?,
-        links: List<String>?
+        content: String,
+        attachments: List<String>,
+        linkUrl: String?,
     ): Inquiry {
-        val created = Inquiry(
-            id = "i-${items.size + 1}",
+        val created = InquiryDetail(
+            id = (items.size + 1).toString(),
             title = title,
-            body = body,
-            status = "PENDING",
+            content = content,
+            attachments = attachments,
+            linkUrl = linkUrl,
+            answered = false,
             createdAt = "방금",
-            imageUrls = imageUrls ?: emptyList(),
-            links = links ?: emptyList()
         )
         items.add(0, created)
-        return created
+        return created.summary()
     }
 
-    override suspend fun get(id: String): Inquiry = items.first { it.id == id }
+    override suspend fun update(
+        id: String,
+        title: String,
+        content: String,
+        attachments: List<String>,
+        linkUrl: String?,
+    ): Inquiry {
+        val index = items.indexOfFirst { it.id == id }
+        val updated = items[index].copy(
+            title = title,
+            content = content,
+            attachments = attachments,
+            linkUrl = linkUrl,
+        )
+        items[index] = updated
+        return updated.summary()
+    }
+
+    override suspend fun delete(id: String) {
+        items.removeAll { it.id == id }
+    }
+
+    /** 목 모드에서는 올릴 서버가 없으니 고른 URI 를 그대로 경로처럼 쓴다. */
+    override suspend fun uploadAttachment(uri: String): String = uri
 }
+
+class FakeNoticeRepository : NoticeRepository {
+    private val items = listOf(
+        NoticeDetail(
+            id = "1",
+            title = "[안내] 개인정보처리방침 개정",
+            content = "루키즈 서비스 개인정보처리방침이 개정되었습니다. 자세한 내용은 아래 링크를 참고해 주세요.",
+            links = listOf("https://rookiekids.example.com/privacy"),
+            createdAt = "2024-08-20T09:00:00",
+        ),
+        NoticeDetail(
+            id = "2",
+            title = "루키즈 2.5.0 업데이트 - 유해사이트 감지 강화",
+            content = "키워드 기반 유해사이트 차단이 강화되었습니다.",
+            createdAt = "2024-08-15T09:00:00",
+        ),
+    )
+
+    override suspend fun list(keyword: String?, page: Int): Paged<Notice> {
+        val filtered = items.filter { keyword.isNullOrBlank() || it.title.contains(keyword, ignoreCase = true) }
+        return Paged(
+            filtered.map { Notice(it.id, it.title, it.createdAt, it.attachments.size, it.links.size) },
+            page = 0,
+            totalPages = 1,
+        )
+    }
+
+    override suspend fun get(id: String): NoticeDetail = items.first { it.id == id }
+}
+
+
 
 class FakeWalletRepository : WalletRepository {
     private var balance = 45_000

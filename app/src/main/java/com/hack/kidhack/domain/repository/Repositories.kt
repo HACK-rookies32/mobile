@@ -1,30 +1,34 @@
 package com.hack.kidhack.domain.repository
 
 import androidx.paging.PagingData
-import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.Activity
 import com.hack.kidhack.domain.model.ActivityType
 import com.hack.kidhack.domain.model.Allowance
 import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
+import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
-import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
-import com.hack.kidhack.domain.model.ChildPhoto
+import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.ChildDashboard
+import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
-import com.hack.kidhack.domain.model.InstalledApp
 import com.hack.kidhack.domain.model.Inquiry
+import com.hack.kidhack.domain.model.InquiryDetail
+import com.hack.kidhack.domain.model.InstalledApp
 import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
+import com.hack.kidhack.domain.model.Notice
+import com.hack.kidhack.domain.model.NoticeDetail
 import com.hack.kidhack.domain.model.NotificationSettings
+import com.hack.kidhack.domain.model.Paged
 import com.hack.kidhack.domain.model.PairingCode
 import com.hack.kidhack.domain.model.Payment
 import com.hack.kidhack.domain.model.PointBalance
@@ -32,13 +36,13 @@ import com.hack.kidhack.domain.model.PointHistory
 import com.hack.kidhack.domain.model.Post
 import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.Role
-import com.hack.kidhack.domain.model.SentCode
 import com.hack.kidhack.domain.model.Screenshot
+import com.hack.kidhack.domain.model.SentCode
 import com.hack.kidhack.domain.model.Session
+import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
-import com.hack.kidhack.domain.model.TransferResult
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 
@@ -289,9 +293,34 @@ interface CommunityRepository {
 }
 
 interface InquiryRepository {
-    suspend fun list(): List<Inquiry>
-    suspend fun create(title: String, body: String, imageUrls: List<String>? = null, links: List<String>? = null): Inquiry
-    suspend fun get(id: String): Inquiry
+    suspend fun list(page: Int = 0): Paged<Inquiry>
+
+    /** 본문·첨부·답변은 상세에만 있다. */
+    suspend fun get(id: String): InquiryDetail
+
+    /**
+     * 문의 등록.
+     *
+     * @param attachments [uploadAttachment] 로 받은 공개 경로들. 로컬 URI 를 넣으면 안 된다.
+     * @param linkUrl 서버가 링크를 하나만 받는다.
+     */
+    suspend fun create(title: String, content: String, attachments: List<String>, linkUrl: String?): Inquiry
+
+    /** 통째로 교체한다. 답변이 달린 문의는 서버가 400 으로 막는다. */
+    suspend fun update(id: String, title: String, content: String, attachments: List<String>, linkUrl: String?): Inquiry
+
+    /** 첨부 실물·답변까지 함께 지워진다. 답변이 달린 문의는 400. */
+    suspend fun delete(id: String)
+
+    /** 파일 하나를 올리고 공개 경로를 받는다. */
+    suspend fun uploadAttachment(uri: String): String
+}
+
+/** 공지사항. 열람에 로그인이 필요 없다. */
+interface NoticeRepository {
+    /** @param keyword 제목 부분 검색. 비우면 전체. */
+    suspend fun list(keyword: String? = null, page: Int = 0): Paged<Notice>
+    suspend fun get(id: String): NoticeDetail
 }
 
 interface WalletRepository {

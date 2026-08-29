@@ -26,8 +26,11 @@ fun ParentNoticeScreen(
     ) {
         NoticeBody(
             state = state,
+            onKeyword = viewModel::onKeyword,
+            onSearch = viewModel::refresh,
             onOpen = viewModel::open,
             onClose = viewModel::close,
+            onLoadMore = viewModel::loadMore,
         )
     }
 }

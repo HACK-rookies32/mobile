@@ -5,6 +5,7 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
 import android.content.Context
+import android.net.Uri
 import com.hack.kidhack.core.common.DeviceId
 import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.remote.api.AllowanceApi
@@ -18,6 +19,7 @@ import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.InquiryApi
+import com.hack.kidhack.data.remote.api.NoticeApi
 import com.hack.kidhack.data.remote.api.DashboardApi
 import com.hack.kidhack.data.remote.api.DeviceApi
 import com.hack.kidhack.data.remote.api.LocationApi
@@ -52,7 +54,7 @@ import com.hack.kidhack.data.remote.dto.CheckoutRequest
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
 import com.hack.kidhack.data.remote.dto.CreateChatRoomRequest
-import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
+import com.hack.kidhack.data.remote.dto.InquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
 import com.hack.kidhack.data.remote.dto.FindIdSendCodeRequest
 import com.hack.kidhack.data.remote.dto.FindIdVerifyRequest
@@ -99,6 +101,10 @@ import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
+import com.hack.kidhack.domain.model.InquiryDetail
+import com.hack.kidhack.domain.model.Notice
+import com.hack.kidhack.domain.model.NoticeDetail
+import com.hack.kidhack.domain.model.Paged
 import com.hack.kidhack.domain.model.InstalledApp
 import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
@@ -128,6 +134,7 @@ import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
+import com.hack.kidhack.domain.repository.NoticeRepository
 import com.hack.kidhack.domain.repository.LocationEventRepository
 import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.DeviceRepository
@@ -151,6 +158,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -518,19 +526,88 @@ class RealCommunityRepository(private val api: CommunityApi) : CommunityReposito
     }
 }
 
-class RealInquiryRepository(private val api: InquiryApi) : InquiryRepository {
-    override suspend fun list(): List<Inquiry> =
-        api.getInquiries().unwrap().map { it.toDomain() }
+/**
+ * 1:1 문의 (명세 21).
+ *
+ * 첨부는 반드시 [uploadAttachment] 로 먼저 올린다. 예전 코드는 갤러리에서 고른
+ * `content://` URI 를 그대로 등록 본문에 실어 보냈는데, 서버에는 그런 파일이 없다.
+ */
+class RealInquiryRepository(
+    private val api: InquiryApi,
+    private val context: Context,
+) : InquiryRepository {
+
+    override suspend fun list(page: Int): Paged<Inquiry> {
+        val res = api.list(page = page).unwrap()
+        return Paged(res.content.map { it.toDomain() }, res.page, res.totalPages)
+    }
+
+    override suspend fun get(id: String): InquiryDetail =
+        api.detail(id.toServerId()).unwrap().toDomain()
 
     override suspend fun create(
         title: String,
-        body: String,
-        imageUrls: List<String>?,
-        links: List<String>?
-    ): Inquiry = api.createInquiry(CreateInquiryRequest(title, body, imageUrls, links)).unwrap().toDomain()
+        content: String,
+        attachments: List<String>,
+        linkUrl: String?,
+    ): Inquiry = api.create(InquiryRequest(title, content, attachments, linkUrl?.ifBlank { null }))
+        .unwrap().toDomain()
 
-    override suspend fun get(id: String): Inquiry =
-        api.getInquiry(id).unwrap().toDomain()
+    override suspend fun update(
+        id: String,
+        title: String,
+        content: String,
+        attachments: List<String>,
+        linkUrl: String?,
+    ): Inquiry = api.update(id.toServerId(), InquiryRequest(title, content, attachments, linkUrl?.ifBlank { null }))
+        .unwrap().toDomain()
+
+    override suspend fun delete(id: String) {
+        api.delete(id.toServerId()).unwrap()
+    }
+
+    override suspend fun uploadAttachment(uri: String): String {
+        val parsed = Uri.parse(uri)
+        val resolver = context.contentResolver
+        val bytes = resolver.openInputStream(parsed)?.use { it.readBytes() }
+            ?: throw IllegalStateException("첨부 파일을 읽을 수 없습니다")
+        val mime = resolver.getType(parsed) ?: "application/octet-stream"
+        val part = MultipartBody.Part.createFormData(
+            "file",
+            resolver.displayName(parsed),
+            bytes.toRequestBody(mime.toMediaTypeOrNull()),
+        )
+        return api.upload(part).unwrap().url
+    }
+
+    /**
+     * 업로드에 쓸 파일 이름.
+     *
+     * `content://` URI 의 마지막 조각은 보통 숫자 id 라 확장자가 없다. 서버가 확장자로
+     * 종류를 판단하므로(첨부가 이미지인지 앱도 확장자로 본다) 이름을 못 얻으면
+     * MIME 서브타입으로 확장자를 만들어 붙인다.
+     */
+    private fun android.content.ContentResolver.displayName(uri: Uri): String {
+        val fromCursor = runCatching {
+            query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        }.getOrNull()
+        if (!fromCursor.isNullOrBlank()) return fromCursor
+        val suffix = getType(uri)?.substringAfter('/')?.takeIf { it.isNotBlank() } ?: "bin"
+        return "attachment." + suffix
+    }
+}
+
+/** 공지사항 (명세 23). 열람에 로그인이 필요 없다. */
+class RealNoticeRepository(private val api: NoticeApi) : NoticeRepository {
+
+    override suspend fun list(keyword: String?, page: Int): Paged<Notice> {
+        val res = api.list(keyword = keyword?.ifBlank { null }, page = page).unwrap()
+        return Paged(res.content.map { it.toDomain() }, res.page, res.totalPages)
+    }
+
+    override suspend fun get(id: String): NoticeDetail =
+        api.detail(id.toServerId()).unwrap().toDomain()
 }
 
 class RealWalletRepository(
@@ -768,9 +845,9 @@ class RealCommandRepository(
     }
 }
 
-/** 위치 API body의 `childId`는 숫자다. 숫자가 아니면 엉뚱한 대상으로 보내지 말고 실패시킨다. */
+/** 서버 식별자는 숫자다(childId·문의 id·공지 id). 숫자가 아니면 엉뚱한 대상으로 보내지 말고 실패시킨다. */
 private fun String.toServerId(): Long =
-    toLongOrNull() ?: throw IllegalStateException("childId는 숫자 형식이어야 합니다: $this")
+    toLongOrNull() ?: throw IllegalStateException("서버 id 는 숫자 형식이어야 합니다: $this")
 
 /** 장소 좌표도 서버에서는 숫자다. (0.0, 0.0)으로 조용히 등록되는 것을 막는다. */
 private fun String.toServerCoordinate(label: String): Double =

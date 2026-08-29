@@ -33,6 +33,7 @@ import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.DashboardApi
 import com.hack.kidhack.data.remote.api.DeviceApi
 import com.hack.kidhack.data.remote.api.InquiryApi
+import com.hack.kidhack.data.remote.api.NoticeApi
 import com.hack.kidhack.data.remote.api.LocationApi
 import com.hack.kidhack.data.remote.api.LocationEventApi
 import com.hack.kidhack.data.remote.api.NotificationApi
@@ -63,6 +64,7 @@ import com.hack.kidhack.data.repository.fake.FakeChildRepository
 import com.hack.kidhack.data.repository.fake.FakeCommandRepository
 import com.hack.kidhack.data.repository.fake.FakeCommunityRepository
 import com.hack.kidhack.data.repository.fake.FakeInquiryRepository
+import com.hack.kidhack.data.repository.fake.FakeNoticeRepository
 import com.hack.kidhack.data.repository.fake.FakeLocationEventRepository
 import com.hack.kidhack.data.repository.fake.FakeDashboardRepository
 import com.hack.kidhack.data.repository.fake.FakeLocationRepository
@@ -88,6 +90,7 @@ import com.hack.kidhack.data.repository.real.RealChildRepository
 import com.hack.kidhack.data.repository.real.RealCommandRepository
 import com.hack.kidhack.data.repository.real.RealCommunityRepository
 import com.hack.kidhack.data.repository.real.RealInquiryRepository
+import com.hack.kidhack.data.repository.real.RealNoticeRepository
 import com.hack.kidhack.data.repository.real.RealLocationEventRepository
 import com.hack.kidhack.data.repository.real.RealDashboardRepository
 import com.hack.kidhack.data.repository.real.RealLocationRepository
@@ -116,6 +119,7 @@ import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.CommunityRepository
 import com.hack.kidhack.domain.repository.InquiryRepository
+import com.hack.kidhack.domain.repository.NoticeRepository
 import com.hack.kidhack.domain.repository.LocationEventRepository
 import com.hack.kidhack.domain.repository.DashboardRepository
 import com.hack.kidhack.domain.repository.LocationRepository
@@ -259,6 +263,7 @@ val appModule = module {
     single { get<Retrofit>().create(PhotoApi::class.java) }
     single { get<Retrofit>().create(AppControlApi::class.java) }
     single { get<Retrofit>().create(InquiryApi::class.java) }
+    single { get<Retrofit>().create(NoticeApi::class.java) }
     single { get<Retrofit>().create(PaymentChargeApi::class.java) }
     single { get<Retrofit>().create(WalletApi::class.java) }
     single { get<Retrofit>().create(CardApi::class.java) }
@@ -294,7 +299,10 @@ val appModule = module {
         if (useMock) FakeCommunityRepository() else RealCommunityRepository(get())
     }
     single<InquiryRepository> {
-        if (useMock) FakeInquiryRepository() else RealInquiryRepository(get())
+        if (useMock) FakeInquiryRepository() else RealInquiryRepository(get(), androidContext())
+    }
+    single<NoticeRepository> {
+        if (useMock) FakeNoticeRepository() else RealNoticeRepository(get())
     }
     single { ChatWebSocketClient(get(), BuildConfig.BASE_URL) }
     // 로그인 중 콜드 스타트용 캐시. 로그아웃 시 AuthRepository가 ChatMessageStore를 비운다.
@@ -355,7 +363,7 @@ val appModule = module {
     viewModel { CommunityListViewModel(get()) }
     viewModel { params -> CommunityDetailViewModel(params.get(), get(), get()) }
     viewModel { CommunityWriteViewModel(get()) }
-    viewModel { NoticeViewModel() }
+    viewModel { NoticeViewModel(get()) }
     viewModel { ContactViewModel(get<InquiryRepository>()) }
     viewModel { PayViewModel(get(), get(), get()) }
     viewModel { CardViewModel(get()) }

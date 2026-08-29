@@ -176,23 +176,68 @@ data class Comment(
     val createdAt: String,
 )
 
+/**
+ * 문의 목록 항목. 서버 목록 응답에는 **본문·첨부가 없다** — [InquiryDetail] 로 따로 받는다.
+ */
 data class Inquiry(
     val id: String,
     val title: String,
-    val body: String,
-    val status: String, // PENDING, ANSWERED
+    /** 답변 완료 여부. 답변이 달리면 수정·삭제가 막힌다(서버 400). */
+    val answered: Boolean,
     val createdAt: String,
-    val imageUrls: List<String> = emptyList(),
-    val links: List<String> = emptyList(),
-    val answers: List<InquiryAnswer> = emptyList(),
+    val authorNickname: String = "",
+)
+
+data class InquiryDetail(
+    val id: String,
+    val title: String,
+    val content: String,
+    /** 첨부 공개 경로. 화면에서 절대 URL 로 바꿔 연다. */
+    val attachments: List<String> = emptyList(),
+    /** 서버가 링크를 하나만 받는다. */
+    val linkUrl: String? = null,
+    val answered: Boolean = false,
+    val createdAt: String = "",
+    val answer: InquiryAnswer? = null,
 )
 
 data class InquiryAnswer(
     val id: String,
-    val author: String,
-    val body: String,
+    val content: String,
     val createdAt: String,
 )
+
+/** 공지 목록 항목. 본문은 [NoticeDetail] 에 있고 여기엔 첨부·링크 개수만 온다. */
+data class Notice(
+    val id: String,
+    val title: String,
+    val createdAt: String,
+    val attachmentCount: Int = 0,
+    val linkCount: Int = 0,
+)
+
+data class NoticeDetail(
+    val id: String,
+    val title: String,
+    val content: String,
+    val attachments: List<String> = emptyList(),
+    val links: List<String> = emptyList(),
+    val createdAt: String = "",
+)
+
+/**
+ * 페이지 단위 조회 결과.
+ *
+ * 목록이 길어질 수 있는 공지·문의가 쓴다. 화면은 [items] 를 이어 붙이고
+ * [hasMore] 로 「더 보기」를 보일지 정한다.
+ */
+data class Paged<T>(
+    val items: List<T>,
+    val page: Int = 0,
+    val totalPages: Int = 1,
+) {
+    val hasMore: Boolean get() = page + 1 < totalPages
+}
 
 data class ChatRoom(
     val id: String,
