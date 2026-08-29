@@ -18,15 +18,15 @@ import java.util.concurrent.TimeUnit
  * 앱이 꺼져 있어도 부모가 알림을 받게 하는 백업 경로.
  *
  * FCM 을 쓰지 않으므로 15분(WorkManager 최소 주기)마다 서버 알림 목록을 긁어와
- * 새 알림만 푸시로 띄운다. 앱을 켜 두었을 때는 화면 새로고침이 같은 [ParentAlertSync] 를
+ * 새 알림만 푸시로 띄운다. 앱을 켜 두었을 때는 화면 새로고침이 같은 [ServerAlertSync] 를
  * 먼저 실행하므로 여기서는 대부분 새 알림 없이 끝난다.
  */
-class ParentAlertPollWorker(
+class ServerAlertPollWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params), KoinComponent {
 
-    private val alertSync: ParentAlertSync by inject()
+    private val alertSync: ServerAlertSync by inject()
     private val watcher: ParentChildWatcher by inject()
 
     override suspend fun doWork(): Result {
@@ -41,7 +41,7 @@ class ParentAlertPollWorker(
         private const val UNIQUE_NOW = "kidhack.parent.alert.poll.now"
 
         fun enqueuePeriodic(context: Context) {
-            val request = PeriodicWorkRequestBuilder<ParentAlertPollWorker>(15, TimeUnit.MINUTES)
+            val request = PeriodicWorkRequestBuilder<ServerAlertPollWorker>(15, TimeUnit.MINUTES)
                 .setConstraints(networkConstraints())
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
@@ -53,7 +53,7 @@ class ParentAlertPollWorker(
 
         /** 로그인 직후처럼 15분을 기다릴 수 없을 때 한 번 바로 돌린다. */
         fun enqueueNow(context: Context) {
-            val request = OneTimeWorkRequestBuilder<ParentAlertPollWorker>()
+            val request = OneTimeWorkRequestBuilder<ServerAlertPollWorker>()
                 .setConstraints(networkConstraints())
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(

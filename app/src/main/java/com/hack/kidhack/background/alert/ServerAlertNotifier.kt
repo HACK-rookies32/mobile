@@ -14,14 +14,14 @@ import com.hack.kidhack.core.permission.KidhackPermissions
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.NotificationSettings
 import com.hack.kidhack.domain.model.body
-import com.hack.kidhack.domain.model.title
+import com.hack.kidhack.domain.model.displayTitle
 
 /**
  * 부모 기기에 자녀 안전 알림을 푸시로 띄운다.
  *
  * 알림을 누르면 [MainActivity] 가 알림 탭으로 이동시킨다(라우팅은 `KidhackNavHost`).
  */
-class ParentAlertNotifier(private val context: Context) {
+class ServerAlertNotifier(private val context: Context) {
 
     /**
      * @return 실제로 띄운 알림들. 알림 권한이 없거나 수신 설정이 꺼져 있으면 비어 있다.
@@ -31,16 +31,16 @@ class ParentAlertNotifier(private val context: Context) {
         settings: NotificationSettings?,
     ): List<AppNotification> {
         if (alerts.isEmpty() || !canPostNotifications()) return emptyList()
-        ParentNotifications.ensureChannel(context)
+        ServerAlertNotifications.ensureChannel(context)
         val allowed = alerts.filter { settings == null || settings.allows(it.type) }
         allowed.forEach { notify(it) }
         return allowed
     }
 
     private fun notify(alert: AppNotification) {
-        val title = alert.title.ifBlank { context.getString(R.string.parent_alert_default_title) }
-        val body = alert.body.ifBlank { alert.title }
-        val notification = NotificationCompat.Builder(context, ParentNotifications.CHANNEL_ID)
+        val title = alert.displayTitle.ifBlank { context.getString(R.string.parent_alert_default_title) }
+        val body = alert.body.ifBlank { alert.displayTitle }
+        val notification = NotificationCompat.Builder(context, ServerAlertNotifications.CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
@@ -52,7 +52,7 @@ class ParentAlertNotifier(private val context: Context) {
             .build()
 
         NotificationManagerCompat.from(context)
-            .notify(ParentNotifications.alertNotificationId(alert.id), notification)
+            .notify(ServerAlertNotifications.alertNotificationId(alert.id), notification)
     }
 
     private fun contentIntent(alert: AppNotification): PendingIntent {
@@ -63,7 +63,7 @@ class ParentAlertNotifier(private val context: Context) {
         }
         return PendingIntent.getActivity(
             context,
-            ParentNotifications.alertNotificationId(alert.id),
+            ServerAlertNotifications.alertNotificationId(alert.id),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

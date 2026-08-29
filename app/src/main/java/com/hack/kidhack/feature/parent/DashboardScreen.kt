@@ -43,7 +43,7 @@ import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
 import com.hack.kidhack.core.permission.KidhackPermissions
 import com.hack.kidhack.permissionRequester
-import com.hack.kidhack.background.alert.ParentAlertSync
+import com.hack.kidhack.background.alert.ServerAlertSync
 import com.hack.kidhack.background.alert.ParentChildWatcher
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidCard
@@ -104,7 +104,7 @@ class DashboardViewModel(
     private val appUsageRepository: AppUsageRepository,
     private val appControlRepository: AppControlRepository,
     private val dashboardRepository: DashboardRepository,
-    private val alertSync: ParentAlertSync,
+    private val alertSync: ServerAlertSync,
     private val childWatcher: ParentChildWatcher,
     private val sessionRepository: SessionRepository,
 ) : ViewModel() {

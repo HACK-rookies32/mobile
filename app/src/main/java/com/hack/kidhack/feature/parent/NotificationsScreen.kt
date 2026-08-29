@@ -27,7 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.BuildConfig
 import com.hack.kidhack.R
-import com.hack.kidhack.background.alert.ParentAlertSync
+import com.hack.kidhack.background.alert.ServerAlertSync
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
@@ -47,6 +47,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import com.hack.kidhack.domain.model.displayTitle
+import com.hack.kidhack.domain.model.body
 
 data class NotificationsUiState(
     val settings: NotificationSettings = NotificationSettings(true, true, false, true),
@@ -59,7 +61,7 @@ data class NotificationsUiState(
 
 class NotificationsViewModel(
     private val userRepository: UserRepository,
-    private val alertSync: ParentAlertSync,
+    private val alertSync: ServerAlertSync,
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
 ) : ViewModel() {
@@ -87,7 +89,7 @@ class NotificationsViewModel(
     /**
      * 알림 테스트 버튼(디버그 빌드 전용).
      *
-     * 서버 폴링과 같은 경로([ParentAlertSync.emitLocal])를 타므로 「최근 알림에 영구 기록 +
+     * 서버 폴링과 같은 경로([ServerAlertSync.emitLocal])를 타므로 「최근 알림에 영구 기록 +
      * 푸시 표시」가 실제로 되는지 그대로 확인할 수 있다. 목록을 다시 읽되 읽음 처리는 하지
      * 않는다 — 대시보드의 미확인 건수가 오르는 것까지 봐야 하기 때문이다.
      */
@@ -228,19 +230,36 @@ private fun NotificationCard(n: AppNotification) {
             "HARMFUL_SITE" -> "🚫"
             "PAYMENT_APPROVED" -> "💳"
             "PAYMENT_CANCELED" -> "↩️"
+            "CHAT_MESSAGE" -> "💬"
+            "SCREEN_TIME_LIMIT" -> "⏰"
+            "APP_USAGE" -> "📊"
+            "NOTICE" -> "📢"
+            "INQUIRY_ANSWERED" -> "📮"
+            "ALLOWANCE_RECEIVED" -> "💰"
+            "ALLOWANCE_RECLAIMED" -> "↪️"
             else -> "🔔"
         }
         Row(verticalAlignment = Alignment.Top) {
             Text(icon, fontSize = 20.sp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
+                // 서버가 제목을 준다(#150 이후). 없으면 message 첫 줄로 떨어진다.
                 Text(
-                    text = n.message,
+                    text = n.displayTitle,
                     fontFamily = KidhackFontFamily,
-                    fontWeight = FontSemibold,
+                    fontWeight = FontBold,
                     fontSize = 14.sp,
                     color = colors.text,
                 )
+                if (n.body.isNotBlank()) {
+                    Text(
+                        text = n.body,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontSemibold,
+                        fontSize = 13.sp,
+                        color = colors.muted,
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = n.createdAt,

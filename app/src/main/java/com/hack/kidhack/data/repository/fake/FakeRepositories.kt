@@ -369,16 +369,39 @@ class FakeChildAlertRepository(private val feed: MockNotificationFeed) : ChildAl
 }
 
 class FakeNotificationRepository(private val feed: MockNotificationFeed) : NotificationRepository {
+    /** 목업 피드에는 읽음 상태가 없어 여기서 들고 있는다. 화면이 읽음 처리 결과를 확인할 수 있어야 한다. */
+    private val readIds = mutableSetOf<String>()
+
     override suspend fun list(recipientId: String, childId: String?): List<AppNotification> =
         (feed.all() + SAMPLES)
             .filter { childId == null || it.childId == null || it.childId == childId }
+            .map { if (it.id in readIds) it.copy(read = true) else it }
 
-    override suspend fun markRead(notificationId: String) {}
+    override suspend fun markRead(notificationId: String) {
+        readIds += notificationId
+    }
+
+    override suspend fun markAllRead(recipientId: String): Int {
+        val unread = list(recipientId).filterNot { it.read }
+        readIds += unread.map { it.id }
+        return unread.size
+    }
+
+    override suspend fun unreadCount(recipientId: String): Int =
+        list(recipientId).count { !it.read }
 
     private companion object {
         val SAMPLES = listOf(
-            AppNotification("n1", "LOCATION", "민준이가 '학교' 구역을 벗어났습니다.", "14:20", false, FakeData.minjun.id),
-            AppNotification("n2", "HARMFUL", "지아의 부적절한 사이트 접속 시도가 차단되었습니다.", "12:05", true, FakeData.jia.id),
+            AppNotification(
+                id = "n1", type = "LOCATION_EXIT", title = "장소 이탈",
+                message = "민준이가 '학교' 구역을 벗어났습니다.", createdAt = "14:20",
+                read = false, childId = FakeData.minjun.id,
+            ),
+            AppNotification(
+                id = "n2", type = "HARMFUL_SITE", title = "유해 접속 감지",
+                message = "지아의 부적절한 사이트 접속 시도가 차단되었습니다.", createdAt = "12:05",
+                read = true, childId = FakeData.jia.id,
+            ),
         )
     }
 }
@@ -631,7 +654,6 @@ class FakeChatRepository(
                 title = "이지아",
                 lastMessage = "아직 대화가 없어요",
                 lastAt = "",
-                online = false,
                 parentId = parentId,
                 childId = childId,
             )
@@ -640,7 +662,6 @@ class FakeChatRepository(
                 title = "김민준",
                 lastMessage = "학원 끝나요",
                 lastAt = "14:32",
-                online = true,
                 parentId = parentId,
                 childId = childId,
             )
@@ -649,8 +670,8 @@ class FakeChatRepository(
 
     /** 방 제목은 보는 쪽 기준으로 바뀐다 — 부모는 자녀 이름을, 자녀는 보호자 이름을 본다. */
     override suspend fun rooms(): List<ChatRoom> = listOf(
-        ChatRoom("room-minjun", "김민준", "학원 끝나요", "14:32", true, parentId = 1L, childId = 101L),
-        ChatRoom("room-jia", "이지아", "아직 대화가 없어요", "", false, parentId = 1L, childId = 102L),
+        ChatRoom("room-minjun", "김민준", "학원 끝나요", "14:32", unreadCount = 2, parentId = 1L, childId = 101L),
+        ChatRoom("room-jia", "이지아", "아직 대화가 없어요", "", unreadCount = 0, parentId = 1L, childId = 102L),
     )
 
     override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> =
@@ -840,6 +861,19 @@ class FakeAppControlRepository : AppControlRepository {
     override suspend fun deleteRule(ruleId: String) {
         db.removeAll { it.ruleId == ruleId }
     }
+
+    /** 자녀당 한도. null 이면 제한 없음 — 목업도 서버와 같은 규약을 지킨다. */
+    private val screenTimeLimits = mutableMapOf<String, Int?>()
+
+    override suspend fun screenTimeLimit(childId: String): Int? = screenTimeLimits[childId]
+
+    override suspend fun setScreenTimeLimit(childId: String, dailyLimitMinutes: Int?): Int? {
+        screenTimeLimits[childId] = dailyLimitMinutes
+        return dailyLimitMinutes
+    }
+
+    override suspend fun reportScreenTimeReached(childId: String, usedMinutes: Int): Boolean =
+        screenTimeLimits[childId] != null
 }
 
 /**

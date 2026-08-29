@@ -29,8 +29,12 @@ import java.util.concurrent.atomic.AtomicInteger
  * STOMP over SockJS client for Spring endpoint `/ws-chat`.
  *
  * - CONNECT → `{origin}/ws-chat/websocket`
- * - SUBSCRIBE → `/topic/chat/{roomId}`
- * - SEND → `/app/chat/{roomId}` body `{ senderId, content }`
+ * - SUBSCRIBE → `/sub/chat/{roomId}`
+ * - SEND → `/pub/chat/{roomId}` body `{ senderId, content }`
+ *
+ * 서버 WebSocketConfig 가 `enableSimpleBroker("/sub")` + `setApplicationDestinationPrefixes("/pub")`
+ * 다. Spring 기본값인 `/topic`·`/app` 을 쓰면 **구독도 발행도 아무 데도 닿지 않는다** —
+ * 연결은 되므로 오류 없이 조용히 메시지만 오가지 않는다.
  */
 class ChatWebSocketClient(
     private val sessionRepository: SessionRepository,
@@ -100,7 +104,7 @@ class ChatWebSocketClient(
                 return@launch
             }
             disposables.add(
-                client.send("/app/chat/$roomId", body)
+                client.send("/pub/chat/$roomId", body)
                     .subscribe(
                         { _events.tryEmit(ChatWsEvent.Send(roomId, content)) },
                         { t ->
@@ -199,7 +203,7 @@ class ChatWebSocketClient(
         }
         synchronized(this) {
             topicDisposable?.dispose()
-            topicDisposable = client.topic("/topic/chat/$roomId").subscribe(
+            topicDisposable = client.topic("/sub/chat/$roomId").subscribe(
                 { message ->
                     Log.d(TAG, "stomp recv room=$roomId payload=${message.payload}")
                     val payload = runCatching {
@@ -240,7 +244,7 @@ class ChatWebSocketClient(
                 },
             )
             topicDisposable?.let { disposables.add(it) }
-            Log.d(TAG, "stomp subscribed /topic/chat/$roomId")
+            Log.d(TAG, "stomp subscribed /sub/chat/$roomId")
         }
     }
 

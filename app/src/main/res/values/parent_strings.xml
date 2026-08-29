@@ -52,8 +52,6 @@
     <string name="parent_chat_title">채팅</string>
     <string name="parent_chat_input_hint">메시지 입력...</string>
     <string name="parent_chat_send">→</string>
-    <string name="parent_chat_online">● 온라인</string>
-    <string name="parent_chat_offline">오프라인</string>
     <string name="parent_chat_empty_rooms">아직 채팅방이 없어요</string>
     <string name="parent_chat_send_error">메시지 전송에 실패했어요</string>
 
@@ -143,6 +141,13 @@
     <string name="parent_editprofile_saved">저장했어요</string>
 
     <string name="parent_appcontrol_title">앱 통제</string>
+    <string name="parent_appcontrol_daily_limit">하루 총 사용 한도</string>
+    <string name="parent_appcontrol_daily_limit_desc">아래 앱별 한도와 별개예요. 한도에 닿으면 자녀 기기에서 다른 앱이 열리지 않아요.</string>
+    <string name="parent_appcontrol_daily_limit_label">한도 (분)</string>
+    <string name="parent_appcontrol_daily_limit_hint">예: 180</string>
+    <string name="parent_appcontrol_daily_limit_save">저장</string>
+    <string name="parent_appcontrol_daily_limit_saving">저장 중...</string>
+    <string name="parent_appcontrol_daily_limit_none">지금은 제한이 없어요. 비워 두고 저장하면 제한이 풀려요.</string>
     <string name="parent_filter_all">전체</string>
     <string name="parent_filter_blocked">차단</string>
     <string name="parent_filter_allowed">허용</string>
@@ -310,9 +315,6 @@
     <string name="parent_notif_test_notice">공지 알림 보내기</string>
     <string name="parent_notif_test_notice_title">새 공지가 등록됐어요</string>
     <string name="parent_notif_test_notice_body">루키즈 업데이트 안내를 확인해 주세요.</string>
-
-    <string name="parent_alert_channel">자녀 안전 알림</string>
-    <string name="parent_alert_channel_desc">안전 구역 이탈·유해 사이트 차단처럼 바로 확인해야 하는 알림</string>
     <string name="parent_alert_default_title">새 알림이 도착했어요</string>
     <string name="parent_alert_permission_rationale">알림을 켜면 안전 구역 이탈·유해 사이트 차단을 바로 받아볼 수 있어요</string>
 

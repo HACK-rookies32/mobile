@@ -12,7 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.hack.kidhack.BuildConfig
-import com.hack.kidhack.background.alert.ParentAlertBus
+import com.hack.kidhack.background.alert.ServerAlertBus
 import com.hack.kidhack.background.command.ChildCommandBus
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.data.repository.fake.FakeData
@@ -29,7 +29,7 @@ fun KidhackNavHost() {
     val sessionRepository = koin.get<SessionRepository>()
     val sessionEvents = koin.get<SessionEvents>()
     val commandBus = koin.get<ChildCommandBus>()
-    val parentAlertBus = koin.get<ParentAlertBus>()
+    val serverAlertBus = koin.get<ServerAlertBus>()
     val navController = rememberNavController()
     val colors = LocalKidhackColors.current
 
@@ -72,17 +72,24 @@ fun KidhackNavHost() {
         }
     }
 
-    // 부모 안전 알림 푸시 탭 → 알림 탭. 탭 위에 쌓지 않고 부모 그래프 최상위로 연다.
+    // 서버 알림 팝업 탭 → 알림이 보이는 화면. 탭 위에 쌓지 않고 그래프 최상위로 연다.
+    // 자녀에게는 알림 탭이 없어 「최근 알림」이 있는 홈으로 보낸다.
     LaunchedEffect(Unit) {
-        parentAlertBus.pending.collect {
-            if (sessionRepository.current()?.user?.role == Role.PARENT) {
-                navController.navigate(Route.ParentNotifications.path) {
+        serverAlertBus.pending.collect {
+            when (sessionRepository.current()?.user?.role) {
+                Role.PARENT -> navController.navigate(Route.ParentNotifications.path) {
                     popUpTo(Route.ParentGraph.path) { saveState = true }
                     launchSingleTop = true
                     restoreState = false
                 }
+                Role.CHILD -> navController.navigate(Route.ChildHome.path) {
+                    popUpTo(Route.ChildGraph.path) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = false
+                }
+                null -> Unit
             }
-            parentAlertBus.consume()
+            serverAlertBus.consume()
         }
     }
 

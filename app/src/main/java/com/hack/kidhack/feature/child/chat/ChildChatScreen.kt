@@ -109,13 +109,16 @@ fun ChildChatScreen(
                         fontWeight = FontBold,
                         fontSize = 16.sp,
                     )
-                    Text(
-                        text = stringResource(
-                            if (state.online) R.string.child_chat_online else R.string.child_chat_offline,
-                        ),
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 12.sp,
-                    )
+                    // 서버 ChatRoomSummaryResponse 에 접속 여부가 없어 온라인 표시를 걷어냈다.
+                    // 실제로 주는 값은 안 읽음 수라 그것을 보여 준다.
+                    val unread = state.room?.unreadCount ?: 0
+                    if (unread > 0) {
+                        Text(
+                            text = stringResource(R.string.child_chat_unread, unread),
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 12.sp,
+                        )
+                    }
                 }
             }
         }

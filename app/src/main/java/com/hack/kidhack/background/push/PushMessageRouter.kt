@@ -2,7 +2,7 @@ package com.hack.kidhack.background.push
 
 import android.content.Context
 import com.hack.kidhack.R
-import com.hack.kidhack.background.alert.ParentAlertSync
+import com.hack.kidhack.background.alert.ServerAlertSync
 import com.hack.kidhack.background.command.ChildCommandBus
 import com.hack.kidhack.background.command.ChildCommandNotifier
 import com.hack.kidhack.core.common.KoreanParticles
@@ -20,7 +20,7 @@ import com.hack.kidhack.domain.repository.SessionRepository
  *
  * 두 갈래다.
  *
- * - **보호자 알림**([PushMessage.Kind.PARENT_ALERT]) → [ParentAlertSync.recordRemote].
+ * - **보호자 알림**([PushMessage.Kind.PARENT_ALERT]) → [ServerAlertSync.recordRemote].
  *   보관함에 영구 기록 + 헤드업 푸시 + 대시보드 「최근 알림」 즉시 반영이 한 번에 된다.
  *   폴링 경로와 **완전히 같은 함수**를 쓰므로, FCM 과 15분 폴링이 같은 알림을 둘 다 물어와도
  *   id 로 합쳐져 중복 푸시가 없다.
@@ -36,7 +36,7 @@ import com.hack.kidhack.domain.repository.SessionRepository
 class PushMessageRouter(
     private val context: Context,
     private val sessionRepository: SessionRepository,
-    private val parentAlertSync: ParentAlertSync,
+    private val serverAlertSync: ServerAlertSync,
     private val childCommandBus: ChildCommandBus,
     private val childCommandNotifier: ChildCommandNotifier,
     private val childAlertStore: ChildAlertStore,
@@ -52,7 +52,7 @@ class PushMessageRouter(
 
     private suspend fun routeParentAlert(message: PushMessage) {
         if (sessionRepository.current()?.user?.role != Role.PARENT) return
-        parentAlertSync.recordRemote(
+        serverAlertSync.recordRemote(
             id = message.id.ifBlank { "fcm-" + message.type + "-" + message.title },
             type = message.type,
             title = message.title,

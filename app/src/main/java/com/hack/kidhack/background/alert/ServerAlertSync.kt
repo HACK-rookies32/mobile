@@ -1,10 +1,10 @@
 package com.hack.kidhack.background.alert
 
-import com.hack.kidhack.data.local.ParentAlertStore
+import com.hack.kidhack.data.local.ServerAlertStore
 import com.hack.kidhack.domain.model.AppNotification
-import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.SessionRepository
+import com.hack.kidhack.domain.repository.notificationRecipientId
 import com.hack.kidhack.domain.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,19 +15,19 @@ import kotlinx.coroutines.sync.withLock
 /**
  * 부모 알림의 단일 진입점.
  *
- * 1. 서버 알림 목록을 가져와 [ParentAlertStore] 에 **영구 저장**한다.
+ * 1. 서버 알림 목록을 가져와 [ServerAlertStore] 에 **영구 저장**한다.
  * 2. 이번에 처음 들어온 알림만 골라 푸시로 띄운다.
  * 3. 화면에 그릴 목록(로컬 보관함 전체)을 돌려준다.
  *
- * 대시보드·알림 탭의 새로고침과 15분 주기 [ParentAlertPollWorker] 가 모두 이 함수를 쓴다.
+ * 대시보드·알림 탭의 새로고침과 15분 주기 [ServerAlertPollWorker] 가 모두 이 함수를 쓴다.
  * 그래서 앱을 켜 두든 꺼 두든 같은 결과가 나온다.
  */
-class ParentAlertSync(
+class ServerAlertSync(
     private val sessionRepository: SessionRepository,
     private val notificationRepository: NotificationRepository,
     private val userRepository: UserRepository,
-    private val store: ParentAlertStore,
-    private val notifier: ParentAlertNotifier,
+    private val store: ServerAlertStore,
+    private val notifier: ServerAlertNotifier,
 ) {
     /** 워커와 화면 새로고침이 동시에 돌 때 같은 알림을 두 번 띄우지 않도록 직렬화한다. */
     private val mutex = Mutex()
@@ -36,7 +36,7 @@ class ParentAlertSync(
      * 보관함의 최신 알림 목록.
      *
      * 워커가 백그라운드에서 새 알림을 받아 넣든, 테스트 버튼이 직접 기록하든
-     * 같은 [ParentAlertStore] 를 거치므로 구독 중인 화면에 즉시 반영된다.
+     * 같은 [ServerAlertStore] 를 거치므로 구독 중인 화면에 즉시 반영된다.
      */
     val alerts: StateFlow<List<AppNotification>> get() = store.alerts
 
@@ -52,10 +52,10 @@ class ParentAlertSync(
     )
 
     suspend fun sync(): Result = mutex.withLock {
-        if (sessionRepository.current()?.user?.role != Role.PARENT) {
-            return@withLock Result(emptyList())
-        }
-        val recipientId = sessionRepository.current()?.user?.id ?: return@withLock Result(emptyList())
+        // 부모 전용이 아니다. 자녀도 채팅·스크린타임 한도 같은 서버 알림을 받아야 한다.
+        // 예전에는 여기서 PARENT 가 아니면 빈 값을 돌려줘, 자녀는 목록을 새로고침할 때만
+        // 알림을 봤고 팝업은 아예 뜨지 않았다.
+        val recipientId = sessionRepository.notificationRecipientId().ifBlank { return@withLock Result(emptyList()) }
         val remote = runCatching { notificationRepository.list(recipientId) }
         remote.getOrNull()?.let { list ->
             val fresh = store.merge(list)

@@ -210,11 +210,6 @@ fun ChildHomeScreen(
                         fontWeight = FontBlack,
                         fontSize = 12.sp,
                     )
-                    Text(
-                        text = "/ ${state.limitLabel}",
-                        color = colors.muted,
-                        fontSize = 12.sp,
-                    )
                 }
             }
         }
@@ -232,42 +227,11 @@ fun ChildHomeScreen(
                     fontSize = 14.sp,
                     color = colors.text,
                 )
-                Text(
-                    text = stringResource(R.string.child_home_remaining, state.remaining),
-                    color = colors.brand,
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBold,
-                    fontSize = 12.sp,
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(12.dp)
-                    .clip(RoundedCornerShape(99.dp))
-                    .background(colors.border),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(state.progress.coerceIn(0f, 1f))
-                        .height(12.dp)
-                        .clip(RoundedCornerShape(99.dp))
-                        .background(Brush.horizontalGradient(listOf(colors.brand, colors.brandDark))),
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            Row(modifier = Modifier.fillMaxWidth()) {
+                // 서버에 「하루 총 스크린타임 한도」 개념이 없다(앱 통제는 앱별 한도뿐).
+                // 근거 없는 3시간 상수를 보여 주느니 사용량만 보여 준다.
                 Text(
                     text = stringResource(R.string.child_home_used, state.usedLabel),
                     modifier = Modifier.weight(1f),
-                    color = colors.muted,
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontSemibold,
-                    fontSize = 12.sp,
-                )
-                Text(
-                    text = stringResource(R.string.child_home_limit, state.limitLabel),
                     color = colors.muted,
                     fontFamily = KidhackFontFamily,
                     fontWeight = FontSemibold,

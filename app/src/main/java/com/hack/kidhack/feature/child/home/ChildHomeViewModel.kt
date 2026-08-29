@@ -7,6 +7,7 @@ import com.hack.kidhack.background.usage.AppUsageCollector
 import com.hack.kidhack.background.usage.ScreenTimeWatcher
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.domain.model.AppNotification
+import com.hack.kidhack.domain.repository.notificationRecipientId
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.SessionRepository
 import com.hack.kidhack.feature.child.formatDurationMin
@@ -48,17 +49,12 @@ data class ChildHomeUiState(
     val name: String = "",
     val alias: String = "",
     val usedMinutes: Int = 0,
-    val limitMinutes: Int = 0,
     val protectedNow: Boolean = false,
     val services: List<HomeServiceRow> = emptyList(),
     val alerts: List<HomeAlertRow> = emptyList(),
     val error: String? = null,
 ) {
     val usedLabel: String get() = formatDurationMin(usedMinutes)
-    val limitLabel: String get() = formatDurationMin(limitMinutes)
-    val remaining: String get() = remainingLabel(usedMinutes, limitMinutes)
-    val progress: Float
-        get() = if (limitMinutes <= 0) 0f else usedMinutes / limitMinutes.toFloat()
 
     /**
      * 꺼져 있는데 자녀가 켤 수 있는 보호 기능들.
@@ -98,7 +94,7 @@ class ChildHomeViewModel(
             _state.update { it.copy(loading = true, error = null) }
 
             val user = sessionRepository.current()?.user
-            val notifications = runCatching { notificationRepository.list(sessionRepository.current()?.user?.id.orEmpty()) }
+            val notifications = runCatching { notificationRepository.list(sessionRepository.notificationRecipientId()) }
 
             // 스크린타임은 서비스 현황 탭의 앱 사용 모니터링 합계와 반드시 같아야 하므로
             // 같은 수집기를 쓴다.
@@ -122,7 +118,6 @@ class ChildHomeViewModel(
                     name = user?.name.orEmpty(),
                     alias = user?.name?.aliasOrSelf().orEmpty(),
                     usedMinutes = usedMinutes,
-                    limitMinutes = screenTimeWatcher.dailyLimitMinutes,
                     protectedNow = locationOn || harmfulOn,
                     services = listOf(
                         HomeServiceRow(
