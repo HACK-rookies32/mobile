@@ -31,8 +31,9 @@ import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
 import com.hack.kidhack.data.remote.dto.CreateInquiryRequest
 import com.hack.kidhack.data.remote.dto.CreatePostRequest
-import com.hack.kidhack.data.remote.dto.FindIdRequest
-import com.hack.kidhack.data.remote.dto.FindIdResponse
+import com.hack.kidhack.data.remote.dto.FindIdSendCodeRequest
+import com.hack.kidhack.data.remote.dto.FindIdVerifyRequest
+import com.hack.kidhack.data.remote.dto.FindIdVerifyResponse
 import com.hack.kidhack.data.remote.dto.DashboardResponse
 import com.hack.kidhack.data.remote.dto.DeviceEventRequest
 import com.hack.kidhack.data.remote.dto.PushTokenRequest
@@ -61,6 +62,8 @@ import com.hack.kidhack.data.remote.dto.RefreshRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
 import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
+import com.hack.kidhack.data.remote.dto.ResetPasswordSendCodeRequest
+import com.hack.kidhack.data.remote.dto.SendCodeResponse
 import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.SignupRequest
 import com.hack.kidhack.data.remote.dto.UsePointRequest
@@ -96,9 +99,21 @@ interface AuthApi {
     @POST("auth/token/refresh")
     suspend fun refresh(@Body body: RefreshRequest): ApiEnvelope<LoginResponse>
 
-    @POST("auth/find-id")
-    suspend fun findId(@Body body: FindIdRequest): ApiEnvelope<FindIdResponse>
+    /** 아이디 찾기 1단계 — 실명 + 이메일로 6자리 인증코드를 발송한다. */
+    @POST("auth/find-id/send-code")
+    suspend fun sendFindIdCode(@Body body: FindIdSendCodeRequest): ApiEnvelope<SendCodeResponse>
 
+    /** 아이디 찾기 2단계 — 이메일 + 코드를 검증하고 로그인 아이디를 돌려준다. */
+    @POST("auth/find-id/verify")
+    suspend fun verifyFindId(@Body body: FindIdVerifyRequest): ApiEnvelope<FindIdVerifyResponse>
+
+    /** 비밀번호 재설정 1단계 — 아이디 + 이메일로 6자리 인증코드를 발송한다. */
+    @POST("auth/reset-password/send-code")
+    suspend fun sendResetPasswordCode(
+        @Body body: ResetPasswordSendCodeRequest,
+    ): ApiEnvelope<SendCodeResponse>
+
+    /** 비밀번호 재설정 2단계 — 이메일 + 코드 + 새 비밀번호. */
     @POST("auth/reset-password")
     suspend fun resetPassword(@Body body: ResetPasswordRequest): ApiEnvelope<Unit>
 }

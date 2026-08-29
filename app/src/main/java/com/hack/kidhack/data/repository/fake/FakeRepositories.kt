@@ -45,6 +45,7 @@ import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.model.Session
+import com.hack.kidhack.domain.model.SentCode
 import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AllowanceRepository
@@ -164,8 +165,35 @@ class FakeAuthRepository(
         sessionEvents.emitLogout()
     }
 
-    override suspend fun findId(name: String, phone: String): String = "parent01"
-    override suspend fun resetPassword(loginId: String, verifyCode: String, newPassword: String) {}
+    /** 목업은 서버처럼 6자리 코드를 응답에 실어 준다. 검증은 [FAKE_CODE] 로만 통과한다. */
+    override suspend fun sendFindIdCode(username: String, email: String): SentCode {
+        delay(300)
+        require(username.isNotBlank()) { "이름을 입력해 주세요" }
+        require(email.contains("@")) { "이메일 형식이 올바르지 않아요" }
+        return SentCode(message = "인증코드가 발송되었습니다.", code = FAKE_CODE)
+    }
+
+    override suspend fun verifyFindId(email: String, code: String): String {
+        delay(300)
+        require(code.trim() == FAKE_CODE) { "인증코드가 올바르지 않습니다." }
+        return "parent01"
+    }
+
+    override suspend fun sendResetPasswordCode(loginId: String, email: String): SentCode {
+        delay(300)
+        require(loginId.isNotBlank()) { "아이디를 입력해 주세요" }
+        require(email.contains("@")) { "이메일 형식이 올바르지 않아요" }
+        return SentCode(message = "인증코드가 발송되었습니다.", code = FAKE_CODE)
+    }
+
+    override suspend fun resetPassword(email: String, code: String, newPassword: String) {
+        delay(300)
+        require(code.trim() == FAKE_CODE) { "인증코드가 올바르지 않습니다." }
+    }
+
+    private companion object {
+        const val FAKE_CODE = "123456"
+    }
 }
 
 /**

@@ -8,6 +8,17 @@ data class Session(
     val user: User,
 )
 
+/**
+ * 인증코드 발송 결과(아이디 찾기 / 비밀번호 재설정 공용).
+ *
+ * 백엔드가 실제 메일을 보내지 않고(`MockEmailSender`) 6자리 코드를 응답에 그대로 실어 준다.
+ * 그래서 [code] 가 채워져 오지만, 운영 화면에 띄우면 인증이 무력화된다 — 디버그 빌드에서만 쓴다.
+ */
+data class SentCode(
+    val message: String?,
+    val code: String?,
+)
+
 data class User(
     val id: String,
     val loginId: String,
