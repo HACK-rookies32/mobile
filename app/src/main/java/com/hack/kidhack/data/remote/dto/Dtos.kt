@@ -141,27 +141,47 @@ data class UserDto(
     val parentId: Long? = null,
 )
 
+/**
+ * 내 활동 내역 항목. 서버 ActivityResponse 와 1:1.
+ *
+ * 예전에는 게시글(PostDto)로 받았는데 서버는 활동 요약을 준다 — 게시글 본문이 아니라
+ * 어떤 글에 무슨 활동(작성/댓글/좋아요)을 했는지다.
+ */
+@Serializable
+data class ActivityDto(
+    @Serializable(with = FlexibleStringSerializer::class)
+    val id: String = "",
+    /** POST | COMMENT | LIKE */
+    val type: String? = null,
+    val postId: Long? = null,
+    val preview: String? = null,
+    val createdAt: String? = null,
+)
+
+/**
+ * PATCH /users/me 요청. 서버 MemberUpdateRequest 와 필드가 1:1 이다.
+ *
+ * 예전에는 전화번호를 `phone` 으로 보냈는데 서버 키는 `phoneNumber` 라 **저장되지 않았다**
+ * (200 이 오고 화면은 저장됐다고 표시했다). 실명(`username`)은 서버가 수정 대상으로 받지 않는다.
+ */
 @Serializable
 data class UserUpdateRequest(
     val nickname: String? = null,
-    val name: String? = null,
-    val phone: String? = null,
+    val phoneNumber: String? = null,
     val email: String? = null,
+    val address: String? = null,
     val profileImageUrl: String? = null,
 )
 
-@Serializable
-data class ChangePasswordRequest(
-    val newPassword: String,
-)
-
-@Serializable
-data class NotificationSettingsDto(
-    val location: Boolean,
-    val harmfulAccess: Boolean,
-    val appUsage: Boolean,
-    val notice: Boolean,
-)
+/**
+ * 알림 설정. 서버는 `NotificationType` 을 키로 하는 맵을 준다.
+ *
+ * 예전에는 location/harmfulAccess/appUsage/notice 4개 고정 필드로 받았는데, 서버 응답에
+ * 그런 키가 없어 **역직렬화 단계에서 실패**했다(설정 조회 자체가 터졌다).
+ * 사용자가 끌 수 있는 유형만 내려오므로 개수는 서버 정책에 따라 달라진다 —
+ * 맵으로 받고 화면이 쓰는 키만 골라 쓴다. PATCH 는 부분 갱신이라 바꿀 키만 보내면 된다.
+ */
+typealias NotificationSettingsDto = Map<String, Boolean>
 
 /**
  * 페어링 코드 발급 결과.
@@ -190,7 +210,6 @@ data class ChildDto(
     val nickname: String? = null,
     val alias: String? = null,
     val profileImageUrl: String? = null,
-    val school: String? = null,
     val birthDate: String? = null,
     val ageLabel: String? = null,
     val online: Boolean = false,
@@ -202,7 +221,6 @@ data class ChildUpdateRequest(
     val alias: String? = null,
     val profileImageUrl: String? = null,
     val birthDate: String? = null,
-    val school: String? = null,
 )
 
 /** POST /location/track 요청. 명세상 좌표가 문자열이다(places는 숫자). */

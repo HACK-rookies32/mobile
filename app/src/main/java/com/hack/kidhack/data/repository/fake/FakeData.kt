@@ -1,5 +1,7 @@
 package com.hack.kidhack.data.repository.fake
 
+import com.hack.kidhack.domain.model.Activity
+import com.hack.kidhack.domain.model.ActivityType
 import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.AppUsage
@@ -53,7 +55,6 @@ object FakeData {
         name = "김민준",
         alias = "민준",
         ageLabel = "12세 · 초등학교 6학년",
-        school = "강남 초등학교",
         birthDate = "2014년 3월 15일",
         online = true,
     )
@@ -63,7 +64,6 @@ object FakeData {
         name = "이지아",
         alias = "지아",
         ageLabel = "9세 · 초등학교 3학년",
-        school = "강남 초등학교",
         birthDate = "2017년 6월 2일",
         online = false,
     )
@@ -210,6 +210,12 @@ object FakeData {
     val pointBalance = PointBalance(45_000)
 
     val pairing = PairingCode(PAIRING_CODE, 300)
+
+    val activities = listOf(
+        Activity("1", ActivityType.POST, 12L, "우리 아이 스마트폰 사용 시간 어떻게 정하세요?", "2026-08-28T21:14:02"),
+        Activity("2", ActivityType.COMMENT, 9L, "저희도 같은 고민이에요. 저녁 9시 이후로 막아 뒀습니다.", "2026-08-27T09:31:40"),
+        Activity("3", ActivityType.LIKE, 7L, "초등 저학년 유해사이트 차단 후기", "2026-08-26T18:02:11"),
+    )
 
     const val CHILD_SCREEN_USED_MINUTES = 84
     const val CHILD_SCREEN_LIMIT_MINUTES = 180

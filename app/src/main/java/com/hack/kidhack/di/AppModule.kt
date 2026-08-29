@@ -137,6 +137,9 @@ import com.hack.kidhack.feature.parent.AppControlViewModel
 import com.hack.kidhack.feature.parent.CardViewModel
 import com.hack.kidhack.feature.parent.ChildProfileViewModel
 import com.hack.kidhack.feature.parent.CommunityDetailViewModel
+import com.hack.kidhack.feature.parent.ActivityViewModel
+import com.hack.kidhack.feature.parent.ChildAccountViewModel
+import com.hack.kidhack.feature.parent.WithdrawViewModel
 import com.hack.kidhack.feature.parent.CommunityListViewModel
 import com.hack.kidhack.feature.parent.CommunityWriteViewModel
 import com.hack.kidhack.feature.parent.ContactViewModel
@@ -338,6 +341,9 @@ val appModule = module {
     viewModel { NotificationsViewModel(get(), get(), get(), get()) }
     viewModel { MypageViewModel(get(), get(), get(), get()) }
     viewModel { EditProfileViewModel(get()) }
+    viewModel { ActivityViewModel(get()) }
+    viewModel { ChildAccountViewModel(get()) }
+    viewModel { WithdrawViewModel(get(), get()) }
     viewModel { AppControlViewModel(get(), get(), get()) }
     viewModel { ScreenshotViewModel(get(), get(), get()) }
     viewModel { CameraRequestViewModel(get(), get(), get()) }

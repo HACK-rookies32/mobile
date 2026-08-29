@@ -1,5 +1,6 @@
 package com.hack.kidhack.data.repository
 
+import com.hack.kidhack.data.remote.dto.ActivityDto
 import com.hack.kidhack.data.remote.dto.AllowanceDto
 import com.hack.kidhack.data.remote.dto.AllowanceEntryDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentDto
@@ -31,6 +32,8 @@ import com.hack.kidhack.data.remote.dto.ScreenshotDto
 import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.TransferResponse
 import com.hack.kidhack.data.remote.dto.UserDto
+import com.hack.kidhack.domain.model.Activity
+import com.hack.kidhack.domain.model.ActivityType
 import com.hack.kidhack.domain.model.Allowance
 import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
@@ -124,7 +127,6 @@ fun ChildDto.toDomain(): ChildProfile = ChildProfile(
     alias = alias?.takeIf { it.isNotBlank() }
         ?: nickname?.takeIf { it.isNotBlank() },
     ageLabel = ageLabel,
-    school = school,
     birthDate = birthDate,
     profileImageUrl = profileImageUrl,
     online = online,
@@ -181,18 +183,45 @@ fun NotificationDto.toDomain(): AppNotification = AppNotification(
     childId = childId?.takeIf { it.isNotBlank() },
 )
 
+/**
+ * 서버 키 → 화면 토글.
+ *
+ * 화면의 「GPS·위치 알림」 하나가 서버의 지오펜스 3종 + 전원/GPS 꺼짐을 함께 덮는다
+ * (부제가 "GPS 꺼짐, 안전구역 이탈"). 하나라도 켜져 있으면 켜진 것으로 본다.
+ * 서버가 모르는 키를 보내오거나 일부를 생략해도 기본값 true 로 떨어뜨린다.
+ */
+private val LOCATION_KEYS =
+    listOf("LOCATION_ENTER", "LOCATION_EXIT", "LOCATION_ARRIVED", "DEVICE_POWER_OFF")
+
+private fun Map<String, Boolean>.anyOn(keys: List<String>): Boolean =
+    keys.mapNotNull { this[it] }.let { found -> found.isEmpty() || found.any { it } }
+
 fun NotificationSettingsDto.toDomain(): NotificationSettings = NotificationSettings(
-    location = location,
-    harmfulAccess = harmfulAccess,
-    appUsage = appUsage,
-    notice = notice,
+    location = anyOn(LOCATION_KEYS),
+    harmfulAccess = this["HARMFUL_SITE"] ?: true,
+    appUsage = this["APP_USAGE"] ?: true,
+    notice = this["NOTICE"] ?: true,
 )
 
-fun NotificationSettings.toDto(): NotificationSettingsDto = NotificationSettingsDto(
-    location = location,
-    harmfulAccess = harmfulAccess,
-    appUsage = appUsage,
-    notice = notice,
+/** 화면 토글 → 서버 키. 화면이 다루지 않는 유형은 보내지 않는다(부분 갱신). */
+fun NotificationSettings.toDto(): NotificationSettingsDto = buildMap {
+    LOCATION_KEYS.forEach { put(it, location) }
+    put("HARMFUL_SITE", harmfulAccess)
+    put("APP_USAGE", appUsage)
+    put("NOTICE", notice)
+}
+
+fun ActivityDto.toDomain(): Activity = Activity(
+    id = id,
+    type = when (type?.trim()?.uppercase()) {
+        "POST" -> ActivityType.POST
+        "COMMENT" -> ActivityType.COMMENT
+        "LIKE" -> ActivityType.LIKE
+        else -> ActivityType.UNKNOWN
+    },
+    postId = postId,
+    preview = preview.orEmpty(),
+    createdAtLabel = createdAt.orEmpty(),
 )
 
 fun ScreenshotDto.toDomain(): Screenshot = Screenshot(

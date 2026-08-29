@@ -88,18 +88,6 @@ fun ChildMypageScreen(
                         color = Color.White.copy(alpha = 0.7f),
                         fontSize = 12.sp,
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = state.grade,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(99.dp))
-                            .background(Color.White)
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                        color = colors.brand,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBlack,
-                        fontSize = 12.sp,
-                    )
                 }
             }
         },
@@ -145,35 +133,6 @@ fun ChildMypageScreen(
 
         KidCard {
             Text(
-                text = stringResource(R.string.child_mypage_guardians),
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 14.sp,
-                color = colors.text,
-            )
-            Spacer(Modifier.height(8.dp))
-            if (state.guardians.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.child_mypage_guardians_empty),
-                    color = colors.muted,
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontSemibold,
-                    fontSize = 12.sp,
-                )
-            }
-            state.guardians.forEachIndexed { index, guardian ->
-                ListRow(
-                    title = guardian.name,
-                    leading = guardian.emoji,
-                    subtitle = guardian.status,
-                    trailing = "●",
-                    showDivider = index != state.guardians.lastIndex,
-                )
-            }
-        }
-
-        KidCard {
-            Text(
                 text = stringResource(R.string.child_mypage_section_info),
                 color = colors.muted,
                 fontFamily = KidhackFontFamily,
@@ -185,11 +144,6 @@ fun ChildMypageScreen(
                 title = stringResource(R.string.child_mypage_link_parent),
                 leading = "\uD83D\uDD17",
                 onClick = onLinkParent,
-            )
-            ListRow(
-                title = stringResource(R.string.child_mypage_change_password),
-                onClick = comingSoon,
-                showDivider = false,
             )
         }
 
@@ -247,6 +201,13 @@ fun ChildMypageScreen(
                 )
                 Text("›", color = colors.border, fontSize = 16.sp)
             }
+            // 자녀 로그아웃은 서버상 부모 권한(POST /children/{id}/logout)이다.
+            // 이 버튼은 테스트 중 계정 전환용 임시 조치라 그 사실을 화면에 밝혀 둔다.
+            Text(
+                text = stringResource(R.string.child_mypage_logout_temp_notice),
+                color = colors.muted,
+                fontSize = 11.sp,
+            )
         }
         Spacer(Modifier.height(8.dp))
     }

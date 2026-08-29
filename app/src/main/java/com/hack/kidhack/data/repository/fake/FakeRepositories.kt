@@ -13,6 +13,8 @@ import com.hack.kidhack.domain.model.Allowance
 import com.hack.kidhack.domain.model.AllowanceEntry
 import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AllowanceType
+import com.hack.kidhack.domain.model.Activity
+import com.hack.kidhack.domain.model.ActivityType
 import com.hack.kidhack.domain.model.AppControlItem
 import com.hack.kidhack.data.local.BlocklistStore
 import com.hack.kidhack.domain.model.AppNotification
@@ -211,24 +213,26 @@ class FakeUserRepository(
 
     override suspend fun updateMe(
         nickname: String?,
-        name: String?,
-        phone: String?,
+        phoneNumber: String?,
         email: String?,
+        address: String?,
         profileImageUrl: String?,
     ): User {
         delay(200)
         val current = me()
+        // 서버가 실명(username)은 수정 대상으로 받지 않으므로 목업도 바꾸지 않는다.
         return current.copy(
             nickname = nickname ?: current.nickname,
-            name = name?.takeIf { it.isNotBlank() } ?: current.name,
-            phone = phone ?: current.phone,
+            phone = phoneNumber ?: current.phone,
             email = email,
             profileImageUrl = profileImageUrl ?: current.profileImageUrl,
         )
     }
 
-    override suspend fun changePassword(newPassword: String) {}
     override suspend fun deleteMe() = Unit
+
+    override fun pagedActivities(type: ActivityType): Flow<PagingData<Activity>> =
+        flowOf(PagingData.from(FakeData.activities.filter { it.type == type }))
     override suspend fun notificationSettings(): NotificationSettings = settings
     override suspend fun patchNotificationSettings(settings: NotificationSettings): NotificationSettings {
         this.settings = settings
@@ -252,7 +256,11 @@ class FakePairingRepository : PairingRepository {
 }
 
 class FakeChildRepository : ChildRepository {
-    override suspend fun children(): List<ChildProfile> = FakeData.children
+    /** 목업에서 해제된 자녀. 목록에서 빠져야 화면이 결과를 확인할 수 있다. */
+    private val removed = mutableSetOf<String>()
+
+    override suspend fun children(): List<ChildProfile> =
+        FakeData.children.filterNot { it.id in removed }
     override suspend fun child(childId: String): ChildProfile =
         FakeData.children.first { it.id == childId }
     override suspend fun updateChild(
@@ -261,15 +269,22 @@ class FakeChildRepository : ChildRepository {
         alias: String?,
         profileImageUrl: String?,
         birthDate: String?,
-        school: String?
     ): ChildProfile = child(childId).copy(
         name = name ?: child(childId).name,
         alias = alias ?: child(childId).alias,
         profileImageUrl = profileImageUrl ?: child(childId).profileImageUrl,
         birthDate = birthDate ?: child(childId).birthDate,
-        school = school ?: child(childId).school
     )
+    override suspend fun unpair(childId: String) {
+        delay(200)
+        removed += childId
+    }
+
+    override suspend fun forceLogout(childId: String) {
+        delay(200)
+    }
 }
+
 
 class FakeLocationRepository : LocationRepository {
     private val historyMap = mutableMapOf<String, MutableList<LocationPoint>>()

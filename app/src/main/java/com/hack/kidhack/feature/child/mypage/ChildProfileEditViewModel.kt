@@ -89,9 +89,9 @@ class ChildProfileEditViewModel(
             runCatching {
                 userRepository.updateMe(
                     nickname = null,
-                    name = current.name.trim(),
-                    phone = current.phone.trim(),
+                    phoneNumber = current.phone.trim(),
                     email = current.email.takeIf { it.isNotBlank() },
+                    address = null,
                     profileImageUrl = null,
                 )
             }.onSuccess { updated ->

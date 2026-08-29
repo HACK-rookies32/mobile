@@ -15,13 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,7 +34,6 @@ import com.hack.kidhack.core.common.formatPhoneNumber
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
-import com.hack.kidhack.core.designsystem.component.KidTextField
 import com.hack.kidhack.core.designsystem.component.ListRow
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
@@ -58,20 +52,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
-enum class PasswordError { EMPTY, MISMATCH }
-
 data class MypageUiState(
     val user: User? = null,
     val children: List<ChildProfile> = emptyList(),
     val selectedChildId: String? = null,
     val loading: Boolean = true,
     val error: String? = null,
-    val changingPassword: Boolean = false,
-    val newPassword: String = "",
-    val confirmPassword: String = "",
-    val passwordError: PasswordError? = null,
-    val showPasswordConfirm: Boolean = false,
-    val passwordChanged: Boolean = false,
 )
 
 class MypageViewModel(
@@ -120,58 +106,6 @@ class MypageViewModel(
         viewModelScope.launch { selectedChildRepository.select(id) }
     }
 
-    fun togglePasswordChange() = _state.update {
-        val opening = !it.changingPassword
-        it.copy(
-            changingPassword = opening,
-            newPassword = "",
-            confirmPassword = "",
-            passwordError = null,
-            passwordChanged = false,
-        )
-    }
-
-    fun onNewPassword(v: String) = _state.update { it.copy(newPassword = v, passwordError = null) }
-    fun onConfirmPassword(v: String) = _state.update { it.copy(confirmPassword = v, passwordError = null) }
-
-    fun requestPasswordChange() {
-        val s = _state.value
-        val error = when {
-            s.newPassword.isBlank() -> PasswordError.EMPTY
-            s.newPassword != s.confirmPassword -> PasswordError.MISMATCH
-            else -> null
-        }
-        if (error != null) {
-            _state.update { it.copy(passwordError = error) }
-        } else {
-            _state.update { it.copy(showPasswordConfirm = true) }
-        }
-    }
-
-    fun dismissPasswordConfirm() = _state.update { it.copy(showPasswordConfirm = false) }
-
-    fun confirmPasswordChange() {
-        val newPassword = _state.value.newPassword
-        viewModelScope.launch {
-            runCatching { userRepository.changePassword(newPassword) }
-                .onSuccess {
-                    _state.update {
-                        it.copy(
-                            showPasswordConfirm = false,
-                            changingPassword = false,
-                            newPassword = "",
-                            confirmPassword = "",
-                            passwordError = null,
-                            passwordChanged = true,
-                        )
-                    }
-                }
-                .onFailure { t ->
-                    _state.update { it.copy(showPasswordConfirm = false, error = t.message) }
-                }
-        }
-    }
-
     fun logout() {
         viewModelScope.launch { runCatching { authRepository.logout() } }
     }
@@ -181,6 +115,9 @@ class MypageViewModel(
 fun ParentMypageScreen(
     onOpenEditProfile: () -> Unit = {},
     onOpenNotifications: () -> Unit = {},
+    onOpenActivities: () -> Unit = {},
+    onOpenChildAccount: () -> Unit = {},
+    onOpenWithdraw: () -> Unit = {},
     onOpenAppControl: () -> Unit = {},
     onOpenScreenshot: () -> Unit = {},
     onOpenCamera: () -> Unit = {},
@@ -221,67 +158,10 @@ fun ParentMypageScreen(
         },
     ) {
         ParentLoadingOrError(state.loading && user == null, state.error, viewModel::load)
-        if (state.changingPassword) {
-            KidCard {
-                FormHeader(stringResource(R.string.parent_mypage_change_password), viewModel::togglePasswordChange)
-                KidTextField(
-                    state.newPassword,
-                    viewModel::onNewPassword,
-                    stringResource(R.string.parent_mypage_new_password),
-                    placeholder = stringResource(R.string.parent_mypage_password_placeholder),
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    isError = state.passwordError == PasswordError.EMPTY,
-                )
-                Spacer(Modifier.height(8.dp))
-                KidTextField(
-                    state.confirmPassword,
-                    viewModel::onConfirmPassword,
-                    stringResource(R.string.parent_mypage_new_password_confirm),
-                    placeholder = stringResource(R.string.parent_mypage_password_confirm_placeholder),
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    isError = state.passwordError == PasswordError.MISMATCH,
-                )
-                state.passwordError?.let { err ->
-                    val msg = when (err) {
-                        PasswordError.EMPTY -> stringResource(R.string.parent_mypage_password_error_empty)
-                        PasswordError.MISMATCH -> stringResource(R.string.parent_mypage_password_error_mismatch)
-                    }
-                    Text(msg, color = colors.danger, fontSize = 12.sp, fontWeight = FontBold)
-                }
-                Spacer(Modifier.height(8.dp))
-                KidButton(
-                    stringResource(R.string.parent_mypage_password_change),
-                    viewModel::requestPasswordChange,
-                    Modifier.fillMaxWidth(),
-                )
-            }
-        }
-        if (state.passwordChanged) {
-            Text(stringResource(R.string.parent_mypage_password_changed), color = colors.safe, fontSize = 12.sp, fontWeight = FontBold)
-        }
-        if (state.showPasswordConfirm) {
-            AlertDialog(
-                onDismissRequest = viewModel::dismissPasswordConfirm,
-                title = { Text(stringResource(R.string.parent_mypage_password_confirm_title), fontWeight = FontBold) },
-                text = { Text(stringResource(R.string.parent_mypage_password_confirm_message)) },
-                confirmButton = {
-                    TextButton(onClick = viewModel::confirmPasswordChange) {
-                        Text(stringResource(R.string.parent_mypage_password_confirm_ok), color = colors.brand, fontWeight = FontBold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = viewModel::dismissPasswordConfirm) {
-                        Text(stringResource(R.string.parent_mypage_password_confirm_cancel), color = colors.muted)
-                    }
-                },
-            )
-        }
         GroupCard(stringResource(R.string.parent_mypage_account)) {
             ListRow(stringResource(R.string.parent_mypage_edit_profile), onClick = onOpenEditProfile)
-            ListRow(stringResource(R.string.parent_mypage_change_password), subtitle = stringResource(R.string.parent_mypage_password_stub), onClick = viewModel::togglePasswordChange)
-            ListRow(stringResource(R.string.parent_mypage_notif_settings), onClick = onOpenNotifications, showDivider = false)
+            ListRow(stringResource(R.string.parent_mypage_notif_settings), onClick = onOpenNotifications)
+            ListRow(stringResource(R.string.parent_mypage_activities), onClick = onOpenActivities, showDivider = false)
         }
 
         GroupCard(stringResource(R.string.parent_mypage_child_manage)) {
@@ -320,7 +200,8 @@ fun ParentMypageScreen(
             ListRow(stringResource(R.string.parent_mypage_camera), leading = "📷", onClick = onOpenCamera)
             ListRow(stringResource(R.string.parent_mypage_child_profile), leading = "👦", onClick = onOpenProfile)
             ListRow(stringResource(R.string.parent_mypage_harmful), leading = "🚫", onClick = onOpenHarmful)
-            ListRow(stringResource(R.string.parent_mypage_pay), leading = "💳", onClick = onOpenPay, showDivider = false)
+            ListRow(stringResource(R.string.parent_mypage_pay), leading = "💳", onClick = onOpenPay)
+            ListRow(stringResource(R.string.parent_mypage_child_account), leading = "🔓", onClick = onOpenChildAccount, showDivider = false)
         }
 
         GroupCard(stringResource(R.string.parent_mypage_community_group)) {
@@ -335,7 +216,8 @@ fun ParentMypageScreen(
         }
         GroupCard(stringResource(R.string.parent_mypage_other)) {
             ListRow(stringResource(R.string.parent_mypage_terms), onClick = onOpenTerms)
-            ListRow(stringResource(R.string.parent_mypage_version), trailing = "", onClick = null, showDivider = false)
+            ListRow(stringResource(R.string.parent_mypage_version), trailing = "", onClick = null)
+            ListRow(stringResource(R.string.parent_mypage_withdraw), onClick = onOpenWithdraw, showDivider = false)
         }
         KidButton(
             stringResource(R.string.parent_mypage_logout),

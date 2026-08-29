@@ -37,7 +37,6 @@ data class ChildProfile(
     val name: String,
     val alias: String? = null,
     val ageLabel: String? = null,
-    val school: String? = null,
     val birthDate: String? = null,
     val profileImageUrl: String? = null,
     val online: Boolean = false,
@@ -128,6 +127,17 @@ data class Screenshot(
     val trigger: String,
     val imageUrl: String? = null,
 )
+
+/** 커뮤니티에서 내가 한 활동(글 작성 / 댓글 / 좋아요). GET /users/me/activities */
+data class Activity(
+    val id: String,
+    val type: ActivityType,
+    val postId: Long?,
+    val preview: String,
+    val createdAtLabel: String,
+)
+
+enum class ActivityType { POST, COMMENT, LIKE, UNKNOWN }
 
 data class Post(
     val id: String,
