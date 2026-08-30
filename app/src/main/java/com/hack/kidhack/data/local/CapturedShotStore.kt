@@ -35,6 +35,8 @@ class CapturedShotStore(context: Context) {
         val atMillis: Long,
     )
 
+    // [VULN-MOBILE-STORE-3] 화면 캡처 원본 이미지 + 목록(index.json)을 filesDir/captures 에 평문 저장.
+    // 채팅 저장(ChatMessageStore)과 같은 ID. 의도된 취약점(OWASP Mobile M9). 명세: mobile/docs/vuln-spec-mobile.md
     private val root = File(context.filesDir, "captures")
     private val index = File(root, "index.json")
     private val mutex = Mutex()

@@ -23,6 +23,9 @@ import java.io.File
  */
 class ChatMessageStore(context: Context) {
 
+    // [VULN-MOBILE-STORE-3] 채팅 대화 전문을 filesDir/chat/<roomId>.json 에 평문 저장(암호화 없음).
+    // 캡처 이미지는 CapturedShotStore(filesDir/captures)도 동일. 루팅/백업/기기이전 시 대화·캡처 유출.
+    // 의도된 취약점(OWASP Mobile M9 Insecure Data Storage). 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md
     private val root = File(context.filesDir, "chat")
     private val mutex = Mutex()
     private val json = KidhackJson.instance

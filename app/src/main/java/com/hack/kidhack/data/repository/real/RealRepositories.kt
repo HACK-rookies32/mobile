@@ -209,6 +209,10 @@ class RealAuthRepository(
         parentId: Long?,
     ): Session {
         // Signup response has User only (no tokens). Do not auto-login.
+        // [VULN-MOBILE-AUTHZ-1] 가입 role 을 클라이언트(가입 화면 라디오 선택값)가 결정해 그대로 전송한다.
+        // 서버가 이 값을 신뢰(백엔드 VULN-7)하므로 요청 변조로 관리자 자가생성이 가능한 클라이언트측 진입점이다.
+        // 의도된 취약점(OWASP Mobile M3 Insecure Authentication/Authorization). 보존: 고치지 말 것.
+        // 명세: mobile/docs/vuln-spec-mobile.md
         val user = api.signup(
             SignupRequest(
                 loginId = loginId,

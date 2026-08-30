@@ -205,6 +205,8 @@ class ChatWebSocketClient(
             topicDisposable?.dispose()
             topicDisposable = client.topic("/sub/chat/$roomId").subscribe(
                 { message ->
+                    // [VULN-MOBILE-LOG-1] 채팅 메시지 payload 전문을 빌드 변형 가드 없이 logcat 에 출력.
+                    // 의도된 취약점(OWASP Mobile M9). 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md
                     Log.d(TAG, "stomp recv room=$roomId payload=${message.payload}")
                     val payload = runCatching {
                         json.decodeFromString(

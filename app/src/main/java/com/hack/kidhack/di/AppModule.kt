@@ -213,6 +213,10 @@ val appModule = module {
     single { ProfileScopeStore(androidContext()) }
 
     single {
+        // [VULN-MOBILE-LOG-1] api 변형은 initWith(debug)라 BuildConfig.DEBUG=true → HTTP 요청/응답 본문 +
+        // Authorization: Bearer 헤더가 전부 logcat 에 평문 출력된다(채팅 payload 로깅 ChatWebSocketClient 도 동반).
+        // 의도된 취약점(OWASP Mobile M9 Insecure Data Storage / 민감정보 로그 노출). 보존: 고치지 말 것.
+        // 명세: mobile/docs/vuln-spec-mobile.md
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.BODY

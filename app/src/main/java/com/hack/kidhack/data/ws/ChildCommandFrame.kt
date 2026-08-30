@@ -47,6 +47,9 @@ internal object WsUrls {
         val raw = origin + path
         if (token.isNullOrBlank()) return raw
         val separator = if (raw.contains('?')) "&" else "?"
+        // [VULN-MOBILE-NET-2] JWT 를 WebSocket URL 쿼리스트링(?token=<JWT>)에 실어 전송 →
+        // 프록시·서버 액세스 로그·브라우저 히스토리에 토큰이 평문으로 남는다(헤더 방식이 안전).
+        // 의도된 취약점(OWASP Mobile M5 Insecure Communication). 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md
         return "$raw$separator" + "token=$token"
     }
 }
