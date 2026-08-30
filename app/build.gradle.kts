@@ -100,7 +100,7 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"https://api.childsafe.example.com/api\"",
+                "\"https://kidhackapp.com/api\"",
             )
             manifestPlaceholders["usesCleartextTraffic"] = "false"
             // [VULN-MOBILE-RE-1] R8 축소·난독화 완전 비활성(enable=false) + release signingConfig 없음 →
