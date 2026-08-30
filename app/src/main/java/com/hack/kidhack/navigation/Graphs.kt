@@ -64,6 +64,7 @@ import com.hack.kidhack.feature.parent.ParentNoticeScreen
 import com.hack.kidhack.feature.parent.ParentNotificationsScreen
 import com.hack.kidhack.feature.parent.ParentPairingScreen
 import com.hack.kidhack.feature.parent.ParentPayScreen
+import com.hack.kidhack.feature.terminal.StoreTerminalScreen
 import com.hack.kidhack.feature.parent.ParentCameraRequestScreen
 import com.hack.kidhack.feature.parent.ParentScreenshotScreen
 import com.hack.kidhack.feature.parent.ParentTermsScreen
@@ -201,10 +202,15 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 ParentPayScreen(
                     onBack = { navController.popBackStack() },
                     onRegisterCard = { navController.navigate(Route.ParentCards.path) },
+                    onOpenTerminal = { navController.navigate(Route.StoreTerminal.path) },
                 )
             }
         }
         composable(Route.ParentCards.path) { ParentShell(navController) { ParentCardsScreen(onBack = { navController.popBackStack() }) } }
+        // 매장 단말 테스트 화면 — 숨은 라우트(회원 앱 정상 내비게이션에 없음, 디버그/시연 전용).
+        composable(Route.StoreTerminal.path) {
+            StoreTerminalScreen(onBack = { navController.popBackStack() })
+        }
         composable(Route.ParentGeofence.path) { ParentShell(navController) { ParentGeofenceScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentAppUsageDetail.path) { ParentShell(navController) { ParentAppUsageDetailScreen(onBack = { navController.popBackStack() }) } }
     }

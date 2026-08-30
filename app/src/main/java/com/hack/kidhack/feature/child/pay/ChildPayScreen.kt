@@ -3,7 +3,6 @@ package com.hack.kidhack.feature.child.pay
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,7 +23,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,24 +32,20 @@ import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
-import com.hack.kidhack.core.designsystem.component.KidTextField
 import com.hack.kidhack.core.designsystem.component.QrCode
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
-import com.hack.kidhack.domain.model.AllowanceType
 import com.hack.kidhack.feature.child.components.ChildScreenScaffold
 import org.koin.androidx.compose.koinViewModel
-
-private val QUICK_AMOUNTS = listOf(1_000, 3_000, 5_000, 10_000)
 
 /**
  * 마이페이지 › 루키즈 페이 (자녀 모드).
  *
- * 잔액은 부모가 「용돈 보내기」로 채워 준 금액에서 「회수하기」를 뺀 값이다.
- * 자녀는 그 한도 안에서 **QR 결제만** 할 수 있고, 보내기·회수 UI 는 여기 없다.
+ * 자녀는 잔액 한도 안에서 **결제 QR** 을 띄우고, 매장 단말이 스캔·승인하면 결제가 완료된다.
+ * 금액은 자녀가 정하지 않고 단말이 확정한다(보내기·회수 UI 는 부모 모드 기능이라 여기 없다).
  */
 @Composable
 fun ChildPayScreen(
@@ -127,63 +120,28 @@ fun ChildPayScreen(
             )
         }
 
-        val token = state.token
-        if (token == null) {
+        val ticket = state.ticket
+        if (ticket == null) {
             KidCard {
                 Text(
-                    text = stringResource(R.string.child_pay_amount_title),
+                    text = "매장에서 결제할 때 QR 을 보여 주세요",
                     fontFamily = KidhackFontFamily,
                     fontWeight = FontBold,
                     fontSize = 14.sp,
                     color = colors.text,
                 )
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    QUICK_AMOUNTS.forEach { amount ->
-                        Text(
-                            text = stringResource(R.string.child_pay_quick, formatPoint(amount)),
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (state.amount == amount) colors.brand else colors.brandLight,
-                                )
-                                .clickable(enabled = amount <= state.balance) {
-                                    viewModel.quickAmount(amount)
-                                }
-                                .padding(vertical = 10.dp),
-                            color = when {
-                                amount > state.balance -> colors.border
-                                state.amount == amount -> Color.White
-                                else -> colors.brand
-                            },
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontBold,
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                KidTextField(
-                    value = state.amountInput,
-                    onValueChange = viewModel::onAmountChange,
-                    label = stringResource(R.string.child_pay_amount_label),
-                    placeholder = stringResource(R.string.child_pay_amount_hint),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = state.overLimit,
-                    supportingText = if (state.overLimit) {
-                        stringResource(R.string.child_pay_over_limit)
-                    } else {
-                        null
-                    },
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "금액은 매장 단말이 정해요. QR 을 만들면 60초 동안 쓸 수 있어요.",
+                    color = colors.muted,
+                    fontSize = 12.sp,
                 )
                 Spacer(Modifier.height(12.dp))
                 KidButton(
                     text = stringResource(R.string.child_pay_issue),
-                    onClick = viewModel::issueToken,
+                    onClick = viewModel::issueQr,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = state.canIssue,
+                    enabled = !state.issuing,
                 )
             }
         } else {
@@ -199,14 +157,6 @@ fun ChildPayScreen(
                         fontSize = 14.sp,
                         color = colors.text,
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.child_pay_qr_amount, formatPoint(token.amount)),
-                        color = colors.brand,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBlack,
-                        fontSize = 24.sp,
-                    )
                     Spacer(Modifier.height(12.dp))
                     Box(
                         modifier = Modifier
@@ -215,7 +165,7 @@ fun ChildPayScreen(
                             .background(Color.White)
                             .padding(12.dp),
                     ) {
-                        QrCode(content = token.payload, modifier = Modifier.fillMaxWidth())
+                        QrCode(content = ticket.qrToken, modifier = Modifier.fillMaxWidth())
                     }
                     Spacer(Modifier.height(12.dp))
                     Text(
@@ -227,21 +177,15 @@ fun ChildPayScreen(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = stringResource(R.string.child_pay_qr_guide),
+                        text = "매장 단말이 스캔해 승인하면 결제가 완료돼요.",
                         color = colors.muted,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center,
                     )
                     Spacer(Modifier.height(12.dp))
                     KidButton(
-                        text = stringResource(R.string.child_pay_confirm),
-                        onClick = viewModel::confirmPayment,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !state.paying,
-                    )
-                    KidButton(
                         text = stringResource(R.string.child_pay_cancel),
-                        onClick = viewModel::cancelToken,
+                        onClick = viewModel::cancelTicket,
                         modifier = Modifier.fillMaxWidth(),
                         variant = KidButtonVariant.Ghost,
                     )
@@ -268,34 +212,28 @@ fun ChildPayScreen(
                 )
             }
             state.history.forEachIndexed { index, item ->
+                val cancelled = item.status == "CANCELLED"
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = when (item.type) {
-                            AllowanceType.SEND -> "💰"
-                            AllowanceType.WITHDRAW -> "↩️"
-                            AllowanceType.PAYMENT -> "🧾"
-                        },
-                        fontSize = 18.sp,
-                    )
+                    Text(text = if (cancelled) "↩️" else "🧾", fontSize = 18.sp)
                     Spacer(Modifier.size(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = item.description,
+                            text = item.storeName,
                             fontFamily = KidhackFontFamily,
                             fontWeight = FontBold,
                             fontSize = 14.sp,
                             color = colors.text,
                         )
-                        Text(text = item.dateLabel, color = colors.muted, fontSize = 12.sp)
+                        Text(text = item.paidAtLabel, color = colors.muted, fontSize = 12.sp)
                     }
                     Text(
-                        text = signedPoint(item.amount),
-                        color = if (item.amount >= 0) colors.safe else colors.danger,
+                        text = if (cancelled) "취소됨" else "-" + formatPoint(item.amount) + "P",
+                        color = if (cancelled) colors.muted else colors.danger,
                         fontFamily = KidhackFontFamily,
                         fontWeight = FontBlack,
                         fontSize = 14.sp,
@@ -311,6 +249,3 @@ fun ChildPayScreen(
 /** 1234567 → "1,234,567" */
 private fun formatPoint(value: Int): String =
     value.toString().reversed().chunked(3).joinToString(",").reversed()
-
-private fun signedPoint(value: Int): String =
-    if (value >= 0) "+" + formatPoint(value) + "P" else "-" + formatPoint(-value) + "P"

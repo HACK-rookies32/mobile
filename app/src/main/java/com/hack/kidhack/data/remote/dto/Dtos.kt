@@ -894,3 +894,232 @@ data class CardRegisterRequest(
     val birthDate: String,
     val ownerName: String
 )
+
+/* ============================================================================
+ * 11~19. 지갑·카드·QR 결제 — 서버 /api/wallet · /api/qrpay (v0.2)
+ * ========================================================================== */
+
+/** 지갑 원장 1건 (서버 TxResponse). */
+@Serializable
+data class TxResponseDto(
+    val id: Long = 0,
+    val type: String = "",
+    val amount: Long = 0,
+    val balanceAfter: Long = 0,
+    val refUid: String? = null,
+    @Serializable(with = FlexibleDateTimeSerializer::class)
+    val createdAt: String = "",
+)
+
+// --- 11. 충전/환불 ---
+
+@Serializable
+data class WalletChargePrepareRequest(val amount: Long)
+
+@Serializable
+data class WalletChargePrepareResponse(
+    val merchantUid: String,
+    val amount: Long = 0,
+    val pgProvider: String = "",
+    val checkoutUrl: String? = null,
+    val mock: Boolean = false,
+)
+
+@Serializable
+data class WalletChargeApproveRequest(
+    val merchantUid: String,
+    val amount: Long,
+    val pgTransactionId: String? = null,
+)
+
+@Serializable
+data class WalletChargeApproveResponse(
+    val merchantUid: String = "",
+    val balance: Long = 0,
+    val transaction: TxResponseDto? = null,
+)
+
+@Serializable
+data class WalletRefundResponse(
+    val merchantUid: String = "",
+    val refundedAmount: Long = 0,
+    val balance: Long = 0,
+    val transaction: TxResponseDto? = null,
+)
+
+@Serializable
+data class ChargeOrderResponseDto(
+    val merchantUid: String = "",
+    val amount: Long = 0,
+    val status: String = "",
+    val pgTransactionId: String? = null,
+    @Serializable(with = FlexibleDateTimeSerializer::class)
+    val createdAt: String = "",
+)
+
+@Serializable
+data class ChargeHistoryResponseDto(
+    val merchantUid: String = "",
+    val amount: Long = 0,
+    val status: String = "",
+    val pgTransactionId: String? = null,
+    @Serializable(with = FlexibleDateTimeSerializer::class)
+    val createdAt: String = "",
+    @Serializable(with = FlexibleDateTimeSerializer::class)
+    val refundedAt: String? = null,
+)
+
+// --- 12. 이체 ---
+
+@Serializable
+data class WalletTransferRequest(val childId: Long, val amount: Long)
+
+@Serializable
+data class WalletTransferResponse(
+    val fromOwnerId: Long = 0,
+    val fromOwnerName: String = "",
+    val toOwnerId: Long = 0,
+    val toOwnerName: String = "",
+    val amount: Long = 0,
+    val fromBalance: Long = 0,
+    val toBalance: Long = 0,
+)
+
+// --- 13. 조회 ---
+
+@Serializable
+data class MyWalletResponse(
+    val balance: Long = 0,
+    val monthlyChargeTotal: Long = 0,
+    val monthlySpendTotal: Long = 0,
+    val content: List<TxResponseDto> = emptyList(),
+    val page: Int = 0,
+    val size: Int = 20,
+    val totalElements: Long = 0,
+    val totalPages: Int = 0,
+)
+
+@Serializable
+data class ChildWalletResponse(
+    val childId: Long = 0,
+    val balance: Long = 0,
+    val recentTransactions: List<TxResponseDto> = emptyList(),
+)
+
+// --- 14. 카드 (E2E 암호화) ---
+
+@Serializable
+data class CardPublicKeyResponse(
+    val keyId: String,
+    val publicKey: String,
+    val keyRotationDays: Long = 0,
+)
+
+@Serializable
+data class EncryptedCardRequest(
+    val keyId: String,
+    val encryptedKey: String,
+    val iv: String,
+    val ciphertext: String,
+)
+
+/** 암호화 대상 평문 payload — 서버 CardPlain 스키마와 필드명 1:1. */
+@Serializable
+data class CardPlainPayload(
+    val cardNumber: String,
+    val expiry: String,
+    val cvc: String,
+    val passwordFront: String,
+    val birthDate: String,
+    val ownerName: String,
+    val nonce: String,
+    val timestamp: Long,
+)
+
+@Serializable
+data class CardResponse(
+    val id: Long = 0,
+    val maskedCardNumber: String = "",
+    val ownerName: String = "",
+    val expiry: String = "",
+    @Serializable(with = FlexibleDateTimeSerializer::class)
+    val createdAt: String = "",
+)
+
+// --- 15. QR 발급/조회 ---
+
+@Serializable
+data class QrIssueResponse(
+    val qrToken: String,
+    val status: String = "ISSUED",
+    @Serializable(with = FlexibleDateTimeSerializer::class)
+    val expiresAt: String = "",
+)
+
+@Serializable
+data class QrStatusResponse(
+    val qrToken: String,
+    val status: String = "",
+    @Serializable(with = FlexibleDateTimeSerializer::class)
+    val expiresAt: String = "",
+)
+
+// --- 16. 매장 단말 승인 ---
+
+@Serializable
+data class QrApproveRequest(val qrToken: String, val amount: Long)
+
+@Serializable
+data class QrApproveResponse(
+    val qrToken: String = "",
+    val status: String = "",
+    val amount: Long = 0,
+    val storeName: String? = null,
+    val balance: Long = 0,
+    val transaction: TxResponseDto? = null,
+)
+
+// --- 17. 매장 단말 등록 ---
+
+@Serializable
+data class TerminalIssueRequest(val storeName: String)
+
+@Serializable
+data class TerminalResponse(
+    val id: Long = 0,
+    val storeName: String = "",
+    val terminalToken: String? = null,
+    val status: String = "",
+    @Serializable(with = FlexibleDateTimeSerializer::class)
+    val createdAt: String = "",
+)
+
+@Serializable
+data class TerminalAuthResponse(
+    val terminalId: Long = 0,
+    val storeName: String = "",
+    val status: String = "",
+)
+
+// --- 18. QR 취소 ---
+
+@Serializable
+data class QrCancelResponse(
+    val qrToken: String = "",
+    val status: String = "",
+    val canceledAmount: Long = 0,
+    val balance: Long = 0,
+    val transaction: TxResponseDto? = null,
+)
+
+// --- 19. 결제 내역 ---
+
+@Serializable
+data class QrPaymentHistoryResponseDto(
+    val qrToken: String = "",
+    val storeName: String? = null,
+    val amount: Long = 0,
+    val status: String = "",
+    @Serializable(with = FlexibleDateTimeSerializer::class)
+    val paidAt: String = "",
+)

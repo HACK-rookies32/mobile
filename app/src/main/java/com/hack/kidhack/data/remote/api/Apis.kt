@@ -89,11 +89,36 @@ import com.hack.kidhack.data.remote.dto.VisitResponse
 import com.hack.kidhack.data.remote.dto.UserUpdateRequest
 import com.hack.kidhack.data.remote.dto.WalletDto
 import com.hack.kidhack.data.remote.dto.WalletTransactionDto
+import com.hack.kidhack.data.remote.dto.WalletChargePrepareRequest
+import com.hack.kidhack.data.remote.dto.WalletChargePrepareResponse
+import com.hack.kidhack.data.remote.dto.WalletChargeApproveRequest
+import com.hack.kidhack.data.remote.dto.WalletChargeApproveResponse
+import com.hack.kidhack.data.remote.dto.ChargeOrderResponseDto
+import com.hack.kidhack.data.remote.dto.WalletRefundResponse
+import com.hack.kidhack.data.remote.dto.TxResponseDto
+import com.hack.kidhack.data.remote.dto.ChargeHistoryResponseDto
+import com.hack.kidhack.data.remote.dto.WalletTransferRequest
+import com.hack.kidhack.data.remote.dto.WalletTransferResponse
+import com.hack.kidhack.data.remote.dto.MyWalletResponse
+import com.hack.kidhack.data.remote.dto.ChildWalletResponse
+import com.hack.kidhack.data.remote.dto.CardPublicKeyResponse
+import com.hack.kidhack.data.remote.dto.EncryptedCardRequest
+import com.hack.kidhack.data.remote.dto.CardResponse
+import com.hack.kidhack.data.remote.dto.QrIssueResponse
+import com.hack.kidhack.data.remote.dto.QrStatusResponse
+import com.hack.kidhack.data.remote.dto.QrCancelResponse
+import com.hack.kidhack.data.remote.dto.QrPaymentHistoryResponseDto
+import com.hack.kidhack.data.remote.dto.TerminalIssueRequest
+import com.hack.kidhack.data.remote.dto.TerminalResponse
+import com.hack.kidhack.data.remote.dto.TerminalAuthResponse
+import com.hack.kidhack.data.remote.dto.QrApproveRequest
+import com.hack.kidhack.data.remote.dto.QrApproveResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.HTTP
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
@@ -658,36 +683,145 @@ interface PaymentChargeApi {
     suspend fun cancel(@Path("chargeId") chargeId: String, @Body body: ChargeCancelRequest): ApiEnvelope<Unit>
 }
 
+/**
+ * 지갑 API (서버 v0.2, /api/wallet) — Swagger 태그 11~13.
+ * 옛 [PaymentChargeApi]·[PaymentApi]·[PointApi] 는 남겨 두되, 화면은 이 인터페이스를 쓴다.
+ */
 interface WalletApi {
-    @GET("wallets/me")
-    suspend fun me(): ApiEnvelope<WalletDto>
+    // 11. 충전/환불 (2단계: prepare → approve)
+    @POST("wallet/charge/prepare")
+    suspend fun chargePrepare(@Body body: WalletChargePrepareRequest): ApiEnvelope<WalletChargePrepareResponse>
 
-    @GET("wallets/me/transactions")
+    @POST("wallet/charge/approve")
+    suspend fun chargeApprove(@Body body: WalletChargeApproveRequest): ApiEnvelope<WalletChargeApproveResponse>
+
+    @POST("wallet/charge/{merchantUid}/cancel")
+    suspend fun chargeCancel(@Path("merchantUid") merchantUid: String): ApiEnvelope<ChargeOrderResponseDto>
+
+    @POST("wallet/charge/{merchantUid}/refund")
+    suspend fun chargeRefund(@Path("merchantUid") merchantUid: String): ApiEnvelope<WalletRefundResponse>
+
+    @GET("wallet/transactions")
     suspend fun transactions(
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20,
+    ): ApiEnvelope<PageResponse<TxResponseDto>>
+
+    @GET("wallet/charges")
+    suspend fun charges(
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20,
+    ): ApiEnvelope<PageResponse<ChargeOrderResponseDto>>
+
+    @GET("wallet/charge-history")
+    suspend fun chargeHistory(
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20,
+    ): ApiEnvelope<PageResponse<ChargeHistoryResponseDto>>
+
+    // 12. 이체/회수
+    @POST("wallet/transfer")
+    suspend fun transfer(@Body body: WalletTransferRequest): ApiEnvelope<WalletTransferResponse>
+
+    @POST("wallet/recover")
+    suspend fun recover(@Body body: WalletTransferRequest): ApiEnvelope<WalletTransferResponse>
+
+    // 13. 조회 (잔액 + 이번달 합계 + 원장이 한 응답)
+    @GET("wallet/me")
+    suspend fun me(
         @Query("type") type: String? = null,
         @Query("from") from: String? = null,
         @Query("to") to: String? = null,
         @Query("page") page: Int = 0,
-        @Query("size") size: Int = 20
-    ): ApiEnvelope<PageResponse<WalletTransactionDto>>
+        @Query("size") size: Int = 20,
+    ): ApiEnvelope<MyWalletResponse>
 
-    @POST("wallets/transfer")
-    suspend fun transfer(@Body body: TransferRequest): ApiEnvelope<TransferResponse>
+    @GET("wallet/children/{childId}")
+    suspend fun childWallet(
+        @Path("childId") childId: Long,
+        @Query("limit") limit: Int = 5,
+    ): ApiEnvelope<ChildWalletResponse>
 
-    @POST("wallets/reclaim")
-    suspend fun reclaim(@Body body: TransferRequest): ApiEnvelope<TransferResponse>
+    @GET("wallet/children/{childId}/transactions")
+    suspend fun childTransactions(
+        @Path("childId") childId: Long,
+        @Query("type") type: String? = null,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20,
+    ): ApiEnvelope<MyWalletResponse>
 
-    @GET("children/{childId}/wallet")
-    suspend fun childWallet(@Path("childId") childId: String): ApiEnvelope<WalletDto>
+    @GET("wallet/children/{childId}/transfers")
+    suspend fun childTransfers(
+        @Path("childId") childId: Long,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20,
+    ): ApiEnvelope<PageResponse<TxResponseDto>>
 }
 
+/**
+ * 카드 API (서버 v0.2, /api/wallet/cards) — Swagger 태그 14. E2E 암호화 등록.
+ * 등록 흐름: [publicKey] 조회 → 클라이언트 암호화 → [register].
+ */
 interface CardApi {
-    @POST("payments/cards")
-    suspend fun register(@Body body: CardRegisterRequest): ApiEnvelope<CardDto>
+    @GET("wallet/cards/public-key")
+    suspend fun publicKey(): ApiEnvelope<CardPublicKeyResponse>
 
-    @GET("payments/cards")
-    suspend fun list(): ApiEnvelope<List<CardDto>>
+    @POST("wallet/cards")
+    suspend fun register(@Body body: EncryptedCardRequest): ApiEnvelope<CardResponse>
 
-    @DELETE("payments/cards/{cardId}")
-    suspend fun delete(@Path("cardId") cardId: String): ApiEnvelope<Unit>
+    @GET("wallet/cards")
+    suspend fun list(): ApiEnvelope<List<CardResponse>>
+
+    @DELETE("wallet/cards/{cardId}")
+    suspend fun delete(@Path("cardId") cardId: Long): ApiEnvelope<Unit>
+}
+
+/**
+ * QR 결제 API (서버 v0.2, /api/qrpay) — Swagger 태그 15·18·19.
+ * 발급(자녀)·상태 폴링·취소(부모)·결제 내역. 매장 단말 승인은 [StoreTerminalApi] 로 분리.
+ */
+interface QrPayApi {
+    // 15. QR 발급/조회 (자녀)
+    @POST("qrpay/qr")
+    suspend fun issue(): ApiEnvelope<QrIssueResponse>
+
+    @GET("qrpay/qr/{qrToken}")
+    suspend fun status(@Path("qrToken") qrToken: String): ApiEnvelope<QrStatusResponse>
+
+    // 18. 결제 취소 (부모)
+    @POST("qrpay/payments/{qrToken}/cancel")
+    suspend fun cancel(@Path("qrToken") qrToken: String): ApiEnvelope<QrCancelResponse>
+
+    // 19. 결제 내역 (부모는 childId 필수, 자녀는 파라미터 무시)
+    @GET("qrpay/payments")
+    suspend fun history(
+        @Query("childId") childId: Long? = null,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20,
+    ): ApiEnvelope<PageResponse<QrPaymentHistoryResponseDto>>
+}
+
+/**
+ * 매장 단말 API (서버 v0.2, /api/qrpay/terminals · /api/qrpay/terminal) — Swagger 태그 16·17.
+ *
+ * **회원 앱 정상 흐름과 분리된 테스트/시연 전용 경로다.** 단말 승인은 앱 JWT 가 아니라
+ * `X-Store-Terminal-Token` 헤더로만 인증된다(자녀 앱의 자가승인과 명확히 구분).
+ */
+interface StoreTerminalApi {
+    // 17. 단말 등록/토큰 발급 + 목록
+    @POST("qrpay/terminals")
+    suspend fun issue(@Body body: TerminalIssueRequest): ApiEnvelope<TerminalResponse>
+
+    @GET("qrpay/terminals")
+    suspend fun list(): ApiEnvelope<List<TerminalResponse>>
+
+    // 16. 단말 인증 확인 + 결제 승인 (X-Store-Terminal-Token 헤더)
+    @GET("qrpay/terminal/me")
+    suspend fun me(@Header("X-Store-Terminal-Token") terminalToken: String): ApiEnvelope<TerminalAuthResponse>
+
+    @POST("qrpay/terminal/pay")
+    suspend fun pay(
+        @Header("X-Store-Terminal-Token") terminalToken: String,
+        @Body body: QrApproveRequest,
+    ): ApiEnvelope<QrApproveResponse>
 }

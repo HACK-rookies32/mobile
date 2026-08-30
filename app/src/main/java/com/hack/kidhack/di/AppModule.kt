@@ -46,6 +46,8 @@ import com.hack.kidhack.data.remote.api.PointApi
 import com.hack.kidhack.data.remote.api.ScreenshotApi
 import com.hack.kidhack.data.remote.api.UserApi
 import com.hack.kidhack.data.remote.api.WalletApi
+import com.hack.kidhack.data.remote.api.QrPayApi
+import com.hack.kidhack.data.remote.api.StoreTerminalApi
 import com.hack.kidhack.data.remote.interceptor.AuthInterceptor
 import com.hack.kidhack.data.remote.interceptor.TokenAuthenticator
 import com.hack.kidhack.data.repository.CachedChatRepository
@@ -78,6 +80,10 @@ import com.hack.kidhack.data.repository.fake.FakeScreenshotRepository
 import com.hack.kidhack.data.repository.fake.FakeUserRepository
 import com.hack.kidhack.data.repository.real.RealAllowanceRepository
 import com.hack.kidhack.data.repository.fake.FakeWalletRepository
+import com.hack.kidhack.data.repository.fake.FakeQrPayRepository
+import com.hack.kidhack.data.repository.fake.FakeStoreTerminalRepository
+import com.hack.kidhack.data.repository.real.RealQrPayRepository
+import com.hack.kidhack.data.repository.real.RealStoreTerminalRepository
 import com.hack.kidhack.data.repository.real.RealAppControlRepository
 import com.hack.kidhack.data.repository.real.RealAppUsageRepository
 import com.hack.kidhack.data.repository.real.RealAuthRepository
@@ -135,6 +141,8 @@ import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
 import com.hack.kidhack.domain.repository.UserRepository
 import com.hack.kidhack.domain.repository.WalletRepository
+import com.hack.kidhack.domain.repository.QrPayRepository
+import com.hack.kidhack.domain.repository.StoreTerminalRepository
 import com.hack.kidhack.feature.auth.forgot.ForgotViewModel
 import com.hack.kidhack.feature.auth.login.LoginViewModel
 import com.hack.kidhack.feature.auth.register.RegisterViewModel
@@ -160,6 +168,7 @@ import com.hack.kidhack.feature.parent.NotificationsViewModel
 import com.hack.kidhack.feature.parent.PairingViewModel
 import com.hack.kidhack.feature.parent.ParentChatViewModel
 import com.hack.kidhack.feature.parent.PayViewModel
+import com.hack.kidhack.feature.terminal.StoreTerminalViewModel
 import com.hack.kidhack.feature.parent.CameraRequestViewModel
 import com.hack.kidhack.feature.parent.ScreenshotViewModel
 import com.hack.kidhack.feature.child.ChildPairingViewModel
@@ -267,6 +276,8 @@ val appModule = module {
     single { get<Retrofit>().create(PaymentChargeApi::class.java) }
     single { get<Retrofit>().create(WalletApi::class.java) }
     single { get<Retrofit>().create(CardApi::class.java) }
+    single { get<Retrofit>().create(QrPayApi::class.java) }
+    single { get<Retrofit>().create(StoreTerminalApi::class.java) }
 
     single<AuthRepository> {
         if (useMock) {
@@ -321,10 +332,18 @@ val appModule = module {
         if (useMock) FakeAppControlRepository() else RealAppControlRepository(get())
     }
     single<WalletRepository> {
-        if (useMock) FakeWalletRepository() else RealWalletRepository(get(), get())
+        if (useMock) FakeWalletRepository() else RealWalletRepository(get())
     }
     single<CardRepository> {
         if (useMock) FakeCardRepository() else RealCardRepository(get())
+    }
+    // 루키즈페이 QR 결제 (자녀 발급/폴링 · 부모 취소/내역)
+    single<QrPayRepository> {
+        if (useMock) FakeQrPayRepository() else RealQrPayRepository(get())
+    }
+    // 매장 단말 — 회원 앱과 분리된 테스트/시연 전용
+    single<StoreTerminalRepository> {
+        if (useMock) FakeStoreTerminalRepository() else RealStoreTerminalRepository(get())
     }
 
     // FCM 대체 푸시 채널 (WebSocket + 폴링 백업)
@@ -365,8 +384,10 @@ val appModule = module {
     viewModel { params -> CommunityWriteViewModel(get(), params.get()) }
     viewModel { NoticeViewModel(get()) }
     viewModel { ContactViewModel(get<InquiryRepository>()) }
-    viewModel { PayViewModel(get(), get(), get()) }
+    viewModel { PayViewModel(get(), get(), get(), get()) }
     viewModel { CardViewModel(get()) }
+    // 매장 단말 테스트 화면 (숨은 라우트, 디버그/시연용)
+    viewModel { StoreTerminalViewModel(get()) }
 
     viewModel { ChildHomeViewModel(get(), get(), get(), get(), get(), get()) }
     viewModel { ChildChatViewModel(get(), get()) }

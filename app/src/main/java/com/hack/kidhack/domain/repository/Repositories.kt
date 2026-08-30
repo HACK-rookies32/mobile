@@ -13,6 +13,10 @@ import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.ChargeHistoryItem
+import com.hack.kidhack.domain.model.QrTicket
+import com.hack.kidhack.domain.model.QrPaymentHistoryItem
+import com.hack.kidhack.domain.model.StoreTerminalInfo
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
@@ -344,6 +348,18 @@ interface WalletRepository {
     suspend fun getChildWallet(childId: String): Wallet
     suspend fun prepareCharge(amount: Int, method: String, cardId: String): Charge
     suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet
+
+    /** 이 부모↔자녀 사이 이체/회수 원장(최신순 페이징). */
+    suspend fun getChildTransfers(childId: String, page: Int = 0): List<WalletTransaction>
+
+    /** 충전 통합 내역(주문+환불시각). */
+    suspend fun getChargeHistory(page: Int = 0): List<ChargeHistoryItem>
+
+    /** 결제 완료(PAID)된 충전을 전액 환불한다. @return 환불 후 잔액. */
+    suspend fun refundCharge(merchantUid: String): Int
+
+    /** 아직 결제 안 된(READY) 충전 주문을 취소한다. @return 취소 후 주문 상태. */
+    suspend fun cancelCharge(merchantUid: String): String
 }
 
 interface CardRepository {
@@ -357,6 +373,32 @@ interface CardRepository {
     ): Card
     suspend fun list(): List<Card>
     suspend fun delete(cardId: String)
+}
+
+/**
+ * QR 결제(태그 15·18·19) — 서버 `/api/qrpay`.
+ *
+ * 자녀는 [issueQr] 로 **서버 발급** 토큰을 받아 QR 을 띄우고 [qrStatus] 로 승인 여부를 폴링한다.
+ * 승인(PAID 전이)은 매장 단말이 하며(→ [StoreTerminalRepository]) 자녀 앱은 하지 않는다.
+ * [cancel] 은 부모, [paymentHistory] 는 부모(childId 필수)·자녀(null) 공용.
+ */
+interface QrPayRepository {
+    suspend fun issueQr(): QrTicket
+    suspend fun qrStatus(qrToken: String): QrTicket
+    suspend fun cancel(qrToken: String)
+    suspend fun paymentHistory(childId: String?, page: Int = 0): List<QrPaymentHistoryItem>
+}
+
+/**
+ * 매장 단말(태그 16·17) — 회원 앱 정상 흐름과 분리된 **테스트/시연 전용** 리포지토리.
+ *
+ * 단말 토큰을 발급/조회하고, 그 토큰으로 자녀 QR 을 승인한다(`X-Store-Terminal-Token`).
+ * 자녀 앱의 옛 자가승인과 혼동되지 않도록 별도 인터페이스로 격리한다.
+ */
+interface StoreTerminalRepository {
+    suspend fun issueTerminal(storeName: String): StoreTerminalInfo
+    suspend fun terminals(): List<StoreTerminalInfo>
+    suspend fun approve(terminalToken: String, qrToken: String, amount: Int): QrPaymentHistoryItem
 }
 
 interface ChatRepository {

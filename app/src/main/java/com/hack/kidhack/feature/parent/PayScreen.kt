@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,12 +44,17 @@ import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.data.remote.userMessage
 import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.QrPaymentHistoryItem
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
 import com.hack.kidhack.domain.repository.CardRepository
+import com.hack.kidhack.domain.repository.QrPayRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
 import com.hack.kidhack.domain.repository.WalletRepository
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,11 +65,33 @@ import org.koin.androidx.compose.koinViewModel
 enum class PayTab { CHARGE, SEND, RECLAIM, HISTORY }
 enum class TxFilter { ALL, OUT, IN, PAY }
 
+/** 확인이 필요한 결제 동작 — 충전 환불(PAID)·충전 취소(READY)·자녀 매장결제 취소(PAID). */
+sealed interface PayAction {
+    val label: String
+    data class RefundCharge(val merchantUid: String, val amount: Int) : PayAction {
+        override val label get() = "₩ ${formatWon(amount)} 충전을 환불할까요? 지갑 잔액에서 차감돼요."
+    }
+    data class CancelCharge(val merchantUid: String, val amount: Int) : PayAction {
+        override val label get() = "₩ ${formatWon(amount)} 충전 주문을 취소할까요?"
+    }
+    data class CancelPayment(val qrToken: String, val storeName: String, val amount: Int) : PayAction {
+        override val label get() = "$storeName 결제 ₩ ${formatWon(amount)} 를 취소할까요? 자녀 지갑으로 환급돼요."
+    }
+}
+
 data class PayUiState(
     val wallet: Wallet? = null,
     val childWallet: Wallet? = null,
     val cards: List<Card> = emptyList(),
     val transactions: List<WalletTransaction> = emptyList(),
+    /** 자녀별 이체 이력(자녀 선택 시). */
+    val childTransfers: List<WalletTransaction> = emptyList(),
+    /** 충전 통합 내역. */
+    val chargeHistory: List<com.hack.kidhack.domain.model.ChargeHistoryItem> = emptyList(),
+    /** 선택한 자녀의 QR 매장결제 내역(태그 19). 부모가 여기서 취소(태그 18)할 수 있다. */
+    val childPayments: List<QrPaymentHistoryItem> = emptyList(),
+    /** 확인 다이얼로그가 떠 있는 동작. */
+    val pendingAction: PayAction? = null,
     val tab: PayTab = PayTab.SEND,
     val txFilter: TxFilter = TxFilter.ALL,
     val selectedCardId: String? = null,
@@ -78,7 +106,8 @@ data class PayUiState(
 class PayViewModel(
     private val walletRepository: WalletRepository,
     private val cardRepository: CardRepository,
-    private val selectedChildRepository: SelectedChildRepository
+    private val selectedChildRepository: SelectedChildRepository,
+    private val qrPayRepository: QrPayRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(PayUiState())
@@ -108,7 +137,20 @@ class PayViewModel(
         }
     }
 
+    /** 마지막 전체 조회 시각 — 화면 재진입 시 과한 재조회를 막는 용도. */
+    private var lastLoadedAt = 0L
+
+    /**
+     * 화면 재진입용(매장 단말 화면·카드 관리에서 돌아올 때). 뷰모델이 유지되면 init 의 load() 가 다시 돌지 않아
+     * 자녀 잔액·매장 결제 내역이 옛 값으로 남던 문제 — 최근 3초 안에 조회했으면 건너뛴다.
+     */
+    fun refreshIfStale() {
+        if (System.currentTimeMillis() - lastLoadedAt < 3_000L) return
+        load()
+    }
+
     fun load() {
+        lastLoadedAt = System.currentTimeMillis()
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
@@ -119,17 +161,64 @@ class PayViewModel(
                 Triple(wallet, cards, childWallet to childId)
             }.onSuccess { (w, c, cw) ->
                 _state.update { it.copy(
-                    loading = false, 
-                    wallet = w, 
-                    cards = c, 
-                    childWallet = cw.first, 
+                    loading = false,
+                    wallet = w,
+                    cards = c,
+                    childWallet = cw.first,
                     childId = cw.second,
                     selectedCardId = c.firstOrNull()?.cardId
                 ) }
                 loadTransactions()
+                loadChargeHistory()
+                cw.second?.let {
+                    loadChildTransfers(it)
+                    loadChildPayments(it)
+                }
             }.onFailure { t ->
                 _state.update { it.copy(loading = false, error = t.message) }
             }
+        }
+    }
+
+    private fun loadChildPayments(childId: String) {
+        viewModelScope.launch {
+            runCatching { qrPayRepository.paymentHistory(childId, 0) }
+                .onSuccess { list -> _state.update { it.copy(childPayments = list) } }
+        }
+    }
+
+    fun request(action: PayAction) = _state.update { it.copy(pendingAction = action, error = null, successMessage = null) }
+    fun dismissAction() = _state.update { it.copy(pendingAction = null) }
+
+    /** 확인 다이얼로그에서 「확인」. 서버 반영 뒤 전체를 다시 읽어 잔액·내역을 맞춘다. */
+    fun confirmAction() {
+        val action = _state.value.pendingAction ?: return
+        _state.update { it.copy(pendingAction = null, loading = true) }
+        viewModelScope.launch {
+            runCatching {
+                when (action) {
+                    is PayAction.RefundCharge -> walletRepository.refundCharge(action.merchantUid).let { "환불이 완료되었습니다." }
+                    is PayAction.CancelCharge -> walletRepository.cancelCharge(action.merchantUid).let { "충전 주문을 취소했습니다." }
+                    is PayAction.CancelPayment -> qrPayRepository.cancel(action.qrToken).let { "결제를 취소했습니다. 자녀 지갑으로 환급됐어요." }
+                }
+            }.onSuccess { msg ->
+                _state.update { it.copy(successMessage = msg) }
+                load()
+            }.onFailure { handlePayError(it) }
+        }
+    }
+
+    private fun loadChargeHistory() {
+        viewModelScope.launch {
+            runCatching { walletRepository.getChargeHistory(0) }
+                .onSuccess { list -> _state.update { it.copy(chargeHistory = list) } }
+        }
+    }
+
+    private fun loadChildTransfers(childId: String) {
+        viewModelScope.launch {
+            runCatching { walletRepository.getChildTransfers(childId, 0) }
+                .onSuccess { list -> _state.update { it.copy(childTransfers = list) } }
         }
     }
 
@@ -146,6 +235,10 @@ class PayViewModel(
         }
     }
 
+    // [VULN-MOBILE-PAY-2] 충전·송금(send)·회수(reclaim)·QR 결제 금액을 클라이언트 입력값 그대로 서버에 전송한다.
+    // 서버 금액 미검증(백엔드 VULN-WALLET-1/7)과 결합하면 금액 변조 표면이 된다. 클라이언트측 신뢰 경계 결함.
+    // 의도된 취약점(OWASP Mobile M4 Insufficient Input/Output Validation). 보존: 고치지 말 것.
+    // 명세: mobile/docs/vuln-spec-mobile.md
     fun charge() {
         val amount = _state.value.amountInput.toIntOrNull() ?: return
         val cardId = _state.value.selectedCardId ?: return
@@ -198,7 +291,7 @@ class PayViewModel(
             t.message?.contains("402") == true -> "잔액이 부족합니다."
             t.message?.contains("403") == true -> "요청 권한이 없습니다."
             t.message?.contains("400") == true -> "잘못된 입력입니다."
-            else -> t.message ?: "오류가 발생했습니다."
+            else -> t.userMessage("오류가 발생했습니다.")
         }
         _state.update { it.copy(loading = false, error = msg) }
     }
@@ -208,10 +301,13 @@ class PayViewModel(
 fun ParentPayScreen(
     onBack: () -> Unit = {},
     onRegisterCard: () -> Unit = {},
+    onOpenTerminal: () -> Unit = {},
     viewModel: PayViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
+    // 단말 테스트·카드 관리 화면에서 돌아오면 잔액·내역을 다시 읽는다.
+    LaunchedEffect(Unit) { viewModel.refreshIfStale() }
 
     LifecycleResumeEffect(Unit) {
         viewModel.refreshCards()
@@ -342,6 +438,16 @@ fun ParentPayScreen(
                                 enabled = state.amountInput.isNotEmpty() && state.selectedCardId != null
                             )
                         }
+                        if (state.chargeHistory.isNotEmpty()) {
+                            Spacer(Modifier.height(16.dp))
+                            KidCard {
+                                Text("충전 내역", fontWeight = FontBold, fontSize = 14.sp)
+                                state.chargeHistory.forEachIndexed { i, item ->
+                                    ChargeHistoryRow(item) { viewModel.request(it) }
+                                    if (i < state.chargeHistory.lastIndex) HorizontalDivider(color = colors.border.copy(0.5f))
+                                }
+                            }
+                        }
                     }
                 }
                 PayTab.HISTORY -> {
@@ -360,10 +466,142 @@ fun ParentPayScreen(
                             if (i < state.transactions.lastIndex) HorizontalDivider(color = colors.border.copy(0.5f))
                         }
                     }
+                    if (state.childId != null && state.childTransfers.isNotEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        KidCard {
+                            Text("자녀 이체 내역", fontWeight = FontBold, fontSize = 14.sp)
+                            state.childTransfers.forEachIndexed { i, tx ->
+                                TransactionRow(tx)
+                                if (i < state.childTransfers.lastIndex) HorizontalDivider(color = colors.border.copy(0.5f))
+                            }
+                        }
+                    }
+                    if (state.childId != null) {
+                        Spacer(Modifier.height(12.dp))
+                        KidCard {
+                            Text("자녀 매장 결제 내역", fontWeight = FontBold, fontSize = 14.sp)
+                            Text("결제를 취소하면 자녀 지갑으로 환급돼요", color = colors.muted, fontSize = 11.sp)
+                            if (state.childPayments.isEmpty()) {
+                                Text("아직 결제 내역이 없어요", color = colors.muted, fontSize = 13.sp, modifier = Modifier.padding(vertical = 12.dp))
+                            }
+                            state.childPayments.forEachIndexed { i, p ->
+                                ChildPaymentRow(p) { viewModel.request(it) }
+                                if (i < state.childPayments.lastIndex) HorizontalDivider(color = colors.border.copy(0.5f))
+                            }
+                        }
+                    }
                 }
             }
         }
+        state.pendingAction?.let { action ->
+            AlertDialog(
+                onDismissRequest = viewModel::dismissAction,
+                title = { Text("확인", fontWeight = FontBold) },
+                text = { Text(action.label) },
+                confirmButton = {
+                    TextButton(onClick = viewModel::confirmAction) {
+                        Text("확인", color = colors.danger, fontWeight = FontBold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = viewModel::dismissAction) { Text("취소", color = colors.muted) }
+                },
+            )
+        }
+        // 매장 단말 테스트 진입점 — 디버그/api 빌드에서만 보이는 숨은 링크(회원 앱 정상 기능 아님).
+        if (com.hack.kidhack.BuildConfig.DEBUG) {
+            Spacer(Modifier.height(16.dp))
+            KidButton(
+                text = "🧪 매장 단말 (테스트)",
+                onClick = onOpenTerminal,
+                modifier = Modifier.fillMaxWidth(),
+                variant = KidButtonVariant.Ghost,
+            )
+        }
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+/** 충전 1건. PAID 는 「환불」(태그 11 refund), READY 는 「취소」(cancel) 버튼이 붙는다. */
+@Composable
+private fun ChargeHistoryRow(
+    item: com.hack.kidhack.domain.model.ChargeHistoryItem,
+    onAction: (PayAction) -> Unit = {},
+) {
+    val colors = LocalKidhackColors.current
+    val statusLabel = when (item.status) {
+        "PAID" -> "충전완료"
+        "REFUNDED" -> "환불됨"
+        "READY" -> "대기중"
+        "CANCELLED" -> "취소됨"
+        "FAILED" -> "실패"
+        "EXPIRED" -> "만료됨"
+        else -> item.status
+    }
+    Row(Modifier.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(statusLabel, fontWeight = FontBold, fontSize = 14.sp)
+            Text(
+                item.refundedAtLabel?.let { "환불 $it" } ?: item.createdAtLabel,
+                color = colors.muted,
+                fontSize = 11.sp,
+            )
+        }
+        Text("₩ ${formatWon(item.amount)}", fontWeight = FontBlack, fontSize = 14.sp, color = colors.text)
+        val action = when (item.status) {
+            "PAID" -> "환불" to PayAction.RefundCharge(item.merchantUid, item.amount)
+            "READY" -> "취소" to PayAction.CancelCharge(item.merchantUid, item.amount)
+            else -> null
+        }
+        if (action != null) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                action.first,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(colors.danger.copy(alpha = 0.1f))
+                    .clickable { onAction(action.second) }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                color = colors.danger,
+                fontWeight = FontBold,
+                fontSize = 12.sp,
+            )
+        }
+    }
+}
+
+/** 자녀 매장 결제 1건(태그 19). PAID 면 부모가 「취소」(태그 18)할 수 있다. */
+@Composable
+private fun ChildPaymentRow(item: QrPaymentHistoryItem, onAction: (PayAction) -> Unit) {
+    val colors = LocalKidhackColors.current
+    val cancelled = item.status == "CANCELLED"
+    Row(Modifier.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(if (cancelled) "↩️" else "🧾", fontSize = 18.sp)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(item.storeName, fontWeight = FontBold, fontSize = 14.sp)
+            Text(item.paidAtLabel, color = colors.muted, fontSize = 11.sp)
+        }
+        Text(
+            if (cancelled) "취소됨" else "-₩ ${formatWon(item.amount)}",
+            fontWeight = FontBlack,
+            fontSize = 14.sp,
+            color = if (cancelled) colors.muted else colors.text,
+        )
+        if (!cancelled) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "취소",
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(colors.danger.copy(alpha = 0.1f))
+                    .clickable { onAction(PayAction.CancelPayment(item.qrToken, item.storeName, item.amount)) }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                color = colors.danger,
+                fontWeight = FontBold,
+                fontSize = 12.sp,
+            )
+        }
     }
 }
 

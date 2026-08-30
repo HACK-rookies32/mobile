@@ -51,12 +51,26 @@ import com.hack.kidhack.domain.model.AllowancePayment
 import com.hack.kidhack.domain.model.AllowanceType
 import com.hack.kidhack.data.remote.dto.WalletDto
 import com.hack.kidhack.data.remote.dto.WalletTransactionDto
+import com.hack.kidhack.data.remote.dto.TxResponseDto
+import com.hack.kidhack.data.remote.dto.MyWalletResponse
+import com.hack.kidhack.data.remote.dto.ChildWalletResponse
+import com.hack.kidhack.data.remote.dto.WalletChargePrepareResponse
+import com.hack.kidhack.data.remote.dto.ChargeHistoryResponseDto
+import com.hack.kidhack.data.remote.dto.CardResponse
+import com.hack.kidhack.data.remote.dto.QrIssueResponse
+import com.hack.kidhack.data.remote.dto.QrStatusResponse
+import com.hack.kidhack.data.remote.dto.QrPaymentHistoryResponseDto
+import com.hack.kidhack.data.remote.dto.TerminalResponse
 import com.hack.kidhack.domain.model.AppNotification
 import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.ChargeHistoryItem
+import com.hack.kidhack.domain.model.QrTicket
+import com.hack.kidhack.domain.model.QrPaymentHistoryItem
+import com.hack.kidhack.domain.model.StoreTerminalInfo
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
@@ -512,3 +526,106 @@ fun TransferResponse.toDomain(): TransferResult = TransferResult(
     childBalance = childBalance,
     txId = txId
 )
+
+/* ---- 결제 서버(v0.2) 매퍼 — /api/wallet · /api/qrpay ---- */
+
+/** 서버 원장(long) → 앱 도메인(Int). 금액은 이 앱 도메인에서 Int 로 충분하다. */
+fun TxResponseDto.toDomain(): WalletTransaction = WalletTransaction(
+    txId = id.toString(),
+    type = type,
+    amount = amount.toInt(),
+    balanceAfter = balanceAfter.toInt(),
+    refId = refUid,
+    createdAt = createdAt.toShortDateTimeLabel(),
+)
+
+/** 내 지갑 응답 → 잔액만 담은 Wallet(원장·월합계는 별도 경로에서 쓴다). */
+fun MyWalletResponse.toWallet(): Wallet = Wallet(
+    walletId = "me",
+    balance = balance.toInt(),
+    updatedAt = "",
+)
+
+fun ChildWalletResponse.toWallet(): Wallet = Wallet(
+    walletId = childId.toString(),
+    balance = balance.toInt(),
+    updatedAt = "",
+)
+
+fun WalletChargePrepareResponse.toCharge(): Charge = Charge(
+    chargeId = merchantUid,
+    amount = amount.toInt(),
+    status = "READY",
+    paymentKey = null,
+    // 서버가 알려 준 PG 이름(mock 이면 "MOCK" 등) — 토스 결제창 목업에 표시한다.
+    method = pgProvider,
+)
+
+fun ChargeHistoryResponseDto.toDomain(): ChargeHistoryItem = ChargeHistoryItem(
+    merchantUid = merchantUid,
+    amount = amount.toInt(),
+    status = status,
+    createdAtLabel = createdAt.toShortDateTimeLabel(),
+    refundedAtLabel = refundedAt?.takeIf { it.isNotBlank() }?.toShortDateTimeLabel(),
+)
+
+fun CardResponse.toDomain(): Card = Card(
+    cardId = id.toString(),
+    last4 = maskedCardNumber.filter { it.isDigit() }.takeLast(4),
+    expiry = expiry,
+    ownerName = ownerName,
+)
+
+fun QrIssueResponse.toDomain(): QrTicket = QrTicket(
+    qrToken = qrToken,
+    status = status,
+    // 서버 expiresAt 은 존(zone) 없는 LocalDateTime(서버 KST). 기기 시간대가 다르면(예: GMT 에뮬레이터)
+    // 9시간짜리 카운트다운이 나오므로 QR TTL(60초)로 상한을 건다.
+    expiresAtMillis = minOf(expiresAt.toEpochMillisOrFuture(), System.currentTimeMillis() + QR_TTL_MS),
+)
+
+/** 서버 QR 유효 시간(태그 15: 발급 후 60초). */
+private const val QR_TTL_MS = 60_000L
+
+fun QrStatusResponse.toDomain(): QrTicket = QrTicket(
+    qrToken = qrToken,
+    status = status,
+    expiresAtMillis = expiresAt.toEpochMillisOrFuture(),
+)
+
+fun QrPaymentHistoryResponseDto.toDomain(): QrPaymentHistoryItem = QrPaymentHistoryItem(
+    qrToken = qrToken,
+    storeName = storeName?.takeIf { it.isNotBlank() } ?: "매장",
+    amount = amount.toInt(),
+    status = status,
+    paidAtLabel = paidAt.toShortDateTimeLabel(),
+)
+
+fun TerminalResponse.toDomain(): StoreTerminalInfo = StoreTerminalInfo(
+    id = id,
+    storeName = storeName,
+    terminalToken = terminalToken.orEmpty(),
+    status = status,
+)
+
+/** "2026-08-30T11:20:00" → "08.30 11:20". 파싱 실패 시 원문 유지. */
+private fun String.toShortDateTimeLabel(): String {
+    if (isBlank()) return ""
+    return runCatching {
+        val dt = java.time.LocalDateTime.parse(take(19))
+        "%02d.%02d %02d:%02d".format(dt.monthValue, dt.dayOfMonth, dt.hour, dt.minute)
+    }.getOrDefault(this)
+}
+
+/** ISO 문자열 → epoch millis. 파싱 실패 시 지금+60초(서버 QR TTL 기본값)로 안전 폴백. */
+private fun String.toEpochMillisOrFuture(): Long {
+    if (isNotBlank()) {
+        runCatching {
+            java.time.LocalDateTime.parse(take(19))
+                .atZone(java.time.ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+        }.getOrNull()?.let { return it }
+    }
+    return System.currentTimeMillis() + 60_000L
+}
