@@ -59,6 +59,41 @@ class PushMessageTest {
     }
 
     @Test
+    fun `서버 실제 페이로드 - kind 없이 type 만 오면 type 으로 추론한다`() {
+        // 서버 FirebasePushSender: data{type, notificationId, childId?, title, body}
+        val command = PushMessage.fromData(
+            mapOf(
+                "type" to "SCREENSHOT_REQUESTED",
+                "notificationId" to "31",
+                "title" to "화면 캡처 요청",
+                "body" to "부모가 화면 캡처를 요청했습니다.",
+            ),
+        )
+        assertEquals(PushMessage.Kind.CHILD_COMMAND, command.kind)
+        assertEquals("31", command.id)
+
+        val alert = PushMessage.fromData(
+            mapOf(
+                "type" to "HARMFUL_SITE",
+                "notificationId" to "32",
+                "childId" to "13",
+                "title" to "유해 접속 감지",
+                "body" to "유해 사이트/앱 접속이 감지되었습니다: badsite",
+            ),
+        )
+        assertEquals(PushMessage.Kind.PARENT_ALERT, alert.kind)
+        assertEquals("32", alert.id)
+        assertEquals("13", alert.childId)
+        assertEquals("유해 접속 감지", alert.title)
+    }
+
+    @Test
+    fun `명시된 kind 가 type 추론보다 우선한다`() {
+        val msg = PushMessage.fromData(mapOf("kind" to "PARENT_ALERT", "type" to "SCREENSHOT_REQUESTED", "notificationId" to "1"))
+        assertEquals(PushMessage.Kind.PARENT_ALERT, msg.kind)
+    }
+
+    @Test
     fun `누락된 필드는 빈 문자열·null 로 안전하게 채운다`() {
         val msg = PushMessage.fromData(mapOf("kind" to "PARENT_ALERT"))
         assertEquals("", msg.type)

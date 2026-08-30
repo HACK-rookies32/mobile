@@ -4,6 +4,8 @@
    for details.
 -->
 <data-extraction-rules>
+    <!-- [VULN-MOBILE-STORE-2] cloud-backup/device-transfer 규칙을 비워 둬 세션 토큰 포함 앱 데이터가
+         클라우드 백업·기기이전 대상이 된다. 의도된 취약점(OWASP Mobile M9). 명세: mobile/docs/vuln-spec-mobile.md -->
     <cloud-backup>
         <!-- TODO: Use <include> and <exclude> to control what is backed up.
         <include .../>

@@ -81,6 +81,10 @@ class SessionRepositoryImpl(
     override suspend fun save(session: Session) {
         cached = session
         loaded = true
+        // [VULN-MOBILE-STORE-1] access/refresh 토큰을 DataStore(session.preferences_pb)에 평문 저장 —
+        // 의도된 취약점(OWASP Mobile M9 Insecure Data Storage / MOB-FIN 자격증명 보호).
+        // Android Keystore·EncryptedSharedPreferences·EncryptedFile 미사용. 보존: 고치지 말 것.
+        // 명세: mobile/docs/vuln-spec-mobile.md
         dataStore.edit { prefs ->
             prefs[Keys.access] = session.accessToken
             prefs[Keys.refresh] = session.refreshToken

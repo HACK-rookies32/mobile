@@ -43,6 +43,13 @@ class ChildAlertUploadWorker(
         if (skip.isNotEmpty()) alertStore.markUploaded(skip.map { it.id })
         if (send.isEmpty()) return Result.success()
 
+        // 서버에 `children/{id}/alerts` 가 없다(항상 404). 유해 접속은 접근성 서비스가 `filtering/visit` 로,
+        // 스크린타임은 `appcontrol/screentime/reached` 로 이미 보고했으므로 여기서는 완료 표시만 한다.
+        // 서버가 이 경로를 붙이면 아래 업로드를 다시 연다.
+        if (!com.hack.kidhack.BuildConfig.USE_MOCK) {
+            alertStore.markUploaded(send.map { it.id })
+            return Result.success()
+        }
         return runCatching { childAlertRepository.upload(childId, send) }.fold(
             onSuccess = {
                 alertStore.markUploaded(send.map { it.id })

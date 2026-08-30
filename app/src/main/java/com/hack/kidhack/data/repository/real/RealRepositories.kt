@@ -15,6 +15,10 @@ import com.hack.kidhack.data.remote.api.AppUsageApi
 import com.hack.kidhack.data.remote.api.AuthApi
 import com.hack.kidhack.data.remote.api.BlocklistApi
 import com.hack.kidhack.data.remote.api.CardApi
+import com.hack.kidhack.data.remote.api.QrPayApi
+import com.hack.kidhack.data.remote.api.StoreTerminalApi
+import com.hack.kidhack.data.crypto.CardCrypto
+import com.hack.kidhack.core.common.KidhackJson
 import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
 import com.hack.kidhack.data.remote.api.CommandApi
@@ -36,6 +40,13 @@ import com.hack.kidhack.data.remote.api.PointApi
 import com.hack.kidhack.data.remote.api.ScreenshotApi
 import com.hack.kidhack.data.remote.api.UserApi
 import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
+import com.hack.kidhack.data.remote.dto.WalletChargePrepareRequest
+import com.hack.kidhack.data.remote.dto.WalletChargeApproveRequest
+import com.hack.kidhack.data.remote.dto.WalletTransferRequest
+import com.hack.kidhack.data.remote.dto.CardPlainPayload
+import com.hack.kidhack.data.remote.dto.EncryptedCardRequest
+import com.hack.kidhack.data.remote.dto.QrApproveRequest
+import com.hack.kidhack.data.remote.dto.TerminalIssueRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
 import com.hack.kidhack.data.remote.api.WalletApi
 import com.hack.kidhack.data.remote.dto.AppControlCreateRequest
@@ -77,6 +88,8 @@ import com.hack.kidhack.data.remote.paging.PageResponsePagingSource
 import com.hack.kidhack.data.remote.unwrap
 import com.hack.kidhack.data.remote.unwrapOrNull
 import com.hack.kidhack.data.repository.toDomain
+import com.hack.kidhack.data.repository.toWallet
+import com.hack.kidhack.data.repository.toCharge
 import com.hack.kidhack.data.repository.toRoleOrNull
 import com.hack.kidhack.data.repository.toDto
 import com.hack.kidhack.data.ws.ChatWebSocketClient
@@ -95,6 +108,9 @@ import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.QrTicket
+import com.hack.kidhack.domain.model.QrPaymentHistoryItem
+import com.hack.kidhack.domain.model.StoreTerminalInfo
 import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
@@ -124,6 +140,8 @@ import com.hack.kidhack.domain.model.SentCode
 import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AllowanceRepository
+import com.hack.kidhack.domain.repository.QrPayRepository
+import com.hack.kidhack.domain.repository.StoreTerminalRepository
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
 import com.hack.kidhack.domain.repository.AppControlRepository
@@ -191,6 +209,10 @@ class RealAuthRepository(
         parentId: Long?,
     ): Session {
         // Signup response has User only (no tokens). Do not auto-login.
+        // [VULN-MOBILE-AUTHZ-1] 가입 role 을 클라이언트(가입 화면 라디오 선택값)가 결정해 그대로 전송한다.
+        // 서버가 이 값을 신뢰(백엔드 VULN-7)하므로 요청 변조로 관리자 자가생성이 가능한 클라이언트측 진입점이다.
+        // 의도된 취약점(OWASP Mobile M3 Insecure Authentication/Authorization). 보존: 고치지 말 것.
+        // 명세: mobile/docs/vuln-spec-mobile.md
         val user = api.signup(
             SignupRequest(
                 loginId = loginId,
@@ -606,33 +628,68 @@ class RealNoticeRepository(private val api: NoticeApi) : NoticeRepository {
         api.detail(id.toServerId()).unwrap().toDomain()
 }
 
+/**
+ * 지갑 리포지토리(서버 v0.2). 충전은 prepare→approve 2단계이고, mock=true 면 화면에서
+ * prepare 직후 곧바로 approve 를 부른다(이 클래스는 각 단계만 노출). 금액은 서버가 long 이라
+ * 경계에서 [Int]→[Long] 으로 올려 보낸다. childId 는 [toServerId] 로 숫자 변환.
+ */
 class RealWalletRepository(
-    private val walletApi: WalletApi,
-    private val chargeApi: PaymentChargeApi
+    private val walletApi: WalletApi
 ) : WalletRepository {
-    override suspend fun getMyWallet(): Wallet = walletApi.me().unwrap().toDomain()
-    
+    override suspend fun getMyWallet(): Wallet = walletApi.me().unwrap().toWallet()
+
     override suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction> =
-        walletApi.transactions(type = type, page = page).unwrap().content.map { it.toDomain() }
+        walletApi.me(type = type, page = page).unwrap().content.map { it.toDomain() }
 
-    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult =
-        walletApi.transfer(TransferRequest(childId, amount, memo)).unwrap().toDomain()
+    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult {
+        // memo 는 서버 계약에 필드가 없어 전송하지 않는다(파라미터는 상위 호환 위해 유지).
+        val r = walletApi.transfer(WalletTransferRequest(childId.toServerId(), amount.toLong())).unwrap()
+        return TransferResult(parentBalance = r.fromBalance.toInt(), childBalance = r.toBalance.toInt(), txId = "")
+    }
 
-    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult =
-        walletApi.reclaim(TransferRequest(childId, amount)).unwrap().toDomain()
+    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult {
+        // 회수는 자녀→부모: 받는 쪽(부모)=toBalance, 보내는 쪽(자녀)=fromBalance.
+        val r = walletApi.recover(WalletTransferRequest(childId.toServerId(), amount.toLong())).unwrap()
+        return TransferResult(parentBalance = r.toBalance.toInt(), childBalance = r.fromBalance.toInt(), txId = "")
+    }
 
     override suspend fun getChildWallet(childId: String): Wallet =
-        walletApi.childWallet(childId).unwrap().toDomain()
+        walletApi.childWallet(childId.toServerId()).unwrap().toWallet()
 
     override suspend fun prepareCharge(amount: Int, method: String, cardId: String): com.hack.kidhack.domain.model.Charge =
-        chargeApi.prepare(ChargePrepareRequest(amount, method, cardId)).unwrap().toDomain()
+        walletApi.chargePrepare(WalletChargePrepareRequest(amount.toLong())).unwrap().toCharge()
 
-    override suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet =
-        chargeApi.confirm(ChargeConfirmRequest(chargeId, paymentKey, amount)).unwrap().let { resp ->
-            Wallet(walletId = resp.chargeId, balance = resp.walletBalance, updatedAt = "")
-        }
+    override suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet {
+        // chargeId = prepare 가 발급한 merchantUid. paymentKey 는 토스 결제위젯 성공 콜백의 paymentKey —
+        // 서버 approve 의 pgTransactionId 로 넘긴다(mock PG 는 검증하지 않지만 실제 PG 연동 시 필요).
+        val r = walletApi.chargeApprove(
+            WalletChargeApproveRequest(
+                merchantUid = chargeId,
+                amount = amount.toLong(),
+                pgTransactionId = paymentKey.takeIf { it.isNotBlank() },
+            ),
+        ).unwrap()
+        return Wallet(walletId = "me", balance = r.balance.toInt(), updatedAt = "")
+    }
+
+    override suspend fun getChildTransfers(childId: String, page: Int): List<WalletTransaction> =
+        walletApi.childTransfers(childId.toServerId(), page = page).unwrap().content.map { it.toDomain() }
+
+    override suspend fun getChargeHistory(page: Int): List<com.hack.kidhack.domain.model.ChargeHistoryItem> =
+        walletApi.chargeHistory(page = page).unwrap().content.map { it.toDomain() }
+
+    override suspend fun refundCharge(merchantUid: String): Int =
+        walletApi.chargeRefund(merchantUid).unwrap().balance.toInt()
+
+    override suspend fun cancelCharge(merchantUid: String): String =
+        walletApi.chargeCancel(merchantUid).unwrap().status
 }
 
+/**
+ * 카드 리포지토리(서버 v0.2, 태그 14). 등록 시 공개키를 실시간 조회해 payload 를 하이브리드
+ * E2E 암호화([CardCrypto])한 뒤 4필드로 보낸다. keyId 회전 등으로 첫 시도가 실패하면
+ * 공개키를 다시 받아 1회 재시도한다(400 KEY_ROTATED 투명 처리).
+ */
 class RealCardRepository(private val api: CardApi) : CardRepository {
     override suspend fun register(
         cardNumber: String,
@@ -641,10 +698,83 @@ class RealCardRepository(private val api: CardApi) : CardRepository {
         cardPassword2: String,
         birthDate: String,
         ownerName: String
-    ): Card = api.register(CardRegisterRequest(cardNumber, expiry, cvc, cardPassword2, birthDate, ownerName)).unwrap().toDomain()
+    ): Card = runCatching {
+        registerOnce(cardNumber, expiry, cvc, cardPassword2, birthDate, ownerName)
+    }.getOrElse {
+        // 공개키 재조회 후 1회 재시도 (KEY_ROTATED 대응).
+        registerOnce(cardNumber, expiry, cvc, cardPassword2, birthDate, ownerName)
+    }
+
+    private suspend fun registerOnce(
+        cardNumber: String,
+        expiry: String,
+        cvc: String,
+        cardPassword2: String,
+        birthDate: String,
+        ownerName: String,
+    ): Card {
+        val publicKey = api.publicKey().unwrap()
+        val payloadJson = KidhackJson.instance.encodeToString(
+            CardPlainPayload.serializer(),
+            CardPlainPayload(
+                cardNumber = cardNumber,
+                expiry = expiry,
+                cvc = cvc,
+                passwordFront = cardPassword2,
+                birthDate = birthDate,
+                ownerName = ownerName,
+                nonce = java.util.UUID.randomUUID().toString(),
+                timestamp = System.currentTimeMillis(),
+            ),
+        )
+        val encrypted = CardCrypto.encrypt(publicKey.publicKey, payloadJson)
+        return api.register(
+            EncryptedCardRequest(
+                keyId = publicKey.keyId,
+                encryptedKey = encrypted.encryptedKey,
+                iv = encrypted.iv,
+                ciphertext = encrypted.ciphertext,
+            ),
+        ).unwrap().toDomain()
+    }
 
     override suspend fun list(): List<Card> = api.list().unwrap().map { it.toDomain() }
-    override suspend fun delete(cardId: String) { api.delete(cardId).unwrapOrNull() }
+    override suspend fun delete(cardId: String) { api.delete(cardId.toServerId()).unwrapOrNull() }
+}
+
+/** QR 결제 리포지토리(서버 v0.2, 태그 15·18·19). */
+class RealQrPayRepository(private val api: QrPayApi) : QrPayRepository {
+    override suspend fun issueQr(): QrTicket = api.issue().unwrap().toDomain()
+
+    override suspend fun qrStatus(qrToken: String): QrTicket = api.status(qrToken).unwrap().toDomain()
+
+    override suspend fun cancel(qrToken: String) { api.cancel(qrToken).unwrapOrNull() }
+
+    override suspend fun paymentHistory(childId: String?, page: Int): List<QrPaymentHistoryItem> =
+        api.history(childId = childId?.toServerId(), page = page).unwrap().content.map { it.toDomain() }
+}
+
+/**
+ * 매장 단말 리포지토리(서버 v0.2, 태그 16·17) — 테스트/시연 전용, 회원 앱 정상 흐름과 분리.
+ * 단말 승인은 `X-Store-Terminal-Token` 헤더로만 인증된다.
+ */
+class RealStoreTerminalRepository(private val api: StoreTerminalApi) : StoreTerminalRepository {
+    override suspend fun issueTerminal(storeName: String): StoreTerminalInfo =
+        api.issue(TerminalIssueRequest(storeName)).unwrap().toDomain()
+
+    override suspend fun terminals(): List<StoreTerminalInfo> =
+        api.list().unwrap().map { it.toDomain() }
+
+    override suspend fun approve(terminalToken: String, qrToken: String, amount: Int): QrPaymentHistoryItem {
+        val r = api.pay(terminalToken, QrApproveRequest(qrToken, amount.toLong())).unwrap()
+        return QrPaymentHistoryItem(
+            qrToken = r.qrToken,
+            storeName = r.storeName?.takeIf { it.isNotBlank() } ?: "매장",
+            amount = r.amount.toInt(),
+            status = r.status,
+            paidAtLabel = "",
+        )
+    }
 }
 
 class RealChatRepository(

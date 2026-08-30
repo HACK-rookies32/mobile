@@ -36,6 +36,17 @@ sealed class Route(val path: String) {
     data object ParentContact : Route("parent/contact")
     data object ParentPay : Route("parent/pay")
     data object ParentCards : Route("parent/cards")
+
+    /**
+     * 매장 단말 테스트 화면. **회원 앱 정상 내비게이션에 노출하지 않는 숨은 라우트**로,
+     * 결제(태그 16) 시연·검증 전용이다. 자녀 앱의 옛 자가승인과 명확히 구분된다.
+     *
+     * [VULN-MOBILE-PAY-1] 이 숨은 라우트는 일반 유저도 도달 가능하며(StoreTerminalScreen),
+     * X-Store-Terminal-Token 헤더만으로 임의 qrToken·임의 금액 결제 승인 UI 를 제공한다.
+     * 서버 BFLA(백엔드 VULN-WALLET-11: 일반 유저 단말 토큰 발급, VULN-WALLET-15: 토큰 없이 승인)와 결합해
+     * 임의 자녀 지갑 차감으로 이어진다. 의도된 취약점(OWASP Mobile M3/M8). 명세: mobile/docs/vuln-spec-mobile.md
+     */
+    data object StoreTerminal : Route("dev/terminal")
     data object ParentGeofence : Route("parent/geofence")
     data object ParentAppUsageDetail : Route("parent/usage-detail")
     data object ParentTerms : Route("parent/terms")

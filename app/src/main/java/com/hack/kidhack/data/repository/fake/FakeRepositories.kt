@@ -25,6 +25,9 @@ import com.hack.kidhack.domain.model.AppUsage
 import com.hack.kidhack.domain.model.AppUsageStat
 import com.hack.kidhack.domain.model.BlocklistItem
 import com.hack.kidhack.domain.model.Card
+import com.hack.kidhack.domain.model.QrTicket
+import com.hack.kidhack.domain.model.QrPaymentHistoryItem
+import com.hack.kidhack.domain.model.StoreTerminalInfo
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.ChatRoom
@@ -57,6 +60,8 @@ import com.hack.kidhack.domain.model.SentCode
 import com.hack.kidhack.domain.model.TransferResult
 import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AllowanceRepository
+import com.hack.kidhack.domain.repository.QrPayRepository
+import com.hack.kidhack.domain.repository.StoreTerminalRepository
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
 import com.hack.kidhack.domain.repository.AppControlRepository
@@ -700,6 +705,18 @@ class FakeWalletRepository : WalletRepository {
         balance += amount
         return Wallet("w-parent", balance, "방금")
     }
+
+    override suspend fun getChildTransfers(childId: String, page: Int): List<WalletTransaction> = listOf(
+        WalletTransaction("tf1", "TRANSFER_OUT", -5000, 40000, childId, "08.20"),
+        WalletTransaction("tf2", "TRANSFER_IN", 2000, 42000, childId, "08.22"),
+    )
+
+    override suspend fun getChargeHistory(page: Int): List<com.hack.kidhack.domain.model.ChargeHistoryItem> = listOf(
+        com.hack.kidhack.domain.model.ChargeHistoryItem("kid_demo1", 50000, "PAID", "08.15 10:00"),
+        com.hack.kidhack.domain.model.ChargeHistoryItem("kid_demo2", 10000, "REFUNDED", "08.10 09:00", "08.11 12:00"),
+    )
+    override suspend fun refundCharge(merchantUid: String): Int = balance
+    override suspend fun cancelCharge(merchantUid: String): String = "CANCELLED"
 }
 
 class FakeCardRepository : CardRepository {
@@ -1035,5 +1052,86 @@ class FakeAllowanceRepository : AllowanceRepository {
 
     private companion object {
         const val SEED_BALANCE = 12_000
+    }
+}
+
+/**
+ * 목 모드 QR 결제 상태 저장소. 자녀 발급([FakeQrPayRepository]) ↔ 단말 승인
+ * ([FakeStoreTerminalRepository]) 가 같은 프로세스에서 공유해 서버 없이도 전체 플로우를 재현한다.
+ */
+private object FakeQrPayStore {
+    val lock = Any()
+    class Rec(var status: String, var amount: Int, var storeName: String, val issuedAt: Long)
+    val tokens = mutableMapOf<String, Rec>()
+    val history = mutableListOf<QrPaymentHistoryItem>()
+    var seq = 0
+    const val TTL_MILLIS = 60_000L
+}
+
+/** 목 모드 QR 결제(태그 15·18·19). 서버 발급과 동일하게 클라이언트가 토큰을 만들지 않는다. */
+class FakeQrPayRepository : QrPayRepository {
+    override suspend fun issueQr(): QrTicket = synchronized(FakeQrPayStore.lock) {
+        val now = System.currentTimeMillis()
+        val token = "qr_fake_${++FakeQrPayStore.seq}_$now"
+        FakeQrPayStore.tokens[token] = FakeQrPayStore.Rec("ISSUED", 0, "매장", now)
+        QrTicket(token, "ISSUED", now + FakeQrPayStore.TTL_MILLIS)
+    }
+
+    override suspend fun qrStatus(qrToken: String): QrTicket = synchronized(FakeQrPayStore.lock) {
+        val rec = FakeQrPayStore.tokens[qrToken]
+        val now = System.currentTimeMillis()
+        val status = when {
+            rec == null -> "EXPIRED"
+            rec.status == "ISSUED" && now > rec.issuedAt + FakeQrPayStore.TTL_MILLIS -> "EXPIRED"
+            else -> rec.status
+        }
+        QrTicket(qrToken, status, (rec?.issuedAt ?: now) + FakeQrPayStore.TTL_MILLIS)
+    }
+
+    override suspend fun cancel(qrToken: String) = synchronized(FakeQrPayStore.lock) {
+        FakeQrPayStore.tokens[qrToken]?.status = "CANCELLED"
+        for (i in FakeQrPayStore.history.indices) {
+            if (FakeQrPayStore.history[i].qrToken == qrToken) {
+                FakeQrPayStore.history[i] = FakeQrPayStore.history[i].copy(status = "CANCELLED")
+            }
+        }
+    }
+
+    override suspend fun paymentHistory(childId: String?, page: Int): List<QrPaymentHistoryItem> =
+        synchronized(FakeQrPayStore.lock) { FakeQrPayStore.history.toList() }
+}
+
+/** 목 모드 매장 단말(태그 16·17) — 회원 앱과 분리된 테스트용. */
+class FakeStoreTerminalRepository : StoreTerminalRepository {
+    private val terminals = mutableListOf<StoreTerminalInfo>()
+    private var seq = 0
+
+    override suspend fun issueTerminal(storeName: String): StoreTerminalInfo {
+        seq += 1
+        val terminal = StoreTerminalInfo(
+            id = seq.toLong(),
+            storeName = storeName,
+            terminalToken = "term_fake_$seq",
+            status = "ACTIVE",
+        )
+        terminals.add(terminal)
+        return terminal
+    }
+
+    override suspend fun terminals(): List<StoreTerminalInfo> = terminals.toList()
+
+    override suspend fun approve(terminalToken: String, qrToken: String, amount: Int): QrPaymentHistoryItem {
+        val storeName = terminals.firstOrNull { it.terminalToken == terminalToken }?.storeName ?: "매장"
+        val label = SimpleDateFormat("MM.dd HH:mm", Locale.getDefault()).format(Date())
+        return synchronized(FakeQrPayStore.lock) {
+            FakeQrPayStore.tokens[qrToken]?.let {
+                it.status = "PAID"
+                it.amount = amount
+                it.storeName = storeName
+            }
+            val item = QrPaymentHistoryItem(qrToken, storeName, amount, "PAID", label)
+            FakeQrPayStore.history.add(0, item)
+            item
+        }
     }
 }

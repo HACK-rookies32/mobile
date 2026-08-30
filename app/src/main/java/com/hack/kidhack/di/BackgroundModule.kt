@@ -24,7 +24,7 @@ val backgroundModule = module {
     single { ScreenTimeWatcher(get(), androidContext(), get(), get()) }
     single { ChildCommandNotifier(androidContext()) }
     single { PushTokenRegistrar(get(), get(), get()) }
-    single { PushMessageRouter(androidContext(), get(), get(), get(), get(), get(), get()) }
+    single { PushMessageRouter(androidContext(), get(), get(), get(), get(), get(), get(), get()) }
     single { GpsStatusMonitor(androidContext(), get(), get(), get()) }
     single { ChildPlatformController(androidContext(), get(), get(), get()) }
     single { ServerAlertBus() }

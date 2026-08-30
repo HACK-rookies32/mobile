@@ -12,6 +12,7 @@ import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.repository.AuthRepository
 import com.hack.kidhack.domain.repository.ChildOnboardingStore
+import com.hack.kidhack.domain.repository.PairingRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,9 @@ data class RegisterUiState(
     val address: String = "",
     val password: String = "",
     val passwordConfirm: String = "",
+    val parentId: String = "",
+    /** 자녀 가입 2단계 — 부모 앱의 6자리 페어링 코드. 계정 생성·로그인 후 connect 에 쓴다. 비우면 건너뜀. */
+    val pairingCode: String = "",
     val agreedAge: Boolean = false,
     val agreedTerms: Boolean = false,
     val agreedPrivacy: Boolean = false,
@@ -47,11 +51,12 @@ data class RegisterUiState(
         get() = agreedAge && agreedTerms && agreedPrivacy && agreedLocation && agreedPush
 
     val doneStep: Int
-        get() = if (role == Role.CHILD) 4 else 3
+        get() = if (role == Role.CHILD) 5 else 3
 }
 
 class RegisterViewModel(
     private val authRepository: AuthRepository,
+    private val pairingRepository: PairingRepository,
     private val onboardingStore: ChildOnboardingStore,
     private val platformController: ChildPlatformController,
     private val appContext: Context,
@@ -73,6 +78,8 @@ class RegisterViewModel(
     fun onAddress(v: String) = _state.update { it.copy(address = v) }
     fun onPassword(v: String) = _state.update { it.copy(password = v) }
     fun onPasswordConfirm(v: String) = _state.update { it.copy(passwordConfirm = v) }
+    fun onParentId(v: String) = _state.update { it.copy(parentId = v.filter { ch -> ch.isDigit() }) }
+    fun onPairingCode(v: String) = _state.update { it.copy(pairingCode = v.filter { ch -> ch.isDigit() }.take(6), error = null) }
     fun onAgreedAge(v: Boolean) = _state.update { it.copy(agreedAge = v) }
     fun onAgreedTerms(v: Boolean) = _state.update { it.copy(agreedTerms = v) }
     fun onAgreedPrivacy(v: Boolean) = _state.update { it.copy(agreedPrivacy = v) }
@@ -102,11 +109,29 @@ class RegisterViewModel(
             role != Role.CHILD && s.email.isBlank() ->
                 _state.update { it.copy(error = "이메일을 입력해 주세요") }
             !birthOk -> _state.update { it.copy(error = "생년월일을 선택해 주세요") }
+            // 자녀도 parentId 없이 가입한다. 부모 연결은 가입 후 마이 → 「부모님 연결」에서 6자리 페어링 코드로 한다.
             s.password.length < 8 -> _state.update { it.copy(error = "비밀번호는 8자 이상이어야 해요") }
             s.password != s.passwordConfirm -> _state.update { it.copy(error = "비밀번호가 일치하지 않아요") }
             else -> _state.update { it.copy(step = 2, error = null) }
         }
     }
+
+    /**
+     * 자녀 2단계(페어링). 코드는 선택이다 — 부모가 아직 코드를 발급하지 않았을 수 있으므로 건너뛰고
+     * 나중에 마이 → 「부모님 연결」에서 넣어도 된다. 코드가 있으면 6자리인지만 여기서 확인하고,
+     * 실제 연결은 계정 생성·로그인 후 [startApp] 에서 한다(connect 는 로그인 상태에서만 된다).
+     */
+    fun nextFromPairing() {
+        val s = _state.value
+        if (s.pairingCode.isNotBlank() && s.pairingCode.length != 6) {
+            _state.update { it.copy(error = "코드는 6자리예요") }
+            return
+        }
+        _state.update { it.copy(step = 3, error = null) }
+    }
+
+    /** 페어링 단계 건너뛰기 — 코드 없이 다음(약관)으로. */
+    fun skipPairing() = _state.update { it.copy(pairingCode = "", step = 3, error = null) }
 
     /** After terms: child goes to OS permissions; parent submits immediately. */
     fun nextFromTerms() {
@@ -114,7 +139,7 @@ class RegisterViewModel(
         val role = s.role ?: return
         when {
             !s.requiredAgreed -> _state.update { it.copy(error = "필수 약관에 모두 동의해 주세요") }
-            role == Role.CHILD -> _state.update { it.copy(step = 3, error = null) }
+            role == Role.CHILD -> _state.update { it.copy(step = 4, error = null) }
             else -> submit()
         }
     }
@@ -141,9 +166,7 @@ class RegisterViewModel(
                         birthDate = s.birthDate.trim(),
                         address = s.address.trim().ifBlank { null },
                         role = role,
-                        // 부모 연결은 가입이 아니라 로그인 후 페어링 코드로 한다.
-                        // 서버도 signup 의 parentId 는 선택이고 검증하지 않는다([VULN-8]).
-                        parentId = null,
+                        parentId = s.parentId.toLongOrNull()?.takeIf { role == Role.CHILD },
                     )
                 }.onSuccess { session ->
                     if (role == Role.CHILD) {
@@ -175,6 +198,11 @@ class RegisterViewModel(
             runCatching {
                 authRepository.login(s.loginId.trim(), s.password, preferredRole = role)
             }.onSuccess { session ->
+                // 가입 2단계에서 받은 코드로 부모와 연결한다(로그인 직후라야 childId 로 인증됨).
+                // 코드가 틀리거나 만료됐어도 앱 진입은 막지 않는다 — 마이 → 「부모님 연결」에서 다시 넣을 수 있다.
+                if (role == Role.CHILD && s.pairingCode.length == 6) {
+                    runCatching { pairingRepository.connect(s.pairingCode) }
+                }
                 if (role == Role.CHILD) {
                     platformController.reevaluate()
                 }

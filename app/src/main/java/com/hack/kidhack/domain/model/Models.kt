@@ -405,6 +405,47 @@ data class TransferResult(
     val txId: String
 )
 
+/** 충전 통합 내역 1건 (주문 + 환불시각). 태그 11 charge-history. */
+data class ChargeHistoryItem(
+    val merchantUid: String,
+    val amount: Int,
+    /** READY / PAID / FAILED / REFUNDED / CANCELLED / EXPIRED */
+    val status: String,
+    val createdAtLabel: String,
+    val refundedAtLabel: String? = null,
+)
+
+/**
+ * 서버가 발급한 결제 QR 티켓(자녀, 태그 15).
+ *
+ * 옛 [PayQrToken] 과 달리 토큰을 클라이언트가 만들지 않고 서버 `POST /qrpay/qr` 로 받는다.
+ * **금액은 여기 없다** — 매장 단말이 승인(태그 16)할 때 확정된다.
+ */
+data class QrTicket(
+    val qrToken: String,
+    /** ISSUED / PAID / EXPIRED / CANCELLED */
+    val status: String,
+    val expiresAtMillis: Long,
+)
+
+/** QR 매장결제 내역 1건 (태그 19). */
+data class QrPaymentHistoryItem(
+    val qrToken: String,
+    val storeName: String,
+    val amount: Int,
+    /** PAID / CANCELLED */
+    val status: String,
+    val paidAtLabel: String,
+)
+
+/** 매장 단말 (태그 16·17) — 회원 앱과 분리된 테스트/시연 전용. */
+data class StoreTerminalInfo(
+    val id: Long,
+    val storeName: String,
+    val terminalToken: String,
+    val status: String,
+)
+
 /** 부모가 보낸 원격 요청 종류. Firebase 대신 WebSocket/폴링으로 전달된다. */
 enum class RemoteCommandType { SCREEN_CAPTURE, CAMERA_SHOT, UNKNOWN }
 

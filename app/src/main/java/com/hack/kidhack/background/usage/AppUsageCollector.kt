@@ -62,9 +62,12 @@ class AppUsageCollector(
             manager.queryAndAggregateUsageStats(startOfToday(), end)
         }.getOrNull().orEmpty()
 
+        // 우리 앱·홈 런처·GMS 는 뺀다 — 예전엔 자녀 스크린타임(부모 대시보드 보고 포함)에 우리 앱 사용시간이 섞였다.
+        val excluded = excludedPackages()
         return stats.values
             .asSequence()
             .filter { it.totalTimeInForeground >= MIN_FOREGROUND_MS }
+            .filter { it.packageName !in excluded }
             .mapNotNull { stat ->
                 val info = packageManager.launchableAppInfo(stat.packageName) ?: return@mapNotNull null
                 AppUsage(
@@ -76,6 +79,20 @@ class AppUsageCollector(
             .sortedByDescending { it.durationSec }
             .take(limit)
             .toList()
+    }
+
+    /** 사용량 집계에서 뺄 패키지: 우리 앱, 홈 런처, GMS·권한 컨트롤러·시스템 UI. */
+    private fun excludedPackages(): Set<String> {
+        val launchers = runCatching {
+            val home = android.content.Intent(android.content.Intent.ACTION_MAIN)
+                .addCategory(android.content.Intent.CATEGORY_HOME)
+            context.packageManager.queryIntentActivities(home, 0).map { it.activityInfo.packageName }
+        }.getOrDefault(emptyList())
+        return buildSet {
+            add(context.packageName)
+            addAll(launchers)
+            addAll(SYSTEM_PACKAGES)
+        }
     }
 
     private fun startOfToday(): Long = Calendar.getInstance().apply {
@@ -98,5 +115,16 @@ class AppUsageCollector(
 
         /** 1초도 안 쓴 앱까지 나열하면 목록이 지저분해진다. */
         const val MIN_FOREGROUND_MS = 1_000L
+
+        val SYSTEM_PACKAGES = setOf(
+            "com.google.android.gms",
+            "com.google.android.gsf",
+            "com.google.android.permissioncontroller",
+            "com.android.permissioncontroller",
+            "com.android.systemui",
+            "com.android.vending",
+            "com.google.android.apps.nexuslauncher",
+            "com.sec.android.app.launcher",
+        )
     }
 }

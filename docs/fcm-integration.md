@@ -17,7 +17,7 @@ Firebase SDK 글루 3가지(플러그인·의존성·`google-services.json`)와 
 | `data/remote/api/Apis.kt` `DeviceApi` | `POST/DELETE /devices/push-token` |
 | `KidhackApplication.kt` | 세션 생성/소멸에 토큰 등록/해제 연결 |
 
-라우터는 **기존 함수를 그대로 재사용**한다 — 보호자 알림은 `ParentAlertSync.recordRemote`,
+라우터는 **기존 함수를 그대로 재사용**한다 — 보호자 알림은 `ServerAlertSync.recordRemote`,
 자녀 명령은 `ChildCommandNotifier`+`ChildAlertStore`+`ChildCommandBus`. 그래서 FCM 을 켜도
 화면 이동·캡처/촬영·「최근 알림」 영구 기록이 지금과 똑같이 동작하고, 폴링과 FCM 이 같은
 알림을 둘 다 물어와도 **id 로 합쳐져 중복 푸시가 없다**.
@@ -127,7 +127,34 @@ class KidhackFirebaseMessagingService : FirebaseMessagingService() {
 `notification` 필드를 쓰면 앱이 백그라운드일 때 시스템이 마음대로 트레이에 띄워
 자녀 명령처럼 **우리가 통제해야 하는 푸시**를 가로챈다. 반드시 **`data` 전용**으로 보낸다.
 
-### 보호자 알림 (자녀 사건 → 부모 기기)
+> ### ✅ 실제 계약 (2026-08-30, 백엔드 `FirebasePushSender`/`NotificationService` 기준 — 아래 §3 예시보다 우선)
+>
+> 서버는 알림 행(`notification` 테이블) 하나를 저장할 때마다 수신자의 모든 기기 토큰으로 **data 전용** 메시지를 보낸다. `kind` 는 보내지 않는다.
+>
+> ```json
+> {
+>   "message": {
+>     "token": "<수신자 기기 FCM 토큰>",
+>     "data": {
+>       "type": "SCREENSHOT_REQUESTED",   // 서버 NotificationType 이름 그대로 (HARMFUL_SITE, ALLOWANCE_RECEIVED, CHAT_MESSAGE …)
+>       "notificationId": "31",            // 알림 행 id — 합침 키이자 자녀 명령의 requestId
+>       "childId": "13",                   // 부모 수신 알림에만(어느 자녀 일인지). 자녀 수신 알림엔 없음
+>       "title": "화면 캡처 요청",           // NotificationType.title (관리자 전체 알림은 관리자가 적은 제목)
+>       "body": "부모가 화면 캡처를 요청했습니다."
+>     },
+>     "android": { "priority": "high" }
+>   }
+> }
+> ```
+>
+> 앱 쪽 처리(`PushMessage.fromData` → `PushMessageRouter`):
+> - `kind` 가 없으면 `type` 으로 추론한다. `SCREENSHOT_REQUESTED`(+ 아래 동의어)는 **자녀 명령**(`SCREEN_CAPTURE`) → 알림·홈 기록·`ChildCommandBus`·`PATCH notifications/{notificationId}/read`(수신 ACK). 그 밖의 `type` 은 **알림** → 부모 기기는 `ServerAlertSync.recordRemote`(폴링과 `notificationId` 로 합침), 자녀 기기는 `ChildAlertStore` + 알림창.
+> - 명령 동의어: `SCREENSHOT_REQUESTED | SCREEN_CAPTURE | CAPTURE | CAPTURE_REQUEST | SCREENSHOT` / `CAMERA_SHOT | CAMERA | CAMERA_REQUEST | PHOTO` (`Mappers.toRemoteCommandType`).
+> - 토큰 등록: **`POST /api/devices/fcm-token { "fcmToken": "…" }`**, 해제 `DELETE /api/devices/fcm-token`(같은 본문). `PushTokenRegistrar.onSignedIn()` 이 로그인·앱 시작 시 `FirebaseMessaging.token` 을 받아 등록한다.
+> - `google-services.json` 이 없으면 플러그인을 적용하지 않아 빌드는 되고 푸시만 꺼진다(`app/build.gradle.kts`).
+> - 로컬 백엔드에서 실제 발송: `infra/firebase-service-account.json` 을 `backend/src/main/resources/` 에 복사(gitignore) 후 `./gradlew bootRun --args='--app.push.provider=firebase'`.
+
+### (참고) 예전 제안 형식 — 보호자 알림 (자녀 사건 → 부모 기기)
 ```json
 {
   "message": {
@@ -165,6 +192,7 @@ class KidhackFirebaseMessagingService : FirebaseMessagingService() {
 키 이름을 바꾸려면 `PushMessage.Companion` 의 상수와 서버만 맞추면 된다.
 
 ### 토큰 등록 엔드포인트
+> ⚠️ 실제 서버는 `POST/DELETE /api/devices/fcm-token { "fcmToken": "..." }` 다(위 "실제 계약" 참고). 아래는 초기 제안 값.
 ```
 POST   /devices/push-token   body: { "token": "...", "platform": "ANDROID" }
 DELETE /devices/push-token   body: { "token": "..." }
@@ -182,9 +210,8 @@ FCM 은 대부분 몇 초 내 도착하지만 **보장되지 않는다**(도즈,
 | 경로 | 역할 | 변화 |
 |---|---|---|
 | FCM | **주** 경로 | 신규 |
-| `ParentAlertPollWorker` (15분) | 보호자 알림 백업 | 유지. 원하면 30분+로 완화 가능 |
-| `ChildCommandService`(WebSocket) | 자녀 명령 백업 | 유지. FCM 검증 후 상주 소켓은 은퇴 검토(안드로이드 15 dataSync 6시간 제한 회피) |
-| ~~`ChildCommandPollWorker`(15분)~~ | ~~자녀 명령 백업~~ | **제거됨(2026-08-28)** — 서버에 `commands/pending` 엔드포인트 없음. REST ack 은 유지 |
+| `ServerAlertPollWorker` (15분) | 보호자 알림 백업 | 유지. 원하면 30분+로 완화 가능 |
+| `ChildCommandService`(WebSocket) + `ChildCommandPollWorker` | 자녀 명령 백업 | 유지. FCM 검증 후 상주 소켓은 은퇴 검토(안드로이드 15 dataSync 6시간 제한 회피) |
 | `ChildAlertUploadWorker` | 자녀 사건 업로드 | 유지 — FCM 은 **수신**만, 업로드는 여전히 필요 |
 
 > **소켓 은퇴는 별도 결정.** FCM 이 자녀 명령을 안정적으로 나르는 게 검증되면

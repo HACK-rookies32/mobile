@@ -173,11 +173,17 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
 
     private suspend fun refreshBlocklist(force: Boolean) {
         if (!force && System.currentTimeMillis() - blocklistLoadedAt <= BLOCKLIST_TTL_MS) return
-        blocklistLoadedAt = System.currentTimeMillis()
         val childId = sessionRepository.childId()
+        // 로그인 전(자녀 id 없음)에는 시각을 찍지 않는다 — 찍어 두면 로그인 후에도 TTL(5분)까지 규칙을 안 읽는다.
         if (childId.isBlank()) return
+        blocklistLoadedAt = System.currentTimeMillis()
+        // 서버 `GET filtering/rules/{childId}` — 자녀 본인 조회 허용(백엔드 feat/filtering-child-rules-fcm-data-push).
         runCatching { blocklistRepository.get(childId) }
-            .onSuccess { items = it }
+            .onSuccess {
+                items = it
+                android.util.Log.d("HarmfulBlock", "blocklist loaded: ${it.size} rules")
+            }
+            .onFailure { android.util.Log.w("HarmfulBlock", "blocklist load failed: ${it.message}") }
     }
 
     /**
