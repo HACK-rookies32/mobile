@@ -18,6 +18,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.hack.kidhack.core.designsystem.component.KidTextField
+import com.hack.kidhack.data.remote.userMessage
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,12 +59,24 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
+enum class PasswordError { EMPTY, MISMATCH, NO_CODE }
+
 data class MypageUiState(
     val user: User? = null,
     val children: List<ChildProfile> = emptyList(),
     val selectedChildId: String? = null,
     val loading: Boolean = true,
     val error: String? = null,
+    val changingPassword: Boolean = false,
+    /** 비밀번호 변경은 서버 `reset-password` 2단계(인증코드 → 재설정)를 그대로 쓴다(`PATCH users/me/password` 없음). */
+    val passwordCodeSent: Boolean = false,
+    val passwordCode: String = "",
+    val newPassword: String = "",
+    val confirmPassword: String = "",
+    val passwordError: PasswordError? = null,
+    val showPasswordConfirm: Boolean = false,
+    val passwordChanged: Boolean = false,
+    val passwordInfo: String? = null,
 )
 
 class MypageViewModel(
@@ -104,6 +123,96 @@ class MypageViewModel(
 
     fun selectChild(id: String) {
         viewModelScope.launch { selectedChildRepository.select(id) }
+    }
+
+    fun togglePasswordChange() = _state.update {
+        val opening = !it.changingPassword
+        it.copy(
+            changingPassword = opening,
+            passwordCodeSent = false,
+            passwordCode = "",
+            newPassword = "",
+            confirmPassword = "",
+            passwordError = null,
+            passwordChanged = false,
+            passwordInfo = null,
+        )
+    }
+
+    fun onNewPassword(v: String) = _state.update { it.copy(newPassword = v, passwordError = null) }
+    fun onConfirmPassword(v: String) = _state.update { it.copy(confirmPassword = v, passwordError = null) }
+    fun onPasswordCode(v: String) = _state.update { it.copy(passwordCode = v.filter { c -> c.isDigit() }, passwordError = null) }
+
+    /**
+     * 1단계 — 내 아이디·이메일로 인증코드 발송(`POST auth/reset-password/send-code`).
+     * 서버에 `PATCH users/me/password` 가 없어 비밀번호 재설정 흐름을 그대로 쓴다.
+     * 서버가 코드를 응답에 실어 주면(`[VULN-AUTH-MAIL]`) 입력칸에 미리 채운다.
+     */
+    fun sendPasswordCode() {
+        val user = _state.value.user ?: return
+        val email = user.email
+        if (email.isNullOrBlank()) {
+            _state.update { it.copy(error = "가입 이메일이 없어 비밀번호를 바꿀 수 없어요. 프로필에서 이메일을 먼저 등록해 주세요.") }
+            return
+        }
+        viewModelScope.launch {
+            runCatching { authRepository.sendResetPasswordCode(user.loginId, email) }
+                .onSuccess { sent ->
+                    _state.update {
+                        it.copy(
+                            passwordCodeSent = true,
+                            passwordCode = sent.code.orEmpty(),
+                            passwordInfo = sent.message?.takeIf { m -> m.isNotBlank() } ?: "인증코드를 $email 로 보냈어요",
+                            error = null,
+                        )
+                    }
+                }
+                .onFailure { t -> _state.update { it.copy(error = t.userMessage("인증코드를 보내지 못했어요")) } }
+        }
+    }
+
+    fun requestPasswordChange() {
+        val s = _state.value
+        val error = when {
+            !s.passwordCodeSent || s.passwordCode.isBlank() -> PasswordError.NO_CODE
+            s.newPassword.isBlank() -> PasswordError.EMPTY
+            s.newPassword != s.confirmPassword -> PasswordError.MISMATCH
+            else -> null
+        }
+        if (error != null) {
+            _state.update { it.copy(passwordError = error) }
+        } else {
+            _state.update { it.copy(showPasswordConfirm = true) }
+        }
+    }
+
+    fun dismissPasswordConfirm() = _state.update { it.copy(showPasswordConfirm = false) }
+
+    /** 2단계 — 코드 + 새 비밀번호로 재설정(`POST auth/reset-password`). */
+    fun confirmPasswordChange() {
+        val s = _state.value
+        val email = s.user?.email ?: return
+        viewModelScope.launch {
+            runCatching { authRepository.resetPassword(email, s.passwordCode.trim(), s.newPassword) }
+                .onSuccess {
+                    _state.update {
+                        it.copy(
+                            showPasswordConfirm = false,
+                            changingPassword = false,
+                            passwordCodeSent = false,
+                            passwordCode = "",
+                            newPassword = "",
+                            confirmPassword = "",
+                            passwordError = null,
+                            passwordChanged = true,
+                            passwordInfo = null,
+                        )
+                    }
+                }
+                .onFailure { t ->
+                    _state.update { it.copy(showPasswordConfirm = false, error = t.userMessage("비밀번호를 바꾸지 못했어요")) }
+                }
+        }
     }
 
     fun logout() {
@@ -158,8 +267,88 @@ fun ParentMypageScreen(
         },
     ) {
         ParentLoadingOrError(state.loading && user == null, state.error, viewModel::load)
+        if (state.changingPassword) {
+            KidCard {
+                FormHeader(stringResource(R.string.parent_mypage_change_password), viewModel::togglePasswordChange)
+                Text(
+                    "가입 이메일(${user?.email ?: "없음"})로 인증코드를 받은 뒤 새 비밀번호를 설정해요",
+                    color = colors.muted,
+                    fontSize = 12.sp,
+                )
+                Spacer(Modifier.height(8.dp))
+                if (!state.passwordCodeSent) {
+                    KidButton("인증코드 받기", viewModel::sendPasswordCode, Modifier.fillMaxWidth(), KidButtonVariant.Secondary)
+                } else {
+                    KidTextField(
+                        state.passwordCode,
+                        viewModel::onPasswordCode,
+                        "인증 코드",
+                        placeholder = "6자리",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        isError = state.passwordError == PasswordError.NO_CODE,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                state.passwordInfo?.let { Text(it, color = colors.safe, fontSize = 12.sp) }
+                KidTextField(
+                    state.newPassword,
+                    viewModel::onNewPassword,
+                    stringResource(R.string.parent_mypage_new_password),
+                    placeholder = stringResource(R.string.parent_mypage_password_placeholder),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    isError = state.passwordError == PasswordError.EMPTY,
+                )
+                Spacer(Modifier.height(8.dp))
+                KidTextField(
+                    state.confirmPassword,
+                    viewModel::onConfirmPassword,
+                    stringResource(R.string.parent_mypage_new_password_confirm),
+                    placeholder = stringResource(R.string.parent_mypage_password_confirm_placeholder),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    isError = state.passwordError == PasswordError.MISMATCH,
+                )
+                state.passwordError?.let { err ->
+                    val msg = when (err) {
+                        PasswordError.EMPTY -> stringResource(R.string.parent_mypage_password_error_empty)
+                        PasswordError.MISMATCH -> stringResource(R.string.parent_mypage_password_error_mismatch)
+                        PasswordError.NO_CODE -> "먼저 인증코드를 받아 주세요"
+                    }
+                    Text(msg, color = colors.danger, fontSize = 12.sp, fontWeight = FontBold)
+                }
+                Spacer(Modifier.height(8.dp))
+                KidButton(
+                    stringResource(R.string.parent_mypage_password_change),
+                    viewModel::requestPasswordChange,
+                    Modifier.fillMaxWidth(),
+                    enabled = state.passwordCodeSent,
+                )
+            }
+        }
+        if (state.passwordChanged) {
+            Text(stringResource(R.string.parent_mypage_password_changed), color = colors.safe, fontSize = 12.sp, fontWeight = FontBold)
+        }
+        if (state.showPasswordConfirm) {
+            AlertDialog(
+                onDismissRequest = viewModel::dismissPasswordConfirm,
+                title = { Text(stringResource(R.string.parent_mypage_password_confirm_title), fontWeight = FontBold) },
+                text = { Text(stringResource(R.string.parent_mypage_password_confirm_message)) },
+                confirmButton = {
+                    TextButton(onClick = viewModel::confirmPasswordChange) {
+                        Text(stringResource(R.string.parent_mypage_password_confirm_ok), color = colors.brand, fontWeight = FontBold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = viewModel::dismissPasswordConfirm) {
+                        Text(stringResource(R.string.parent_mypage_password_confirm_cancel), color = colors.muted)
+                    }
+                },
+            )
+        }
         GroupCard(stringResource(R.string.parent_mypage_account)) {
             ListRow(stringResource(R.string.parent_mypage_edit_profile), onClick = onOpenEditProfile)
+            ListRow(stringResource(R.string.parent_mypage_change_password), subtitle = stringResource(R.string.parent_mypage_password_stub), onClick = viewModel::togglePasswordChange)
             ListRow(stringResource(R.string.parent_mypage_notif_settings), onClick = onOpenNotifications)
             ListRow(stringResource(R.string.parent_mypage_activities), onClick = onOpenActivities, showDivider = false)
         }

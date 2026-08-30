@@ -97,7 +97,18 @@ class ChildProfileEditViewModel(
             }.onSuccess { updated ->
                 // 저장된 값을 세션에 밀어 넣어야 다른 화면들이 바로 새 이름을 쓴다.
                 sessionRepository.current()?.let { session ->
-                    runCatching { sessionRepository.save(session.copy(user = updated)) }
+                    // 서버 users/me 응답엔 role 이 없어 매퍼가 PARENT 로 기본 처리한다 — 그대로 저장하면
+                    // 자녀 계정이 다음 실행부터 부모 화면으로 들어가던 버그. 세션의 role/parentId 를 보존한다.
+                    runCatching {
+                        sessionRepository.save(
+                            session.copy(
+                                user = updated.copy(
+                                    role = session.user.role,
+                                    parentId = updated.parentId ?: session.user.parentId,
+                                ),
+                            ),
+                        )
+                    }
                 }
                 _state.update {
                     it.copy(

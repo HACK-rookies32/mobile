@@ -95,6 +95,9 @@ class CommunityListViewModel(
     // 게시글 목록은 Paging3 로 노출한다(loading/error 는 화면의 loadState 에서 파생).
     val posts: Flow<PagingData<Post>> =
         communityRepository.pagedPosts().cachedIn(viewModelScope)
+
+    /** 목록 화면이 한 번이라도 그려졌는지. 글쓰기·상세에서 돌아오면 목록을 다시 읽기 위한 표시. */
+    var shownOnce = false
 }
 
 data class CommunityDetailUiState(
@@ -307,6 +310,11 @@ fun ParentCommunityScreen(
 ) {
     val colors = LocalKidhackColors.current
     val posts = viewModel.posts.collectAsLazyPagingItems()
+    // 글 작성·상세에서 돌아왔을 때 목록을 다시 읽는다(최초 진입은 페이징이 알아서 읽는다).
+    LaunchedEffect(Unit) {
+        if (viewModel.shownOnce) posts.refresh()
+        viewModel.shownOnce = true
+    }
 
     ParentScreenScaffold(
         header = {

@@ -73,6 +73,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
+/** 위치 탭 재진입 시 이 간격 안에 이미 읽었으면 다시 읽지 않는다. */
+private const val REFRESH_MIN_INTERVAL_MS = 5_000L
+
 data class LocationUiState(
     val history: List<LocationPoint> = emptyList(),
     /** 지도에 반경 원으로 겹쳐 그릴 등록 장소들. */
@@ -104,13 +107,25 @@ class LocationViewModel(
     /** 실시간 토글에 쓸 현재 선택된 자녀. refresh()에서만 갱신한다. */
     private var childId: String? = null
 
+    private var lastLoadedAt = 0L
+
     init {
         viewModelScope.launch {
             selectedChildRepository.selectedChildId.collect { refresh() }
         }
     }
 
+    /**
+     * 탭 재진입용. 뷰모델이 살아 있으면 init 의 조회가 다시 돌지 않아 자녀 위치가 갱신되지 않던 문제 —
+     * 최근 [REFRESH_MIN_INTERVAL_MS] 안에 조회했으면 건너뛴다.
+     */
+    fun refreshIfStale() {
+        if (System.currentTimeMillis() - lastLoadedAt < REFRESH_MIN_INTERVAL_MS) return
+        refresh()
+    }
+
     fun refresh() {
+        lastLoadedAt = System.currentTimeMillis()
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
@@ -199,6 +214,8 @@ fun ParentLocationScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
+    // 탭을 다시 열 때 서버 위치를 다시 읽는다(뷰모델이 유지돼 init 조회가 다시 돌지 않음).
+    LaunchedEffect(Unit) { viewModel.refreshIfStale() }
 
     // 서버가 준 updatedAt이 실제 갱신 시각이다. 없으면 기존처럼 recordedAt.
     val isCurrentLive = state.current?.let { it.updatedAt ?: it.recordedAt }?.let {

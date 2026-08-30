@@ -168,8 +168,15 @@ class ChildHomeViewModel(
         else -> "오늘 ${count}개 앱 사용 중"
     }
 
-    /** 성 한 글자를 떼어 친근한 호칭으로. 한 글자 이름은 그대로 쓴다. */
-    private fun String.aliasOrSelf(): String = if (length > 1) drop(1) else this
+    /**
+     * 성 한 글자를 떼어 친근한 호칭으로("김민수" → "민수").
+     * 한글 2~4자 이름일 때만 적용한다 — 영문 등 다른 이름은 그대로 쓴다("ChildFour" → "hildFour" 오류 방지).
+     */
+    private fun String.aliasOrSelf(): String {
+        val t = trim()
+        val allHangul = t.isNotEmpty() && t.all { it in '가'..'힣' }
+        return if (allHangul && t.length in 2..4) t.drop(1) else t
+    }
 
     private fun AppNotification.toRow(): HomeAlertRow {
         val upper = type.uppercase()

@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.background.usage.AppUsageCollector
 import com.hack.kidhack.data.local.ChildAlertStore
-import com.hack.kidhack.domain.repository.AllowanceRepository
+import com.hack.kidhack.domain.repository.WalletRepository
 import com.hack.kidhack.domain.repository.AuthRepository
 import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
@@ -32,7 +32,7 @@ class ChildMypageViewModel(
     private val chatRepository: ChatRepository,
     private val usageCollector: AppUsageCollector,
     private val notificationRepository: NotificationRepository,
-    private val allowanceRepository: AllowanceRepository,
+    private val walletRepository: WalletRepository,
     private val alertStore: ChildAlertStore,
 ) : ViewModel() {
 
@@ -57,7 +57,7 @@ class ChildMypageViewModel(
             // 서비스 현황 탭과 같은 값을 보여야 하므로 동일한 수집기를 쓴다.
             val usage = usageCollector.todayUsage()
             val notifications = runCatching { notificationRepository.list(childId) }.getOrDefault(emptyList())
-            val balance = runCatching { allowanceRepository.balance(childId).balance }.getOrDefault(0)
+            val balance = runCatching { walletRepository.getMyWallet().balance }.getOrDefault(0)
             val blockedToday = alertStore.countToday(ChildAlertStore.TYPE_HARMFUL_BLOCK)
 
             _state.update {
