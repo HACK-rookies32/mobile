@@ -18,6 +18,7 @@ import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.CommentDto
 import com.hack.kidhack.data.remote.dto.InquiryAnswerDto
 import com.hack.kidhack.data.remote.dto.InquiryDetailDto
+import com.hack.kidhack.data.remote.dto.LikeToggleDto
 import com.hack.kidhack.data.remote.dto.InquiryDto
 import com.hack.kidhack.data.remote.dto.NoticeDetailDto
 import com.hack.kidhack.data.remote.dto.NoticeDto
@@ -67,6 +68,7 @@ import com.hack.kidhack.domain.model.InstalledApp
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryAnswer
 import com.hack.kidhack.domain.model.InquiryDetail
+import com.hack.kidhack.domain.model.LikeResult
 import com.hack.kidhack.domain.model.Notice
 import com.hack.kidhack.domain.model.NoticeDetail
 import com.hack.kidhack.domain.model.LocationEvent
@@ -297,24 +299,27 @@ fun ScreenshotUploadDto.toDomain(capturedAt: String, trigger: String): Screensho
 )
 
 fun PostDto.toDomain(): Post = Post(
-    id = id,
+    id = postId.toString(),
+    authorId = authorId.toString(),
     title = title,
-    author = author,
-    commentCount = commentCount,
+    author = authorNickname,
+    content = content,
     likeCount = likeCount,
-    createdAtLabel = createdAtLabel,
-    liked = liked,
-    imageUrls = imageUrls,
+    createdAtLabel = createdAt,
+    attachments = attachments,
     links = links,
-    comments = comments.map { it.toDomain() }
+    comments = comments.map { it.toDomain() },
 )
 
 fun CommentDto.toDomain(): Comment = Comment(
-    id = id,
-    author = author,
-    text = body,
-    createdAt = createdAt
+    id = commentId.toString(),
+    memberId = memberId.toString(),
+    author = nickname,
+    text = content,
+    createdAt = createdAt,
 )
+
+fun LikeToggleDto.toDomain(): LikeResult = LikeResult(liked = liked, likeCount = likeCount)
 
 fun ChatRoomDto.toDomain(titleOverride: String? = null): ChatRoom = ChatRoom(
     id = roomId,

@@ -34,13 +34,15 @@ import com.hack.kidhack.data.remote.dto.ChildDetailDto
 import com.hack.kidhack.data.remote.dto.ChildDto
 import com.hack.kidhack.data.remote.dto.ChildPhotoDto
 import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
+import com.hack.kidhack.data.remote.dto.CommentDto
 import com.hack.kidhack.data.remote.dto.CommentRequest
 import com.hack.kidhack.data.remote.dto.InquiryDetailDto
 import com.hack.kidhack.data.remote.dto.InquiryRequest
 import com.hack.kidhack.data.remote.dto.NoticeDetailDto
 import com.hack.kidhack.data.remote.dto.NoticeDto
 import com.hack.kidhack.data.remote.dto.UploadedFileDto
-import com.hack.kidhack.data.remote.dto.CreatePostRequest
+import com.hack.kidhack.data.remote.dto.LikeToggleDto
+import com.hack.kidhack.data.remote.dto.PostRequest
 import com.hack.kidhack.data.remote.dto.FindIdSendCodeRequest
 import com.hack.kidhack.data.remote.dto.FindIdVerifyRequest
 import com.hack.kidhack.data.remote.dto.FindIdVerifyResponse
@@ -70,7 +72,6 @@ import com.hack.kidhack.data.remote.dto.RealtimeToggleResponse
 import com.hack.kidhack.data.remote.dto.TrackResponse
 import com.hack.kidhack.data.remote.dto.RefreshRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
-import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordSendCodeRequest
 import com.hack.kidhack.data.remote.dto.SendCodeResponse
@@ -359,7 +360,14 @@ interface ScreenshotApi {
     suspend fun requestCapture(@Path("childId") childId: String): ApiEnvelope<Unit>
 }
 
+/**
+ * 부모 커뮤니티 (명세 20).
+ *
+ * 첨부는 [uploadAttachment] 로 먼저 올려 받은 `url` 을 [PostRequest.attachments] 에 담는다.
+ * 신고 엔드포인트는 서버에 없다 — 예전에는 앱이 `/report` 를 부르며 404 를 받고 있었다.
+ */
 interface CommunityApi {
+    /** @param keyword 제목 또는 작성자 닉네임 부분 검색. */
     @GET("community/posts")
     suspend fun posts(
         @Query("keyword") keyword: String? = null,
@@ -368,45 +376,43 @@ interface CommunityApi {
     ): ApiEnvelope<PageResponse<PostDto>>
 
     @POST("community/posts")
-    suspend fun create(@Body body: CreatePostRequest): ApiEnvelope<PostDto>
+    suspend fun create(@Body body: PostRequest): ApiEnvelope<PostDto>
 
+    /** 본문·첨부·댓글은 여기에만 있다. 목록 항목에는 없다. */
     @GET("community/posts/{postId}")
-    suspend fun post(@Path("postId") postId: String): ApiEnvelope<PostDto>
+    suspend fun post(@Path("postId") postId: Long): ApiEnvelope<PostDto>
 
+    /** 넣은 필드만 반영된다. */
     @PATCH("community/posts/{postId}")
     suspend fun update(
-        @Path("postId") postId: String,
-        @Body body: CreatePostRequest,
+        @Path("postId") postId: Long,
+        @Body body: PostRequest,
     ): ApiEnvelope<PostDto>
 
+    /** 글과 첨부 실물을 함께 지운다. */
     @DELETE("community/posts/{postId}")
-    suspend fun delete(@Path("postId") postId: String): ApiEnvelope<Unit>
+    suspend fun delete(@Path("postId") postId: Long): ApiEnvelope<Unit>
 
     @POST("community/posts/{postId}/comments")
     suspend fun comment(
-        @Path("postId") postId: String,
+        @Path("postId") postId: Long,
         @Body body: CommentRequest,
+    ): ApiEnvelope<CommentDto>
+
+    /** 본인 댓글만. 남의 댓글이면 403. */
+    @DELETE("community/posts/{postId}/comments/{commentId}")
+    suspend fun deleteComment(
+        @Path("postId") postId: Long,
+        @Path("commentId") commentId: Long,
     ): ApiEnvelope<Unit>
 
+    /** 누른 상태면 취소된다. 토글 후 상태와 총 개수가 온다. */
     @POST("community/posts/{postId}/like")
-    suspend fun like(@Path("postId") postId: String): ApiEnvelope<Unit>
-
-    @POST("community/posts/{postId}/report")
-    suspend fun reportPost(
-        @Path("postId") postId: String,
-        @Body body: ReportRequest,
-    ): ApiEnvelope<Unit>
-
-    @POST("community/posts/{postId}/comments/{commentId}/report")
-    suspend fun reportComment(
-        @Path("postId") postId: String,
-        @Path("commentId") commentId: String,
-        @Body body: ReportRequest,
-    ): ApiEnvelope<Unit>
+    suspend fun like(@Path("postId") postId: Long): ApiEnvelope<LikeToggleDto>
 
     @Multipart
     @POST("community/attachments")
-    suspend fun uploadAttachment(@Part file: MultipartBody.Part): ApiEnvelope<Unit>
+    suspend fun uploadAttachment(@Part file: MultipartBody.Part): ApiEnvelope<UploadedFileDto>
 }
 
 interface ChatApi {

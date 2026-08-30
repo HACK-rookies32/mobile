@@ -296,7 +296,7 @@ val appModule = module {
         if (useMock) FakeScreenshotRepository(get(), get()) else RealScreenshotRepository(get())
     }
     single<CommunityRepository> {
-        if (useMock) FakeCommunityRepository() else RealCommunityRepository(get())
+        if (useMock) FakeCommunityRepository() else RealCommunityRepository(get(), androidContext())
     }
     single<InquiryRepository> {
         if (useMock) FakeInquiryRepository() else RealInquiryRepository(get(), androidContext())
@@ -362,7 +362,7 @@ val appModule = module {
     viewModel { PairingViewModel(get(), get()) }
     viewModel { CommunityListViewModel(get()) }
     viewModel { params -> CommunityDetailViewModel(params.get(), get(), get()) }
-    viewModel { CommunityWriteViewModel(get()) }
+    viewModel { params -> CommunityWriteViewModel(get(), params.get()) }
     viewModel { NoticeViewModel(get()) }
     viewModel { ContactViewModel(get<InquiryRepository>()) }
     viewModel { PayViewModel(get(), get(), get()) }

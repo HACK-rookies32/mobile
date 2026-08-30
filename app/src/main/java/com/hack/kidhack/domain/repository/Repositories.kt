@@ -1,6 +1,7 @@
 package com.hack.kidhack.domain.repository
 
 import androidx.paging.PagingData
+import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Activity
 import com.hack.kidhack.domain.model.ActivityType
 import com.hack.kidhack.domain.model.Allowance
@@ -22,6 +23,7 @@ import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryDetail
+import com.hack.kidhack.domain.model.LikeResult
 import com.hack.kidhack.domain.model.InstalledApp
 import com.hack.kidhack.domain.model.LocationEvent
 import com.hack.kidhack.domain.model.LocationPoint
@@ -279,17 +281,28 @@ interface CommandRepository {
 interface CommunityRepository {
     fun pagedPosts(keyword: String? = null): Flow<PagingData<Post>>
     suspend fun posts(): List<Post>
+
+    /** 본문·첨부·댓글은 상세에만 있다. */
     suspend fun post(postId: String): Post
-    suspend fun create(
-        title: String,
-        body: String,
-        imageUrls: List<String>? = null,
-        links: List<String>? = null
-    ): Post
-    suspend fun like(postId: String)
-    suspend fun comment(postId: String, body: String)
-    suspend fun reportPost(postId: String, reason: String, detail: String? = null)
-    suspend fun reportComment(postId: String, commentId: String, reason: String, detail: String? = null)
+
+    /** @param attachments [uploadAttachment] 로 받은 공개 경로들. 로컬 URI 를 넣으면 안 된다. */
+    suspend fun create(title: String, content: String, attachments: List<String>, links: List<String>): Post
+
+    suspend fun update(postId: String, title: String, content: String, attachments: List<String>, links: List<String>): Post
+
+    /** 글과 첨부 실물이 함께 지워진다. */
+    suspend fun delete(postId: String)
+
+    /** 토글 결과를 서버가 준 그대로 돌려준다. */
+    suspend fun like(postId: String): LikeResult
+
+    suspend fun comment(postId: String, content: String): Comment
+
+    /** 본인 댓글만. 남의 댓글이면 서버가 403. */
+    suspend fun deleteComment(postId: String, commentId: String)
+
+    /** 파일 하나를 올리고 공개 경로를 받는다. */
+    suspend fun uploadAttachment(uri: String): String
 }
 
 interface InquiryRepository {

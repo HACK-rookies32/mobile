@@ -36,6 +36,7 @@ import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryAnswer
 import com.hack.kidhack.domain.model.InquiryDetail
+import com.hack.kidhack.domain.model.LikeResult
 import com.hack.kidhack.domain.model.Notice
 import com.hack.kidhack.domain.model.NoticeDetail
 import com.hack.kidhack.domain.model.Paged
@@ -493,65 +494,87 @@ class FakeScreenshotRepository(
 
 class FakeCommunityRepository : CommunityRepository {
     private val items = FakeData.posts.toMutableList()
+
     override fun pagedPosts(keyword: String?): Flow<PagingData<Post>> = Pager(PagingConfig(20)) {
         PageResponsePagingSource { page, size ->
             val all = if (keyword.isNullOrBlank()) items.toList()
-                else items.filter { it.title.contains(keyword, ignoreCase = true) }
+                else items.filter { it.title.contains(keyword, ignoreCase = true) || it.author.contains(keyword, ignoreCase = true) }
             val totalPages = kotlin.math.ceil(all.size / size.toDouble()).toInt().coerceAtLeast(1)
             val slice = all.drop(page * size).take(size)
             PageResponse(slice, page, size, all.size.toLong(), totalPages)
         }
     }.flow
+
     override suspend fun posts() = items.toList()
+
     override suspend fun post(postId: String) = items.first { it.id == postId }
+
     override suspend fun create(
         title: String,
-        body: String,
-        imageUrls: List<String>?,
-        links: List<String>?
+        content: String,
+        attachments: List<String>,
+        links: List<String>,
     ): Post {
         val created = Post(
-            id = "p-${items.size + 1}",
+            id = (items.size + 1).toString(),
             title = title,
             author = FakeData.parent.nickname ?: FakeData.parent.name,
-            commentCount = 0,
-            likeCount = 0,
+            content = content,
             createdAtLabel = "방금",
-            imageUrls = imageUrls ?: emptyList(),
-            links = links ?: emptyList()
+            attachments = attachments,
+            links = links,
         )
         items.add(0, created)
         return created
     }
-    override suspend fun like(postId: String) {
+
+    override suspend fun update(
+        postId: String,
+        title: String,
+        content: String,
+        attachments: List<String>,
+        links: List<String>,
+    ): Post {
+        val index = items.indexOfFirst { it.id == postId }
+        val updated = items[index].copy(title = title, content = content, attachments = attachments, links = links)
+        items[index] = updated
+        return updated
+    }
+
+    override suspend fun delete(postId: String) {
+        items.removeAll { it.id == postId }
+    }
+
+    override suspend fun like(postId: String): LikeResult {
         val i = items.indexOfFirst { it.id == postId }
-        if (i >= 0) {
-            val p = items[i]
-            items[i] = p.copy(liked = !p.liked, likeCount = if (p.liked) p.likeCount - 1 else p.likeCount + 1)
-        }
+        if (i < 0) return LikeResult(liked = false, likeCount = 0)
+        val p = items[i]
+        val liked = !p.liked
+        val count = (if (liked) p.likeCount + 1 else p.likeCount - 1).coerceAtLeast(0)
+        items[i] = p.copy(liked = liked, likeCount = count)
+        return LikeResult(liked, count)
     }
-    override suspend fun comment(postId: String, body: String) {
+
+    override suspend fun comment(postId: String, content: String): Comment {
+        val created = Comment(
+            id = (items.sumOf { it.comments.size } + 1).toString(),
+            memberId = FakeData.parent.id,
+            author = FakeData.parent.nickname ?: FakeData.parent.name,
+            text = content,
+            createdAt = "방금",
+        )
         val i = items.indexOfFirst { it.id == postId }
-        if (i >= 0) {
-            val p = items[i]
-            val newComment = com.hack.kidhack.domain.model.Comment(
-                id = "c-${System.currentTimeMillis()}",
-                author = FakeData.parent.nickname ?: FakeData.parent.name,
-                text = body,
-                createdAt = "방금"
-            )
-            items[i] = p.copy(
-                commentCount = p.commentCount + 1,
-                comments = p.comments + newComment
-            )
-        }
+        if (i >= 0) items[i] = items[i].copy(comments = items[i].comments + created)
+        return created
     }
-    override suspend fun reportPost(postId: String, reason: String, detail: String?) {
-        // 모의(mock): 신고 접수만 처리하고 별도 저장은 하지 않음
+
+    override suspend fun deleteComment(postId: String, commentId: String) {
+        val i = items.indexOfFirst { it.id == postId }
+        if (i >= 0) items[i] = items[i].copy(comments = items[i].comments.filterNot { it.id == commentId })
     }
-    override suspend fun reportComment(postId: String, commentId: String, reason: String, detail: String?) {
-        // 모의(mock): 신고 접수만 처리하고 별도 저장은 하지 않음
-    }
+
+    /** 목 모드에서는 올릴 서버가 없으니 고른 URI 를 그대로 경로처럼 쓴다. */
+    override suspend fun uploadAttachment(uri: String): String = uri
 }
 
 class FakeInquiryRepository : InquiryRepository {
