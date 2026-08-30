@@ -164,19 +164,20 @@ object FakeData {
 
     val posts = listOf(
         Post(
-            id = "p1",
+            id = "1",
+            authorId = "101",
             title = "유튜브 시청 시간 제한, 어떻게 하시나요?",
             author = "행복한엄마",
-            commentCount = 2,
+            content = "하루 한 시간으로 정해 두었는데 다들 어떻게 하시는지 궁금해요.",
             likeCount = 24,
-            createdAtLabel = "2시간 전",
+            createdAtLabel = "2026-08-28T14:02:00",
             comments = listOf(
-                Comment("c1", "도전맘", "저는 하루 1시간으로 정해두고 있어요.", "1시간 전"),
-                Comment("c2", "민준아빠", "약속을 정하는 게 가장 중요한 것 같아요.", "30분 전")
-            )
+                Comment("1", "102", "도전맘", "저는 하루 1시간으로 정해두고 있어요.", "2026-08-28T15:10:00"),
+                Comment("2", "103", "민준아빠", "약속을 정하는 게 가장 중요한 것 같아요.", "2026-08-28T15:40:00"),
+            ),
         ),
-        Post("p2", "스마트폰 처음 사준 시기가 언제예요?", "두아이아빠", 15, 37, "5시간 전"),
-        Post("p3", "루키즈 앱 쓰고 마음이 편해졌어요 후기", "워킹맘", 5, 18, "어제"),
+        Post(id = "2", authorId = "104", title = "스마트폰 처음 사준 시기가 언제예요?", author = "두아이아빠", likeCount = 37, createdAtLabel = "2026-08-28T09:00:00"),
+        Post(id = "3", authorId = "105", title = "루키즈 앱 쓰고 마음이 편해졌어요 후기", author = "워킹맘", likeCount = 18, createdAtLabel = "2026-08-27T20:00:00"),
     ) + (4..48).map { i ->
         // pageSize(20)보다 확실히 많게 하려고 기존 더미 패턴을 순환 생성한다.
         val titles = listOf(
@@ -188,14 +189,13 @@ object FakeData {
             "우리 아이 스마트폰 첫 개통 후기",
         )
         val authors = listOf("행복한엄마", "두아이아빠", "워킹맘", "도전맘", "민준아빠", "하늘맘")
-        val labels = listOf("방금", "1시간 전", "3시간 전", "어제", "2일 전", "지난주")
         Post(
-            id = "p$i",
+            id = i.toString(),
+            authorId = (100 + i).toString(),
             title = titles[i % titles.size],
             author = authors[i % authors.size],
-            commentCount = i % 5,
             likeCount = (i * 3) % 60,
-            createdAtLabel = labels[i % labels.size],
+            createdAtLabel = "2026-08-2" + (i % 8) + "T12:00:00",
         )
     }
 

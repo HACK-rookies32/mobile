@@ -1,5 +1,7 @@
 package com.hack.kidhack.feature.parent
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.paging.LoadState
@@ -63,6 +67,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.hack.kidhack.R
+import com.hack.kidhack.core.common.RemoteUrl
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
@@ -92,25 +97,23 @@ class CommunityListViewModel(
         communityRepository.pagedPosts().cachedIn(viewModelScope)
 }
 
-enum class ReportReason { SPAM, ABUSE, ADULT, FALSE_INFO, ETC }
-
-sealed interface ReportTarget {
-    data object PostTarget : ReportTarget
-    data class CommentTarget(val commentId: String) : ReportTarget
-}
-
 data class CommunityDetailUiState(
     val post: Post? = null,
     val comments: List<Comment> = emptyList(),
     val draft: String = "",
+    /** 내 회원 id. 내 글·내 댓글에만 삭제 버튼을 보인다(남의 것은 서버가 막는다). */
+    val myMemberId: String = "",
     val loading: Boolean = true,
+    val deleted: Boolean = false,
     val error: String? = null,
-    val reportTarget: ReportTarget? = null,
-    val pendingReason: ReportReason? = null,
-    val reportDetail: String = "",
-    val reportDone: Boolean = false,
 )
 
+/**
+ * 게시글 상세 (명세 20).
+ *
+ * 신고 기능은 서버에 없다. 예전에는 `/report` 를 부르며 404 를 받고도 "신고 접수" 를
+ * 띄우고 있었다 — 화면과 함께 걷어냈다.
+ */
 class CommunityDetailViewModel(
     private val postId: String,
     private val communityRepository: CommunityRepository,
@@ -119,13 +122,11 @@ class CommunityDetailViewModel(
     private val _state = MutableStateFlow(CommunityDetailUiState())
     val state: StateFlow<CommunityDetailUiState> = _state.asStateFlow()
 
-    private var myNickname: String = "나"
-
     init {
         load()
         viewModelScope.launch {
             runCatching { userRepository.me() }.getOrNull()?.let { user ->
-                myNickname = user.nickname?.takeIf { it.isNotBlank() } ?: user.name
+                _state.update { it.copy(myMemberId = user.id) }
             }
         }
     }
@@ -141,104 +142,120 @@ class CommunityDetailViewModel(
         }
     }
 
+    /** 서버가 토글 결과를 준다. 예전에는 글을 다시 읽고 앱이 카운트를 ±1 했다. */
     fun like() {
         viewModelScope.launch {
-            runCatching {
-                communityRepository.like(postId)
-                communityRepository.post(postId)
-            }.onSuccess { post ->
-                val current = _state.value.post
-                val liked = current?.let { !it.liked } ?: true
-                val count = (current?.likeCount ?: 0) + if (liked) 1 else -1
-                _state.update { it.copy(post = (post).copy(liked = liked, likeCount = count.coerceAtLeast(0))) }
-            }
-        }
-    }
-
-    fun comment() {
-        val text = _state.value.draft.trim()
-        if (text.isBlank()) return
-        viewModelScope.launch {
-            runCatching { communityRepository.comment(postId, text) }
-                .onSuccess {
-                    val newComment = Comment(
-                        id = "local-${System.currentTimeMillis()}",
-                        author = myNickname,
-                        text = text,
-                        createdAt = "방금"
-                    )
+            runCatching { communityRepository.like(postId) }
+                .onSuccess { result ->
                     _state.update {
-                        it.copy(
-                            draft = "",
-                            comments = it.comments + newComment,
-                            post = it.post?.copy(commentCount = it.post.commentCount + 1),
-                        )
+                        it.copy(post = it.post?.copy(liked = result.liked, likeCount = result.likeCount))
                     }
                 }
                 .onFailure { t -> _state.update { it.copy(error = t.message) } }
         }
     }
 
-    fun openReportPost() =
-        _state.update { it.copy(reportTarget = ReportTarget.PostTarget, pendingReason = null, reportDetail = "") }
-    fun openReportComment(commentId: String) =
-        _state.update { it.copy(reportTarget = ReportTarget.CommentTarget(commentId), pendingReason = null, reportDetail = "") }
-
-    // 사유 선택 → 바로 신고하지 않고 확인 단계로 이동
-    fun selectReason(reason: ReportReason) = _state.update { it.copy(pendingReason = reason) }
-    fun onReportDetail(v: String) = _state.update { it.copy(reportDetail = v) }
-    fun cancelReport() = _state.update { it.copy(reportTarget = null, pendingReason = null, reportDetail = "") }
-    fun dismissReportDone() = _state.update { it.copy(reportDone = false) }
-
-    fun confirmReport() {
-        val target = _state.value.reportTarget ?: return
-        val reason = _state.value.pendingReason ?: return
-        val detail = if (reason == ReportReason.ETC) _state.value.reportDetail.trim().ifBlank { null } else null
+    /** 서버가 돌려준 댓글을 그대로 붙인다. 예전에는 가짜 댓글을 만들어 넣었다. */
+    fun comment() {
+        val text = _state.value.draft.trim()
+        if (text.isBlank()) return
         viewModelScope.launch {
-            runCatching {
-                when (target) {
-                    is ReportTarget.PostTarget -> communityRepository.reportPost(postId, reason.name, detail)
-                    is ReportTarget.CommentTarget ->
-                        communityRepository.reportComment(postId, target.commentId, reason.name, detail)
+            runCatching { communityRepository.comment(postId, text) }
+                .onSuccess { created ->
+                    _state.update { it.copy(draft = "", comments = it.comments + created) }
                 }
-            }.onSuccess {
-                _state.update { it.copy(reportTarget = null, pendingReason = null, reportDetail = "", reportDone = true) }
-            }.onFailure { t ->
-                _state.update { it.copy(reportTarget = null, pendingReason = null, reportDetail = "", error = t.message) }
-            }
+                .onFailure { t -> _state.update { it.copy(error = t.message) } }
+        }
+    }
+
+    fun deleteComment(commentId: String) {
+        viewModelScope.launch {
+            runCatching { communityRepository.deleteComment(postId, commentId) }
+                .onSuccess {
+                    _state.update { it.copy(comments = it.comments.filterNot { c -> c.id == commentId }) }
+                }
+                .onFailure { t -> _state.update { it.copy(error = t.message) } }
+        }
+    }
+
+    fun deletePost() {
+        viewModelScope.launch {
+            runCatching { communityRepository.delete(postId) }
+                .onSuccess { _state.update { it.copy(deleted = true) } }
+                .onFailure { t -> _state.update { it.copy(error = t.message) } }
         }
     }
 }
 
 data class CommunityWriteUiState(
+    /** 수정 모드. 제목·버튼 문구와 호출할 API 가 달라진다. */
+    val editing: Boolean = false,
     val title: String = "",
-    val body: String = "",
-    val imageUrls: List<String> = emptyList(),
+    val content: String = "",
+    /** 업로드를 마친 첨부의 **공개 경로**. 갤러리 URI 가 아니다. */
+    val attachments: List<String> = emptyList(),
     val links: List<String> = emptyList(),
     val showLinkDialog: Boolean = false,
+    val uploading: Boolean = false,
     val loading: Boolean = false,
     val done: Boolean = false,
     val error: String? = null,
 )
 
+/**
+ * 글쓰기 (명세 20).
+ *
+ * 첨부는 `POST /community/attachments` 로 **먼저 올려** 공개 경로를 받고 그 경로만
+ * 글에 실어 보낸다. 예전에는 갤러리 `content://` URI 를 그대로 보냈다(서버에 없는 파일).
+ */
 class CommunityWriteViewModel(
     private val communityRepository: CommunityRepository,
+    /** 수정할 글 id. 비어 있으면 새 글이다. */
+    private val postId: String = "",
 ) : ViewModel() {
-    private val _state = MutableStateFlow(CommunityWriteUiState())
+    private val _state = MutableStateFlow(CommunityWriteUiState(editing = postId.isNotBlank()))
     val state: StateFlow<CommunityWriteUiState> = _state.asStateFlow()
 
+    init {
+        if (postId.isNotBlank()) loadForEdit()
+    }
+
+    /** 목록에는 본문·첨부가 없어서 수정 폼을 채우려면 상세를 받아와야 한다. */
+    private fun loadForEdit() {
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null) }
+            runCatching { communityRepository.post(postId) }
+                .onSuccess { post ->
+                    _state.update {
+                        it.copy(
+                            loading = false,
+                            title = post.title,
+                            content = post.content,
+                            attachments = post.attachments,
+                            links = post.links,
+                        )
+                    }
+                }
+                .onFailure { t -> _state.update { it.copy(loading = false, error = t.message) } }
+        }
+    }
+
     fun onTitle(v: String) = _state.update { it.copy(title = v) }
-    fun onBody(v: String) = _state.update { it.copy(body = v) }
+    fun onContent(v: String) = _state.update { it.copy(content = v) }
 
-    fun addImage(uri: Uri?) {
+    fun addAttachment(uri: Uri?) {
         if (uri == null) return
-        // TODO: Backend Integration - 실제 서버 연동 시 이미지를 업로드하고 반환된 URL을 사용해야 함
-        _state.update { it.copy(imageUrls = it.imageUrls + uri.toString()) }
+        viewModelScope.launch {
+            _state.update { it.copy(uploading = true, error = null) }
+            runCatching { communityRepository.uploadAttachment(uri.toString()) }
+                .onSuccess { url -> _state.update { it.copy(attachments = it.attachments + url, uploading = false) } }
+                .onFailure { t ->
+                    _state.update { it.copy(uploading = false, error = t.message ?: "첨부 업로드에 실패했어요") }
+                }
+        }
     }
 
-    fun removeImage(url: String) {
-        _state.update { it.copy(imageUrls = it.imageUrls - url) }
-    }
+    fun removeAttachment(url: String) = _state.update { it.copy(attachments = it.attachments - url) }
 
     fun toggleLinkDialog(show: Boolean) = _state.update { it.copy(showLinkDialog = show) }
 
@@ -247,26 +264,34 @@ class CommunityWriteViewModel(
         _state.update { it.copy(links = it.links + url, showLinkDialog = false) }
     }
 
-    fun removeLink(url: String) {
-        _state.update { it.copy(links = it.links - url) }
-    }
+    fun removeLink(url: String) = _state.update { it.copy(links = it.links - url) }
 
     fun submit() {
         val title = _state.value.title.trim()
-        val body = _state.value.body.trim()
-        if (title.isBlank() || body.isBlank()) {
+        val content = _state.value.content.trim()
+        if (title.isBlank() || content.isBlank()) {
             _state.update { it.copy(error = "제목과 내용을 입력해 주세요") }
             return
         }
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
-                communityRepository.create(
-                    title = title,
-                    body = body,
-                    imageUrls = _state.value.imageUrls,
-                    links = _state.value.links
-                )
+                if (postId.isBlank()) {
+                    communityRepository.create(
+                        title = title,
+                        content = content,
+                        attachments = _state.value.attachments,
+                        links = _state.value.links,
+                    )
+                } else {
+                    communityRepository.update(
+                        postId = postId,
+                        title = title,
+                        content = content,
+                        attachments = _state.value.attachments,
+                        links = _state.value.links,
+                    )
+                }
             }
                 .onSuccess { _state.update { it.copy(loading = false, done = true) } }
                 .onFailure { t -> _state.update { it.copy(loading = false, error = t.message) } }
@@ -329,9 +354,9 @@ fun ParentCommunityScreen(
                         Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(post.author, fontFamily = KidhackFontFamily, fontWeight = FontSemibold, fontSize = 12.sp, color = colors.text)
-                            Text(post.createdAtLabel, color = colors.muted, fontSize = 12.sp)
+                            Text(post.createdAtLabel.toDisplayDateTime(), color = colors.muted, fontSize = 12.sp)
                             Spacer(Modifier.weight(1f))
-                            Text(stringResource(R.string.parent_community_comments, post.commentCount), color = colors.muted, fontSize = 12.sp)
+                            // 댓글 수는 서버 목록 응답에 없다. 좋아요만 보여 준다.
                             Text(stringResource(R.string.parent_community_likes, post.likeCount), color = colors.muted, fontSize = 12.sp)
                         }
                     }
@@ -366,11 +391,24 @@ fun ParentCommunityScreen(
 fun ParentCommunityDetailScreen(
     postId: String,
     onBack: () -> Unit = {},
+    onEdit: (String) -> Unit = {},
     viewModel: CommunityDetailViewModel = koinViewModel(parameters = { parametersOf(postId) }),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
+    val context = LocalContext.current
     val post = state.post
+
+    // 글이 지워졌으면 상세에 머물 이유가 없다.
+    if (state.deleted) {
+        LaunchedEffect(Unit) { onBack() }
+    }
+
+    // 수정 화면에서 돌아오면 뷰모델이 그대로 살아 있어 옛 내용이 남는다. 다시 읽는다.
+    LifecycleResumeEffect(Unit) {
+        viewModel.load()
+        onPauseOrDispose { }
+    }
 
     ParentScreenScaffold(
         header = { ParentHeaderBar(stringResource(R.string.parent_community_detail), onBack) },
@@ -419,18 +457,23 @@ fun ParentCommunityDetailScreen(
             KidCard {
                 Text(post.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 16.sp, color = colors.text)
                 Spacer(Modifier.height(8.dp))
-                Text("${post.author} · ${post.createdAtLabel}", color = colors.muted, fontSize = 12.sp)
+                Text(
+                    post.author + " · " + post.createdAtLabel.toDisplayDateTime(),
+                    color = colors.muted,
+                    fontSize = 12.sp,
+                )
                 Spacer(Modifier.height(12.dp))
-                Text(stringResource(R.string.parent_community_empty_body), color = colors.text, fontSize = 14.sp)
-                
-                // 이미지 표시
-                if (post.imageUrls.isNotEmpty()) {
+                // 예전에는 서버 본문을 받지 못해 자리표시 문자열을 그리고 있었다.
+                Text(post.content, color = colors.text, fontSize = 14.sp)
+
+                // 첨부 표시 — 상대 경로라 origin 을 붙여야 뜬다.
+                if (post.attachments.isNotEmpty()) {
                     Spacer(Modifier.height(16.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(post.imageUrls) { url ->
+                        items(post.attachments) { path ->
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
-                                    .data(url)
+                                    .data(RemoteUrl.absolute(path))
                                     .crossfade(true)
                                     .build(),
                                 contentDescription = null,
@@ -452,7 +495,7 @@ fun ParentCommunityDetailScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(colors.surface)
-                                .clickable { /* TODO: Open browser */ }
+                                .clickable { context.openExternal(link) }
                                 .padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -476,14 +519,24 @@ fun ParentCommunityDetailScreen(
                         color = if (post.liked) colors.danger else colors.muted,
                         fontWeight = FontBold,
                     )
-                    Text(stringResource(R.string.parent_community_comments, post.commentCount), color = colors.muted)
+                    Text(stringResource(R.string.parent_community_comments, state.comments.size), color = colors.muted)
                     Spacer(Modifier.weight(1f))
-                    Text(
-                        stringResource(R.string.parent_community_report),
-                        modifier = Modifier.clickable(onClick = viewModel::openReportPost),
-                        color = colors.muted,
-                        fontSize = 12.sp,
-                    )
+                    // 서버가 작성자를 검증하지 않지만(VULN-11), 남의 글에 삭제를 노출하지는 않는다.
+                    if (post.authorId.isNotBlank() && post.authorId == state.myMemberId) {
+                        Text(
+                            stringResource(R.string.parent_community_edit),
+                            modifier = Modifier.clickable { onEdit(post.id) },
+                            color = colors.brand,
+                            fontSize = 12.sp,
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            stringResource(R.string.parent_community_delete),
+                            modifier = Modifier.clickable(onClick = viewModel::deletePost),
+                            color = colors.danger,
+                            fontSize = 12.sp,
+                        )
+                    }
                 }
             }
             state.comments.forEach { c ->
@@ -502,17 +555,20 @@ fun ParentCommunityDetailScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = c.createdAt,
+                                text = c.createdAt.toDisplayDateTime(),
                                 color = colors.muted,
                                 fontSize = 11.sp
                             )
                             Spacer(Modifier.weight(1f))
-                            Text(
-                                text = stringResource(R.string.parent_community_report),
-                                modifier = Modifier.clickable { viewModel.openReportComment(c.id) },
-                                color = colors.muted,
-                                fontSize = 11.sp,
-                            )
+                            // 본인 댓글만 지울 수 있다(남의 댓글이면 서버가 403).
+                            if (c.memberId.isNotBlank() && c.memberId == state.myMemberId) {
+                                Text(
+                                    text = stringResource(R.string.parent_community_delete),
+                                    modifier = Modifier.clickable { viewModel.deleteComment(c.id) },
+                                    color = colors.danger,
+                                    fontSize = 11.sp,
+                                )
+                            }
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(c.text, fontSize = 14.sp, color = colors.text)
@@ -522,136 +578,46 @@ fun ParentCommunityDetailScreen(
         }
     }
 
-    if (state.reportTarget != null && state.pendingReason == null) {
-        ReportReasonSheet(
-            onDismiss = viewModel::cancelReport,
-            onSelect = viewModel::selectReason,
-        )
-    }
-
-    val pendingReason = state.pendingReason
-    if (state.reportTarget != null && pendingReason != null) {
-        AlertDialog(
-            onDismissRequest = viewModel::cancelReport,
-            title = { Text(stringResource(R.string.parent_community_report_confirm_title), fontWeight = FontBold) },
-            text = {
-                Column {
-                    Text(
-                        stringResource(R.string.parent_community_report_confirm_reason, reportReasonLabel(pendingReason)),
-                        color = colors.text,
-                    )
-                    if (pendingReason == ReportReason.ETC) {
-                        Spacer(Modifier.height(12.dp))
-                        KidTextField(
-                            value = state.reportDetail,
-                            onValueChange = viewModel::onReportDetail,
-                            label = stringResource(R.string.parent_community_report_detail_label),
-                            placeholder = stringResource(R.string.parent_community_report_detail_placeholder),
-                            singleLine = false,
-                            minLines = 3,
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = viewModel::confirmReport) {
-                    Text(stringResource(R.string.parent_community_report_confirm_ok), color = colors.danger, fontWeight = FontBold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::cancelReport) {
-                    Text(stringResource(R.string.parent_community_report_confirm_cancel), color = colors.muted)
-                }
-            },
-        )
-    }
-
-    if (state.reportDone) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissReportDone,
-            title = { Text(stringResource(R.string.parent_community_report_done_title), fontWeight = FontBold) },
-            text = { Text(stringResource(R.string.parent_community_report_done_message)) },
-            confirmButton = {
-                TextButton(onClick = viewModel::dismissReportDone) {
-                    Text(stringResource(R.string.parent_community_report_done_ok), color = colors.brand, fontWeight = FontBold)
-                }
-            },
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ReportReasonSheet(
-    onDismiss: () -> Unit,
-    onSelect: (ReportReason) -> Unit,
-) {
-    val colors = LocalKidhackColors.current
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
-            Text(
-                stringResource(R.string.parent_community_report_title),
-                modifier = Modifier.padding(16.dp),
-                fontWeight = FontBold,
-                fontSize = 18.sp,
-            )
-            HorizontalDivider(color = colors.border)
-            ReportReason.entries.forEach { reason ->
-                Text(
-                    text = reportReasonLabel(reason),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelect(reason) }
-                        .padding(16.dp),
-                    color = colors.text,
-                    fontWeight = FontSemibold,
-                    fontSize = 15.sp,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun reportReasonLabel(reason: ReportReason): String = when (reason) {
-    ReportReason.SPAM -> stringResource(R.string.parent_community_report_reason_spam)
-    ReportReason.ABUSE -> stringResource(R.string.parent_community_report_reason_abuse)
-    ReportReason.ADULT -> stringResource(R.string.parent_community_report_reason_adult)
-    ReportReason.FALSE_INFO -> stringResource(R.string.parent_community_report_reason_false)
-    ReportReason.ETC -> stringResource(R.string.parent_community_report_reason_etc)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParentCommunityWriteScreen(
+    /** 비어 있으면 새 글, 값이 있으면 그 글을 수정한다. */
+    postId: String = "",
     onBack: () -> Unit = {},
     onDone: () -> Unit = {},
-    viewModel: CommunityWriteViewModel = koinViewModel(),
+    viewModel: CommunityWriteViewModel = koinViewModel(parameters = { parametersOf(postId) }),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
     var linkInput by remember { mutableStateOf("") }
 
     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        viewModel.addImage(uri)
+        viewModel.addAttachment(uri)
     }
 
     if (state.done) {
         androidx.compose.runtime.LaunchedEffect(Unit) { onDone() }
     }
     ParentScreenScaffold(
-        header = { ParentHeaderBar(stringResource(R.string.parent_community_write), onBack) },
+        header = {
+            ParentHeaderBar(
+                stringResource(
+                    if (state.editing) R.string.parent_community_edit
+                    else R.string.parent_community_write
+                ),
+                onBack,
+            )
+        },
     ) {
         ParentLoadingOrError(state.loading, state.error)
         KidTextField(state.title, viewModel::onTitle, stringResource(R.string.parent_community_write_title))
         
         // 본문 입력창 높이 확대
         KidTextField(
-            value = state.body,
-            onValueChange = viewModel::onBody,
+            value = state.content,
+            onValueChange = viewModel::onContent,
             label = stringResource(R.string.parent_community_write_body),
             singleLine = false,
             minLines = 8,
@@ -662,6 +628,9 @@ fun ParentCommunityWriteScreen(
 
         // 이미지 첨부 영역
         Text("이미지 첨부", fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
+        if (state.uploading) {
+            Text("올리는 중…", color = colors.muted, fontSize = 12.sp)
+        }
         Spacer(Modifier.height(8.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
@@ -670,17 +639,17 @@ fun ParentCommunityWriteScreen(
                         .size(80.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(colors.surface)
-                        .clickable { imageLauncher.launch("image/*") },
+                        .clickable(enabled = !state.uploading) { imageLauncher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("➕", fontSize = 20.sp)
                 }
             }
-            items(state.imageUrls) { url ->
+            items(state.attachments) { path ->
                 Box(Modifier.size(80.dp)) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(url)
+                            .data(RemoteUrl.absolute(path))
                             .crossfade(true)
                             .build(),
                         contentDescription = null,
@@ -696,7 +665,7 @@ fun ParentCommunityWriteScreen(
                             .size(20.dp)
                             .clip(CircleShape)
                             .background(Color.Black.copy(alpha = 0.6f))
-                            .clickable { viewModel.removeImage(url) },
+                            .clickable { viewModel.removeAttachment(path) },
                         contentAlignment = Alignment.Center
                     ) {
                         Text("✕", color = Color.White, fontSize = 12.sp)
@@ -742,7 +711,15 @@ fun ParentCommunityWriteScreen(
         }
 
         Spacer(Modifier.height(32.dp))
-        KidButton(stringResource(R.string.parent_community_write_submit), viewModel::submit, Modifier.fillMaxWidth(), enabled = !state.loading)
+        KidButton(
+            stringResource(
+                if (state.editing) R.string.parent_community_edit_submit
+                else R.string.parent_community_write_submit
+            ),
+            viewModel::submit,
+            Modifier.fillMaxWidth(),
+            enabled = !state.loading && !state.uploading,
+        )
         Spacer(Modifier.height(16.dp))
     }
 
@@ -764,4 +741,19 @@ fun ParentCommunityWriteScreen(
             }
         }
     }
+}
+
+/** 서버는 ISO-8601 로만 준다. 목록·상세 모두 분 단위까지만 보여 준다. */
+private fun String.toDisplayDateTime(): String =
+    if (length >= 16) substring(0, 10).replace('-', '.') + " " + substring(11, 16) else this
+
+/**
+ * 게시글 링크·첨부를 외부 브라우저로 연다.
+ *
+ * 첨부는 상대 경로라 origin 을 붙인다. 브라우저가 없는 기기에서는 예외가 나므로 삼킨다.
+ */
+private fun Context.openExternal(rawUrl: String) {
+    val url = RemoteUrl.absolute(rawUrl.filterNot { it.isWhitespace() })
+    if (url.isBlank()) return
+    runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
 }

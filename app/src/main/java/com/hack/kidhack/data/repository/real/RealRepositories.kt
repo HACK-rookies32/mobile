@@ -6,6 +6,7 @@ import androidx.paging.PagingData
 import androidx.paging.map
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import com.hack.kidhack.core.common.DeviceId
 import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.remote.api.AllowanceApi
@@ -55,7 +56,7 @@ import com.hack.kidhack.data.remote.dto.ChildUpdateRequest
 import com.hack.kidhack.data.remote.dto.CommentRequest
 import com.hack.kidhack.data.remote.dto.CreateChatRoomRequest
 import com.hack.kidhack.data.remote.dto.InquiryRequest
-import com.hack.kidhack.data.remote.dto.CreatePostRequest
+import com.hack.kidhack.data.remote.dto.PostRequest
 import com.hack.kidhack.data.remote.dto.FindIdSendCodeRequest
 import com.hack.kidhack.data.remote.dto.FindIdVerifyRequest
 import com.hack.kidhack.data.remote.dto.DeviceEventRequest
@@ -65,7 +66,6 @@ import com.hack.kidhack.data.remote.dto.LoginResponse
 import com.hack.kidhack.data.remote.dto.PairingConnectRequest
 import com.hack.kidhack.data.remote.dto.PlaceRequest
 import com.hack.kidhack.data.remote.dto.RemoteCommandAckRequest
-import com.hack.kidhack.data.remote.dto.ReportRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordRequest
 import com.hack.kidhack.data.remote.dto.ResetPasswordSendCodeRequest
 import com.hack.kidhack.data.remote.dto.SignupRequest
@@ -82,6 +82,7 @@ import com.hack.kidhack.data.repository.toDto
 import com.hack.kidhack.data.ws.ChatWebSocketClient
 import com.hack.kidhack.data.ws.ChatWsEvent
 import com.hack.kidhack.data.ws.ChildCommandSocket
+import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Activity
 import com.hack.kidhack.domain.model.ActivityType
 import com.hack.kidhack.domain.model.AppControlItem
@@ -102,6 +103,7 @@ import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryDetail
+import com.hack.kidhack.domain.model.LikeResult
 import com.hack.kidhack.domain.model.Notice
 import com.hack.kidhack.domain.model.NoticeDetail
 import com.hack.kidhack.domain.model.Paged
@@ -500,30 +502,52 @@ class RealScreenshotRepository(private val api: ScreenshotApi) : ScreenshotRepos
     ).unwrap().toDomain(capturedAt = capturedAt, trigger = trigger)
 }
 
-class RealCommunityRepository(private val api: CommunityApi) : CommunityRepository {
+class RealCommunityRepository(
+    private val api: CommunityApi,
+    private val context: Context,
+) : CommunityRepository {
+
     override fun pagedPosts(keyword: String?): Flow<PagingData<Post>> =
         Pager(PagingConfig(20)) {
             PageResponsePagingSource { page, size -> api.posts(keyword = keyword, page = page, size = size).unwrap() }
         }.flow.map { paging -> paging.map { it.toDomain() } }
-    override suspend fun posts(): List<Post> = api.posts(page = 0, size = 50).unwrap().content.map { it.toDomain() }
-    override suspend fun post(postId: String): Post = api.post(postId).unwrap().toDomain()
+
+    override suspend fun posts(): List<Post> =
+        api.posts(page = 0, size = 50).unwrap().content.map { it.toDomain() }
+
+    override suspend fun post(postId: String): Post = api.post(postId.toServerId()).unwrap().toDomain()
+
     override suspend fun create(
         title: String,
-        body: String,
-        imageUrls: List<String>?,
-        links: List<String>?
-    ): Post =
-        api.create(CreatePostRequest(title, body, imageUrls, links)).unwrap().toDomain()
-    override suspend fun like(postId: String) { api.like(postId).unwrapOrNull() }
-    override suspend fun comment(postId: String, body: String) {
-        api.comment(postId, CommentRequest(body)).unwrapOrNull()
+        content: String,
+        attachments: List<String>,
+        links: List<String>,
+    ): Post = api.create(PostRequest(title, content, attachments, links)).unwrap().toDomain()
+
+    override suspend fun update(
+        postId: String,
+        title: String,
+        content: String,
+        attachments: List<String>,
+        links: List<String>,
+    ): Post = api.update(postId.toServerId(), PostRequest(title, content, attachments, links)).unwrap().toDomain()
+
+    override suspend fun delete(postId: String) {
+        api.delete(postId.toServerId()).unwrap()
     }
-    override suspend fun reportPost(postId: String, reason: String, detail: String?) {
-        api.reportPost(postId, ReportRequest(reason, detail)).unwrapOrNull()
+
+    override suspend fun like(postId: String): LikeResult =
+        api.like(postId.toServerId()).unwrap().toDomain()
+
+    override suspend fun comment(postId: String, content: String): Comment =
+        api.comment(postId.toServerId(), CommentRequest(content)).unwrap().toDomain()
+
+    override suspend fun deleteComment(postId: String, commentId: String) {
+        api.deleteComment(postId.toServerId(), commentId.toServerId()).unwrap()
     }
-    override suspend fun reportComment(postId: String, commentId: String, reason: String, detail: String?) {
-        api.reportComment(postId, commentId, ReportRequest(reason, detail)).unwrapOrNull()
-    }
+
+    override suspend fun uploadAttachment(uri: String): String =
+        api.uploadAttachment(context.filePart(uri)).unwrap().url
 }
 
 /**
@@ -566,36 +590,8 @@ class RealInquiryRepository(
         api.delete(id.toServerId()).unwrap()
     }
 
-    override suspend fun uploadAttachment(uri: String): String {
-        val parsed = Uri.parse(uri)
-        val resolver = context.contentResolver
-        val bytes = resolver.openInputStream(parsed)?.use { it.readBytes() }
-            ?: throw IllegalStateException("첨부 파일을 읽을 수 없습니다")
-        val mime = resolver.getType(parsed) ?: "application/octet-stream"
-        val part = MultipartBody.Part.createFormData(
-            "file",
-            resolver.displayName(parsed),
-            bytes.toRequestBody(mime.toMediaTypeOrNull()),
-        )
-        return api.upload(part).unwrap().url
-    }
-
-    /**
-     * 업로드에 쓸 파일 이름.
-     *
-     * `content://` URI 의 마지막 조각은 보통 숫자 id 라 확장자가 없다. 서버가 확장자로
-     * 종류를 판단하므로(첨부가 이미지인지 앱도 확장자로 본다) 이름을 못 얻으면
-     * MIME 서브타입으로 확장자를 만들어 붙인다.
-     */
-    private fun android.content.ContentResolver.displayName(uri: Uri): String {
-        val fromCursor = runCatching {
-            query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
-                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
-        }.getOrNull()
-        if (!fromCursor.isNullOrBlank()) return fromCursor
-        val suffix = getType(uri)?.substringAfter('/')?.takeIf { it.isNotBlank() } ?: "bin"
-        return "attachment." + suffix
-    }
+    override suspend fun uploadAttachment(uri: String): String =
+        api.upload(context.filePart(uri)).unwrap().url
 }
 
 /** 공지사항 (명세 23). 열람에 로그인이 필요 없다. */
@@ -852,6 +848,26 @@ private fun String.toServerId(): Long =
 /** 장소 좌표도 서버에서는 숫자다. (0.0, 0.0)으로 조용히 등록되는 것을 막는다. */
 private fun String.toServerCoordinate(label: String): Double =
     toDoubleOrNull() ?: throw IllegalStateException("$label 값이 숫자 형식이어야 합니다: $this")
+
+/**
+ * 갤러리·파일 선택기에서 받은 URI 를 multipart 파트로 만든다.
+ *
+ * 문의(21)·커뮤니티(20) 첨부 업로드가 함께 쓴다. 파일 이름을 얻지 못하면 MIME
+ * 서브타입으로 확장자를 만들어 붙인다 — 서버도 앱도 첨부 종류를 확장자로 판단한다.
+ */
+private fun Context.filePart(uri: String): MultipartBody.Part {
+    val parsed = Uri.parse(uri)
+    val resolver = contentResolver
+    val bytes = resolver.openInputStream(parsed)?.use { it.readBytes() }
+        ?: throw IllegalStateException("첨부 파일을 읽을 수 없습니다")
+    val mime = resolver.getType(parsed) ?: "application/octet-stream"
+    val name = runCatching {
+        resolver.query(parsed, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+    }.getOrNull()?.takeIf { it.isNotBlank() }
+        ?: ("attachment." + (mime.substringAfter('/').takeIf { it.isNotBlank() } ?: "bin"))
+    return MultipartBody.Part.createFormData("file", name, bytes.toRequestBody(mime.toMediaTypeOrNull()))
+}
 
 private fun File.toImagePart(): MultipartBody.Part =
     MultipartBody.Part.createFormData("file", name, asRequestBody("image/jpeg".toMediaType()))

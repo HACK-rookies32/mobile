@@ -168,12 +168,26 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
         composable(Route.ParentCommunityDetail.path) { entry ->
             val postId = entry.arguments?.getString("postId").orEmpty()
             ParentShell(navController) {
-                ParentCommunityDetailScreen(postId = postId, onBack = { navController.popBackStack() })
+                ParentCommunityDetailScreen(
+                    postId = postId,
+                    onBack = { navController.popBackStack() },
+                    onEdit = { navController.navigate(Route.ParentCommunityEdit.create(it)) },
+                )
             }
         }
         composable(Route.ParentCommunityWrite.path) {
             ParentShell(navController) {
                 ParentCommunityWriteScreen(
+                    onBack = { navController.popBackStack() },
+                    onDone = { navController.popBackStack() },
+                )
+            }
+        }
+        composable(Route.ParentCommunityEdit.path) { entry ->
+            val postId = entry.arguments?.getString("postId").orEmpty()
+            ParentShell(navController) {
+                ParentCommunityWriteScreen(
+                    postId = postId,
                     onBack = { navController.popBackStack() },
                     onDone = { navController.popBackStack() },
                 )

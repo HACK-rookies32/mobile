@@ -27,6 +27,11 @@ sealed class Route(val path: String) {
         fun create(postId: String) = "parent/community/detail/$postId"
     }
     data object ParentCommunityWrite : Route("parent/community/write")
+
+    /** 글쓰기 화면을 그대로 쓰되 기존 글을 채워 넣는다(PATCH). */
+    data object ParentCommunityEdit : Route("parent/community/edit/{postId}") {
+        fun create(postId: String) = "parent/community/edit/$postId"
+    }
     data object ParentNotice : Route("parent/notice")
     data object ParentContact : Route("parent/contact")
     data object ParentPay : Route("parent/pay")

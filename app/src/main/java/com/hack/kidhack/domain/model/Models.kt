@@ -156,25 +156,38 @@ data class Activity(
 
 enum class ActivityType { POST, COMMENT, LIKE, UNKNOWN }
 
+/**
+ * 커뮤니티 게시글.
+ *
+ * 목록 응답에는 본문·첨부·댓글이 없다(상세에만 온다). `liked` 는 서버 목록·상세에
+ * 아예 없고 좋아요 토글 응답에만 있어서, 이 화면에서 누른 뒤에만 채워진다.
+ */
 data class Post(
     val id: String,
+    val authorId: String = "",
     val title: String,
     val author: String,
-    val commentCount: Int,
-    val likeCount: Int,
-    val createdAtLabel: String,
+    val content: String = "",
+    val likeCount: Int = 0,
+    val createdAtLabel: String = "",
     val liked: Boolean = false,
-    val imageUrls: List<String> = emptyList(),
+    /** 첨부 공개 경로. 화면에서 절대 URL 로 바꿔 연다. */
+    val attachments: List<String> = emptyList(),
     val links: List<String> = emptyList(),
     val comments: List<Comment> = emptyList(),
 )
 
 data class Comment(
     val id: String,
+    /** 작성자 회원 id. 내 댓글일 때만 삭제 버튼을 보인다(남의 것은 서버가 403). */
+    val memberId: String = "",
     val author: String,
     val text: String,
     val createdAt: String,
 )
+
+/** 좋아요 토글 결과. 서버가 준 값을 그대로 쓴다. */
+data class LikeResult(val liked: Boolean, val likeCount: Int)
 
 /**
  * 문의 목록 항목. 서버 목록 응답에는 **본문·첨부가 없다** — [InquiryDetail] 로 따로 받는다.

@@ -450,42 +450,51 @@ data class ScreenshotUploadDto(
     val imageUrl: String? = null,
 )
 
+/** 서버 `CommentResponse`. 예전에는 `id`·`author`·`body` 로 받아 전부 빈 값이었다. */
 @Serializable
 data class CommentDto(
-    val id: String,
-    val author: String,
-    val body: String,
-    val createdAt: String,
+    val commentId: Long,
+    val memberId: Long = 0,
+    val nickname: String = "",
+    val content: String = "",
+    val createdAt: String = "",
 )
 
+/**
+ * 게시글. 목록 응답에는 `content`·`attachments`·`comments` 가 없어 기본값으로 둔다
+ * (상세에만 온다).
+ */
 @Serializable
 data class PostDto(
-    @SerialName("postId") val id: String,
-    val title: String,
-    @SerialName("authorNickname") val author: String,
-    @SerialName("createdAt") val createdAtLabel: String,
-    val likeCount: Int = 0,
-    // TODO: 명세서 목록/상세 응답에 commentCount 없음 — 서버 미제공 시 0 기본값 유지
-    val commentCount: Int = 0,
-    val liked: Boolean = false,
-    val imageUrls: List<String> = emptyList(),
+    val postId: Long,
+    val authorId: Long = 0,
+    val authorNickname: String = "",
+    val title: String = "",
+    val content: String = "",
+    /** 첨부 공개 경로. `/api/files/community/{filename}` 형태의 상대 경로다. */
+    val attachments: List<String> = emptyList(),
     val links: List<String> = emptyList(),
+    val likeCount: Int = 0,
+    val createdAt: String = "",
+    val updatedAt: String? = null,
     val comments: List<CommentDto> = emptyList(),
 )
 
+/** 작성(POST)·수정(PATCH) 공용. 수정은 넣은 필드만 반영된다. */
 @Serializable
-data class CreatePostRequest(
+data class PostRequest(
     val title: String,
-    val body: String,
-    val imageUrls: List<String>? = null,
-    val links: List<String>? = null,
+    val content: String,
+    val attachments: List<String> = emptyList(),
+    val links: List<String> = emptyList(),
 )
 
 @Serializable
-data class CommentRequest(val body: String)
+data class CommentRequest(val content: String)
 
+/** 좋아요 토글 결과. 누른 상태면 취소된다. */
 @Serializable
-data class ReportRequest(val reason: String, val detail: String? = null)
+data class LikeToggleDto(val liked: Boolean = false, val likeCount: Int = 0)
 
 /**
  * 방 목록 항목 (서버 `ChatRoomSummaryResponse`).
