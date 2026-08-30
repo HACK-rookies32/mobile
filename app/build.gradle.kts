@@ -9,6 +9,16 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// FCM: Firebase 콘솔(kidhack-38a89)에서 받은 app/google-services.json 이 있을 때만 플러그인을 적용한다.
+// 파일이 없어도 빌드는 되게 — 그 빌드에선 FirebaseApp 초기화가 실패해 푸시만 조용히 꺼진다
+// (PushTokenRegistrar 가 runCatching 으로 삼킨다). 파일은 git 에 올리지 않는다(.gitignore).
+val hasGoogleServicesJson = rootProject.file("app/google-services.json").exists()
+if (hasGoogleServicesJson) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.lifecycle("kidhack FCM: app/google-services.json 없음 — google-services 플러그인 미적용(푸시 비활성)")
+}
+
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) {
@@ -59,6 +69,9 @@ android {
         buildConfigField("String", "BASE_URL", "\"$apiBaseUrl\"")
         manifestPlaceholders["usesCleartextTraffic"] = "false"
 
+        // [VULN-MOBILE-SECRET-1] Google Maps API 키를 빌드 시 Manifest(<meta-data> API_KEY)에 주입.
+        // Firebase 키도 google-services.json → strings.xml 로 박혀 APK 에서 그대로 추출된다.
+        // 의도된 취약점(OWASP Mobile M2 Inadequate Supply Chain / M8). 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md
         // AndroidManifest의 ${MAPS_API_KEY} 자리에 주입
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
@@ -77,6 +90,8 @@ android {
             versionNameSuffix = "-api"
             buildConfigField("boolean", "USE_MOCK", "false")
             buildConfigField("String", "BASE_URL", "\"$apiBaseUrl\"")
+            // [VULN-MOBILE-NET-1] api 변형에서 평문 HTTP 허용(usesCleartextTraffic=true). networkSecurityConfig
+            // 미설정 + 인증서 피닝 없음 → MITM 노출. 의도된 취약점(OWASP Mobile M5). 명세: mobile/docs/vuln-spec-mobile.md
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
         // 배포·보안 실습용 (서명 필요). keystore 연결 후 signingConfig 지정.
@@ -88,6 +103,9 @@ android {
                 "\"https://api.childsafe.example.com/api\"",
             )
             manifestPlaceholders["usesCleartextTraffic"] = "false"
+            // [VULN-MOBILE-RE-1] R8 축소·난독화 완전 비활성(enable=false) + release signingConfig 없음 →
+            // 클래스/메서드/문자열이 평문으로 남아 jadx/apktool 리버싱 난이도 최저. 의도된 취약점
+            // (OWASP Mobile M7 Insufficient Binary Protection). 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md
             optimization {
                 enable = false
             }
@@ -104,6 +122,9 @@ android {
 }
 
 dependencies {
+    // FCM (docs/fcm-integration.md). 서비스 클래스: background/push/KidhackFirebaseMessagingService.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

@@ -51,6 +51,40 @@ object ChildNotifications {
         }
     }
 
+    /**
+     * 자녀 기기에 오는 일반 알림(용돈 받음·새 메시지 등, FCM `PARENT_ALERT` 경로)을 알림창에 띄운다.
+     * 서버가 data 전용 푸시를 보내므로 앱이 직접 그린다. 같은 `key`(notificationId)면 갱신만 된다.
+     */
+    fun notifyAlert(context: Context, key: String, title: String, body: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        ensureChannel(context)
+        val open = android.app.PendingIntent.getActivity(
+            context,
+            key.hashCode(),
+            android.content.Intent(context, com.hack.kidhack.MainActivity::class.java)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, REQUEST_CHANNEL_ID)
+            .setContentTitle(title.ifBlank { context.getString(R.string.app_name) })
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .build()
+        context.getSystemService(NotificationManager::class.java)
+            ?.notify(7600 + (key.hashCode() and 0x0FFF), notification)
+    }
+
     fun foreground(context: Context, title: String, text: String): Notification {
         ensureChannel(context)
         return NotificationCompat.Builder(context, CHANNEL_ID)

@@ -114,13 +114,13 @@ class ScreenshotViewModel(
                 // 기존 non-paged list() 로 새 캡처 도착만 감지하고, 목록 자체는 items.refresh() 로 갱신한다.
                 val lastId = runCatching { screenshotRepository.list(id).firstOrNull()?.id }.getOrNull()
 
-                // TODO: Backend Integration - 202 Accepted 응답 후 FCM/Socket 알림이 없으므로 폴링 수행 (GAP-11)
+                // 서버가 자녀 기기로 FCM(SCREENSHOT_REQUESTED)을 보내고, 자녀가 화면 공유에 동의하면 업로드된다.
+                // 도착 통지는 없어 여기서 목록을 폴링한다. 자녀가 알림을 보고 동의하는 시간이 있으므로 최대 5분.
                 screenshotRepository.requestCapture(id)
 
-                // 최대 2분간 5초 간격으로 폴링
                 var found = false
-                for (i in 1..24) {
-                    delay(5000)
+                for (i in 1..POLL_MAX_ROUNDS) {
+                    delay(POLL_INTERVAL_MS)
                     val firstId = runCatching { screenshotRepository.list(id).firstOrNull()?.id }.getOrNull()
                     if (firstId != lastId) {
                         _state.update { it.copy(requesting = false) }
@@ -129,11 +129,21 @@ class ScreenshotViewModel(
                         break
                     }
                 }
-                if (!found) error("캡처 응답 시간이 초과되었습니다. 잠시 후 목록을 확인해 주세요.")
+                if (!found) {
+                    // 시간 초과여도 목록은 한 번 다시 읽는다(늦게 올라온 캡처가 옛 목록에 가려지지 않도록).
+                    _refreshSignal.tryEmit(Unit)
+                    error("캡처 응답 시간이 초과되었습니다. 자녀가 화면 공유에 동의하면 목록에 나타나요.")
+                }
             }.onFailure { t ->
                 _state.update { it.copy(requesting = false, error = t.message) }
             }
         }
+    }
+
+    private companion object {
+        const val POLL_INTERVAL_MS = 5_000L
+        /** 5초 × 60 = 5분. */
+        const val POLL_MAX_ROUNDS = 60
     }
 }
 
