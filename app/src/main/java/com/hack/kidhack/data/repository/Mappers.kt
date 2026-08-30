@@ -419,7 +419,8 @@ private const val DEFAULT_PAIRING_TTL_SECONDS = 300
 
 /** 서버/소켓이 쓸 법한 이름들을 넉넉하게 받아 준다. 모르는 값은 UNKNOWN 으로 떨어뜨린다. */
 fun String?.toRemoteCommandType(): RemoteCommandType = when (this?.uppercase()) {
-    "SCREEN_CAPTURE", "CAPTURE", "CAPTURE_REQUEST", "SCREENSHOT" -> RemoteCommandType.SCREEN_CAPTURE
+    // SCREENSHOT_REQUESTED = 서버 NotificationType(FCM data.type). 캡처 요청은 이 이름으로 온다.
+    "SCREEN_CAPTURE", "CAPTURE", "CAPTURE_REQUEST", "SCREENSHOT", "SCREENSHOT_REQUESTED" -> RemoteCommandType.SCREEN_CAPTURE
     "CAMERA_SHOT", "CAMERA", "CAMERA_REQUEST", "PHOTO" -> RemoteCommandType.CAMERA_SHOT
     else -> RemoteCommandType.UNKNOWN
 }
