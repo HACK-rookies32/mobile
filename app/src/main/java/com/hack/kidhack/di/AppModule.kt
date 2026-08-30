@@ -359,7 +359,7 @@ val appModule = module {
     }
 
     viewModel { LoginViewModel(get()) }
-    viewModel { RegisterViewModel(get(), get(), get(), androidContext()) }
+    viewModel { RegisterViewModel(get(), get(), get(), get(), androidContext()) }
     viewModel { ForgotViewModel(get()) }
 
     viewModel { DashboardViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }

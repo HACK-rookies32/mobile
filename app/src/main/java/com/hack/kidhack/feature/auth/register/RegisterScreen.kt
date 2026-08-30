@@ -67,7 +67,7 @@ fun RegisterScreen(
     val role = state.role
     val permissionVm: ChildOnboardingViewModel = koinViewModel { parametersOf(false) }
 
-    val onPermissionsStep = role == Role.CHILD && state.step == 3 && state.session == null
+    val onPermissionsStep = role == Role.CHILD && state.step == 4 && state.session == null
     val onDoneStep = state.session != null && state.step == state.doneStep
 
     LaunchedEffect(state.error, state.session, state.step) {
@@ -115,7 +115,7 @@ fun RegisterScreen(
             Text("루키즈 가족이 되어보세요", color = Color.White.copy(alpha = 0.75f), fontSize = 14.sp)
             if (role != null) {
                 Spacer(Modifier.height(16.dp))
-                val total = if (role == Role.CHILD) 4 else 3
+                val total = if (role == Role.CHILD) 5 else 3
                 val current = if (role == Role.CHILD) {
                     (state.step - 1).coerceIn(0, total - 1)
                 } else {
@@ -139,7 +139,9 @@ fun RegisterScreen(
                 state = state,
                 viewModel = viewModel,
             )
+            state.step == 2 && role == Role.CHILD -> PairingStep(state = state, viewModel = viewModel)
             state.step == 2 -> TermsStep(state = state, viewModel = viewModel)
+            state.step == 3 && role == Role.CHILD -> TermsStep(state = state, viewModel = viewModel)
             onDoneStep -> DoneStep(
                 session = state.session!!,
                 loading = state.loading,
@@ -354,6 +356,54 @@ private fun TermsCheckRow(
             fontSize = if (emphasized) 15.sp else 12.sp,
         )
     }
+}
+
+/**
+ * 자녀 가입 2단계 — 부모 앱의 6자리 페어링 코드 입력.
+ *
+ * 코드는 선택이다(부모가 아직 발급 안 했을 수 있음). 「나중에 연결」로 건너뛰면 가입 후
+ * 마이 → 「부모님 연결」에서 넣을 수 있다. 실제 연결은 가입·로그인 뒤 자동으로 이뤄진다
+ * (`POST /pairing/connect` 는 로그인 상태라야 childId 로 인증된다).
+ */
+@Composable
+private fun PairingStep(state: RegisterUiState, viewModel: RegisterViewModel) {
+    val colors = LocalKidhackColors.current
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("부모님과 연결", fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 24.sp, color = colors.text)
+        Text("부모님 앱에 표시된 6자리 코드를 입력해요", color = colors.muted, fontSize = 14.sp)
+    }
+    KidCard {
+        Text("👪  부모님 앱에서 코드 받기", color = colors.brandDark, fontWeight = FontBold, fontSize = 14.sp)
+        Text(
+            "부모님 앱: 마이 → 「자녀 페어링」 → 「설치 완료」를 누르면 6자리 코드가 떠요. 코드는 5분 동안만 쓸 수 있어요.",
+            color = colors.muted,
+            fontSize = 12.sp,
+        )
+    }
+    KidTextField(
+        state.pairingCode,
+        viewModel::onPairingCode,
+        "연결 코드",
+        placeholder = "6자리 숫자",
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+    )
+    StepError(state.error)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        KidButton("← 이전", viewModel::back, Modifier.weight(1f), KidButtonVariant.Ghost)
+        KidButton("다음 →", viewModel::nextFromPairing, Modifier.weight(1f))
+    }
+    Text(
+        text = "나중에 연결할게요",
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = viewModel::skipPairing)
+            .padding(vertical = 8.dp),
+        color = colors.muted,
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBold,
+        fontSize = 13.sp,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+    )
 }
 
 @Composable
