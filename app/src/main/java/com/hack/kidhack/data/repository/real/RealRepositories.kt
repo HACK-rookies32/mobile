@@ -555,7 +555,9 @@ class RealCommunityRepository(
     ): Post = api.update(postId.toServerId(), PostRequest(title, content, attachments, links)).unwrap().toDomain()
 
     override suspend fun delete(postId: String) {
-        api.delete(postId.toServerId()).unwrap()
+        // 삭제 성공은 본문이 없다({"success":true,"data":null}). unwrap 은 data 가 null 이면
+        // 예외를 던져 성공을 실패로 뒤집는다 — 본문 없는 응답은 unwrapOrNull 로 받는다.
+        api.delete(postId.toServerId()).unwrapOrNull()
     }
 
     override suspend fun like(postId: String): LikeResult =
@@ -565,7 +567,7 @@ class RealCommunityRepository(
         api.comment(postId.toServerId(), CommentRequest(content)).unwrap().toDomain()
 
     override suspend fun deleteComment(postId: String, commentId: String) {
-        api.deleteComment(postId.toServerId(), commentId.toServerId()).unwrap()
+        api.deleteComment(postId.toServerId(), commentId.toServerId()).unwrapOrNull()
     }
 
     override suspend fun uploadAttachment(uri: String): String =
@@ -609,7 +611,7 @@ class RealInquiryRepository(
         .unwrap().toDomain()
 
     override suspend fun delete(id: String) {
-        api.delete(id.toServerId()).unwrap()
+        api.delete(id.toServerId()).unwrapOrNull()
     }
 
     override suspend fun uploadAttachment(uri: String): String =
