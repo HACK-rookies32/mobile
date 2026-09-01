@@ -67,6 +67,7 @@ import com.hack.kidhack.feature.parent.ParentNoticeScreen
 import com.hack.kidhack.feature.parent.ParentNotificationsScreen
 import com.hack.kidhack.feature.parent.ParentPairingScreen
 import com.hack.kidhack.feature.parent.ParentPayScreen
+import com.hack.kidhack.feature.parent.ParentWalletScreen
 import com.hack.kidhack.feature.terminal.StoreTerminalScreen
 import com.hack.kidhack.feature.parent.ParentCameraRequestScreen
 import com.hack.kidhack.feature.parent.ParentScreenshotScreen
@@ -141,7 +142,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 onOpenCommunity = { navController.navigate(Route.ParentCommunity.path) },
                 onOpenNotice = { navController.navigate(Route.ParentNotice.path) },
                 onOpenContact = { navController.navigate(Route.ParentContact.path) },
-                onOpenPay = { navController.navigate(Route.ParentPay.path) },
+                onOpenWallet = { navController.navigate(Route.ParentWallet.path) },
                 onOpenCards = { navController.navigate(Route.ParentCards.path) },
                 onOpenTerms = { navController.navigate(Route.ParentTerms.path) },
             )
@@ -229,6 +230,15 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
         composable(Route.ParentPay.path) {
             ParentShell(navController) {
                 ParentPayScreen(
+                    onBack = { navController.popBackStack() },
+                    onRegisterCard = { navController.navigate(Route.ParentCards.path) },
+                    onOpenTerminal = { navController.navigate(Route.StoreTerminal.path) },
+                )
+            }
+        }
+        composable(Route.ParentWallet.path) {
+            ParentShell(navController) {
+                ParentWalletScreen(
                     onBack = { navController.popBackStack() },
                     onRegisterCard = { navController.navigate(Route.ParentCards.path) },
                     onOpenTerminal = { navController.navigate(Route.StoreTerminal.path) },

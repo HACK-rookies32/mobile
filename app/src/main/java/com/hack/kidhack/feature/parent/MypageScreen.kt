@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -220,6 +223,13 @@ class MypageViewModel(
     }
 }
 
+/**
+ * 부모 마이페이지.
+ *
+ * <p>주황 그라데이션 헤더를 걷어내고 자녀관리 화면과 같은 연주황→흰색 바탕을 쓴다(#43 규칙).
+ * 인사말 바로 아래에 지갑 잔액을 두어, 충전·송금은 화면을 옮기지 않고 미니 시트에서 끝내고
+ * 나머지 지갑 기능은 잔액 칸을 눌러 [ParentWalletScreen] 으로 들어간다.
+ */
 @Composable
 fun ParentMypageScreen(
     onOpenEditProfile: () -> Unit = {},
@@ -233,36 +243,65 @@ fun ParentMypageScreen(
     onOpenCommunity: () -> Unit = {},
     onOpenNotice: () -> Unit = {},
     onOpenContact: () -> Unit = {},
-    onOpenPay: () -> Unit = {},
+    onOpenWallet: () -> Unit = {},
     onOpenCards: () -> Unit = {},
     onOpenTerms: () -> Unit = {},
     viewModel: MypageViewModel = koinViewModel(),
+    walletViewModel: WalletViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // 잔액 칸과 미니 시트는 지갑 화면과 같은 뷰모델을 쓴다. 두 화면이 같은 일을 두 번 적지
+    // 않게 하려는 것이고, 각자 제 화면에 매인 인스턴스라 서로의 상태를 건드리지 않는다.
+    val walletState by walletViewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
     val user = state.user
 
-    ParentScreenScaffold(
-        header = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center,
-                ) { Text("👩", fontSize = 28.sp) }
-                Spacer(Modifier.size(16.dp))
-                Column {
-                    Text(
-                        stringResource(R.string.parent_mypage_greeting, user?.name ?: ""),
-                        color = Color.White,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBlack,
-                        fontSize = 20.sp,
-                    )
-                    Text(user?.email ?: user?.loginId.orEmpty(), color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-                }
-            }
-        },
+    // 지갑 화면에서 충전·송금하고 돌아오면 잔액이 달라져 있다.
+    LifecycleResumeRefresh { walletViewModel.load() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(warmBackground(colors.brandLight, colors.card))
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        Row(
+            modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(52.dp).clip(RoundedCornerShape(99.dp)).background(colors.card),
+                contentAlignment = Alignment.Center,
+            ) { Text("👩", fontSize = 26.sp) }
+            Spacer(Modifier.size(14.dp))
+            Column {
+                Text(
+                    stringResource(R.string.parent_mypage_greeting, user?.name ?: ""),
+                    color = colors.text,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBlack,
+                    fontSize = 20.sp,
+                )
+                Text(
+                    user?.email ?: user?.loginId.orEmpty(),
+                    color = colors.muted,
+                    fontSize = 12.sp,
+                )
+            }
+        }
+
+        WalletBalanceCard(
+            wallet = walletState.wallet,
+            onCharge = { walletViewModel.openSheet(WalletSheet.Charge) },
+            onSend = { walletViewModel.openSheet(WalletSheet.Send) },
+            sendEnabled = walletState.children.isNotEmpty(),
+            onDetail = onOpenWallet,
+        )
+        WalletBanner(error = walletState.error, messageRes = walletState.messageRes)
+
         ParentLoadingOrError(state.loading && user == null, state.error, viewModel::load)
         if (state.changingPassword) {
             KidCard {
@@ -381,9 +420,12 @@ fun ParentMypageScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
-            ListRow(stringResource(R.string.parent_mypage_camera), leading = "📷", onClick = onOpenCamera)
+            // 카메라 촬영은 일단 빼기로 한 기능이라 입구만 감춘다. 화면·라우트(ParentCameraRequest)는
+            // 그대로 두어 되돌리기 쉽게 한다. (mobile#51 — 자녀관리로 옮길지 여부는 별도 결정)
+            // ListRow(stringResource(R.string.parent_mypage_camera), leading = "📷", onClick = onOpenCamera)
             ListRow(stringResource(R.string.parent_mypage_child_profile), leading = "👦", onClick = onOpenProfile)
-            ListRow(stringResource(R.string.parent_mypage_pay), leading = "💳", onClick = onOpenPay)
+            // 루키즈 페이는 위 잔액 칸이 대신한다. 지갑으로 들어가는 문이 두 개면 어느 쪽이
+            // 무엇인지 설명할 수 없다.
             ListRow(stringResource(R.string.parent_mypage_child_account), leading = "🔓", onClick = onOpenChildAccount, showDivider = false)
         }
 
@@ -410,6 +452,9 @@ fun ParentMypageScreen(
         )
         Spacer(Modifier.height(8.dp))
     }
+
+    // 충전·송금 미니 시트. 지갑 화면과 같은 것을 쓴다.
+    WalletSheetHost(state = walletState, viewModel = walletViewModel, onRegisterCard = onOpenCards)
 }
 
 @Composable

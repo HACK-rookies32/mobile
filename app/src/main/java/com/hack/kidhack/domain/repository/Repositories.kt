@@ -361,6 +361,14 @@ interface WalletRepository {
     /** 이 부모↔자녀 사이 이체/회수 원장(최신순 페이징). */
     suspend fun getChildTransfers(childId: String, page: Int = 0): List<WalletTransaction>
 
+    /**
+     * 자녀 지갑의 **전체** 원장(최신순 페이징).
+     *
+     * [getChildTransfers] 는 부모와 주고받은 이체·회수만 담는다. 자녀가 매장에서 쓴 결제까지
+     * 시간순으로 보려면 이 경로가 필요하다.
+     */
+    suspend fun getChildTransactions(childId: String, type: String? = null, page: Int = 0): List<WalletTransaction>
+
     /** 충전 통합 내역(주문+환불시각). */
     suspend fun getChargeHistory(page: Int = 0): List<ChargeHistoryItem>
 
