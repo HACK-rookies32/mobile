@@ -754,7 +754,19 @@ private fun ReportCard(onClick: (() -> Unit)? = null, content: @Composable Colum
 }
 
 /** "1시간 20분". 같은 패키지의 [formatDuration] 은 "1h 20m" 이라 리포트에는 안 맞는다. */
-private fun formatKoreanDuration(totalSeconds: Int): String = formatMinutesLabel(totalSeconds / 60)
+private fun formatKoreanDuration(totalSeconds: Int): String {
+    // 1 분이 안 되는 값을 분으로 자르면 전부 "0분"이 된다. 실제로 30 초를 쓴 앱과 아예
+    // 쓰지 않은 앱이 같은 글자로 보여서, 목록에 앱이 여섯 줄인데 합계는 0분인 화면이 나온다.
+    if (totalSeconds < SECONDS_PER_MINUTE) return totalSeconds.toString() + "초"
+    val minutes = totalSeconds / SECONDS_PER_MINUTE
+    val seconds = totalSeconds % SECONDS_PER_MINUTE
+    // 한 시간이 넘어가면 초는 의미가 없다. "1시간 20분 37초"는 읽기만 번거롭다.
+    if (minutes >= MINUTES_PER_HOUR || seconds == 0) return formatMinutesLabel(minutes)
+    return minutes.toString() + "분 " + seconds + "초"
+}
+
+private const val SECONDS_PER_MINUTE = 60
+private const val MINUTES_PER_HOUR = 60
 
 private fun formatMinutesLabel(minutes: Int): String {
     val h = minutes / 60
