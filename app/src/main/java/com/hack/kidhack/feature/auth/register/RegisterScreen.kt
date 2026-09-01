@@ -260,7 +260,13 @@ private fun InfoStep(
     StepError(state.error)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         KidButton("← 이전", viewModel::back, Modifier.weight(1f), KidButtonVariant.Ghost)
-        KidButton("다음 →", viewModel::nextFromInfo, Modifier.weight(1f))
+        // 중복 확인이 오가는 동안 잠근다. 두 번 누르면 요청도 두 번 나간다.
+        KidButton(
+            text = if (state.checkingDuplicate) "확인 중…" else "다음 →",
+            onClick = viewModel::nextFromInfo,
+            modifier = Modifier.weight(1f),
+            enabled = !state.checkingDuplicate,
+        )
     }
 }
 

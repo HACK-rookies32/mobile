@@ -34,6 +34,7 @@ import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChildProfile
+import com.hack.kidhack.domain.model.Availability
 import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Geofence
 import com.hack.kidhack.domain.model.Inquiry
@@ -108,6 +109,13 @@ class FakeAuthRepository(
     private val chatMessageStore: ChatMessageStore,
     private val chatWebSocketClient: ChatWebSocketClient,
 ) : AuthRepository {
+    /** 목 모드에는 가입한 계정 목록이 없다. 늘 쓸 수 있다고 답해 폼을 막지 않는다. */
+    override suspend fun checkAvailability(loginId: String?, email: String?): Availability =
+        Availability(
+            loginIdAvailable = loginId?.takeIf { it.isNotBlank() }?.let { true },
+            emailAvailable = email?.takeIf { it.isNotBlank() }?.let { true },
+        )
+
     override suspend fun signup(
         loginId: String,
         username: String,
