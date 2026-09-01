@@ -593,6 +593,8 @@ data class AppUsageReportItemDto(
     val appName: String,
     val durationSec: Int,
     val recordedAt: String,
+    /** 서버가 집계를 묶는 기준. 없으면 서버가 앱 이름으로 묶는다. */
+    val packageName: String? = null,
 )
 
 @Serializable

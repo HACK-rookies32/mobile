@@ -51,13 +51,16 @@ class AppUsageWorker(
         if (!today.fromDevice || today.usages.isEmpty()) return Result.success()
 
         val date = LocalDate.now().toString()
-        val current = today.usages.associate { it.appName to it.durationSec }
+        // 기준점은 패키지명으로 잡는다. 앱 이름은 기기 언어를 바꾸거나 앱이 이름을 바꾸면
+        // 달라져서, 이름으로 잡으면 그때 증가분이 처음부터 다시 계산돼 하루치가 두 번 쌓인다.
+        val byPackage = today.usages.associateBy { it.packageName ?: it.appName }
+        val current = byPackage.mapValues { (_, usage) -> usage.durationSec }
         val previous = reportStore.lastTotals(date)
 
         // 증가분만. OS 통계가 되감기는 드문 경우(앱 삭제·초기화)에는 0 으로 눌러 음수를 막는다.
-        val deltas = current.mapNotNull { (name, total) ->
-            val delta = total - (previous[name] ?: 0)
-            if (delta > 0) AppUsage(appName = name, durationSec = delta) else null
+        val deltas = byPackage.mapNotNull { (key, usage) ->
+            val delta = usage.durationSec - (previous[key] ?: 0)
+            if (delta > 0) usage.copy(durationSec = delta) else null
         }
         if (deltas.isEmpty()) return Result.success()
 

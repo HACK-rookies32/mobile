@@ -307,6 +307,13 @@ data class AppUsage(
     val appName: String,
     val durationSec: Int,
     val category: String? = null,
+    /**
+     * 앱을 식별하는 패키지명. 서버가 이 값으로 집계를 묶는다.
+     *
+     * <p>앱 이름은 기기 언어에 따라 달라져서(「카메라」/「Camera」) 같은 앱이 따로 잡힌다.
+     * 기기에서 실측하지 못한 대체값에는 없으므로 null 을 허용한다.
+     */
+    val packageName: String? = null,
 )
 
 /** 서버 GET /monitoring/usage 집계 결과. groupBy에 따라 key의 의미가 달라진다

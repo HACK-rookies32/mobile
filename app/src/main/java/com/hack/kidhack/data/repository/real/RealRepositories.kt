@@ -884,7 +884,7 @@ class RealAppUsageRepository(private val api: AppUsageApi) : AppUsageRepository 
             AppUsageReportRequest(
                 childId = childId.toServerId(),
                 usages = usages.map {
-                    AppUsageReportItemDto(it.appName, it.durationSec, recordedAt)
+                    AppUsageReportItemDto(it.appName, it.durationSec, recordedAt, it.packageName)
                 },
             ),
         ).unwrapOrNull()

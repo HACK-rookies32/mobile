@@ -74,6 +74,7 @@ class AppUsageCollector(
                     appName = packageManager.getApplicationLabel(info).toString(),
                     durationSec = (stat.totalTimeInForeground / 1000L).toInt(),
                     category = info.categoryLabel(),
+                    packageName = stat.packageName,
                 )
             }
             .sortedByDescending { it.durationSec }
