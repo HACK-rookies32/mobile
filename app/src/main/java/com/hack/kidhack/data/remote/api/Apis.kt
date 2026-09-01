@@ -8,6 +8,7 @@ import com.hack.kidhack.data.remote.dto.AllowanceEntryDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
+import com.hack.kidhack.data.remote.dto.AvailabilityDto
 import com.hack.kidhack.data.remote.dto.AppControlDto
 import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
 import com.hack.kidhack.data.remote.dto.AppControlCreateRequest
@@ -129,6 +130,17 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface AuthApi {
+    /**
+     * 가입 전 아이디·이메일 중복 확인. 로그인 불필요.
+     *
+     * 빈 값은 보내지 않는다 — 서버가 "확인하지 않음"(null)과 "쓸 수 있음"을 구분한다.
+     */
+    @GET("auth/availability")
+    suspend fun availability(
+        @Query("loginId") loginId: String? = null,
+        @Query("email") email: String? = null,
+    ): ApiEnvelope<AvailabilityDto>
+
     @POST("auth/signup")
     suspend fun signup(@Body body: SignupRequest): ApiEnvelope<UserDto>
 

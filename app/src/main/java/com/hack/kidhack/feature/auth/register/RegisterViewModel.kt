@@ -34,6 +34,8 @@ data class RegisterUiState(
     val password: String = "",
     val passwordConfirm: String = "",
     val parentId: String = "",
+    /** 아이디·이메일 중복을 확인하는 중. 「다음」이 두 번 눌리지 않게 잠근다. */
+    val checkingDuplicate: Boolean = false,
     /** 자녀 가입 2단계 — 부모 앱의 6자리 페어링 코드. 계정 생성·로그인 후 connect 에 쓴다. 비우면 건너뜀. */
     val pairingCode: String = "",
     val agreedAge: Boolean = false,
@@ -116,7 +118,41 @@ class RegisterViewModel(
             // 자녀도 parentId 없이 가입한다. 부모 연결은 가입 후 마이 → 「부모님 연결」에서 6자리 페어링 코드로 한다.
             s.password.length < 8 -> _state.update { it.copy(error = "비밀번호는 8자 이상이어야 해요") }
             s.password != s.passwordConfirm -> _state.update { it.copy(error = "비밀번호가 일치하지 않아요") }
-            else -> _state.update { it.copy(step = 2, error = null) }
+            else -> checkDuplicateThenNext(s)
+        }
+    }
+
+    /**
+     * 아이디·이메일이 이미 쓰이는지 확인한 뒤 다음 단계로 넘어간다.
+     *
+     * <p>예전에는 마지막 「가입 완료하기」에서야 409 를 받았다. 그때는 부모 연결·약관·권한을
+     * 다 지나온 뒤라 첫 화면으로 되돌아가 고치고 같은 길을 다시 걸어야 했고, 오류 문구도
+     * 정작 입력칸이 없는 권한 화면에 떴다.
+     *
+     * <p>확인에 실패하면(네트워크 등) <b>막지 않고 넘어간다.</b> 가입에서 한 번 더 걸러지므로
+     * 잘못된 계정이 만들어지지는 않는다 — 여기서 막으면 서버가 잠깐 안 될 때 가입 자체가
+     * 불가능해진다.
+     */
+    private fun checkDuplicateThenNext(s: RegisterUiState) {
+        if (s.checkingDuplicate) return
+        viewModelScope.launch {
+            _state.update { it.copy(checkingDuplicate = true, error = null) }
+            val result = runCatching {
+                authRepository.checkAvailability(s.loginId.trim(), s.email.trim().ifBlank { null })
+            }.getOrNull()
+
+            val message = when {
+                result?.loginIdAvailable == false -> "이미 사용 중인 아이디예요"
+                result?.emailAvailable == false -> "이미 사용 중인 이메일이에요"
+                else -> null
+            }
+            _state.update {
+                it.copy(
+                    checkingDuplicate = false,
+                    error = message,
+                    step = if (message == null) 2 else it.step,
+                )
+            }
         }
     }
 

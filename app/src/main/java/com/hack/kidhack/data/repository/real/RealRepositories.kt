@@ -95,6 +95,7 @@ import com.hack.kidhack.data.repository.toDto
 import com.hack.kidhack.data.ws.ChatWebSocketClient
 import com.hack.kidhack.data.ws.ChatWsEvent
 import com.hack.kidhack.data.ws.ChildCommandSocket
+import com.hack.kidhack.domain.model.Availability
 import com.hack.kidhack.domain.model.Comment
 import com.hack.kidhack.domain.model.Activity
 import com.hack.kidhack.domain.model.ActivityType
@@ -239,6 +240,15 @@ class RealAuthRepository(
         )
         sessionRepository.save(session)
         return session
+    }
+
+    override suspend fun checkAvailability(loginId: String?, email: String?): Availability {
+        // 빈 값은 아예 보내지 않는다 — 서버가 "확인하지 않음"(null)과 "쓸 수 있음"을 구분한다.
+        val dto = api.availability(
+            loginId = loginId?.takeIf { it.isNotBlank() },
+            email = email?.takeIf { it.isNotBlank() },
+        ).unwrap()
+        return Availability(dto.loginIdAvailable, dto.emailAvailable)
     }
 
     override suspend fun login(loginId: String, password: String, preferredRole: Role?): Session {

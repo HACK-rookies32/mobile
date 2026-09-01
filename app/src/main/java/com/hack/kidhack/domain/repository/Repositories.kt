@@ -2,6 +2,7 @@ package com.hack.kidhack.domain.repository
 
 import androidx.paging.PagingData
 import com.hack.kidhack.domain.model.Comment
+import com.hack.kidhack.domain.model.Availability
 import com.hack.kidhack.domain.model.Activity
 import com.hack.kidhack.domain.model.ActivityType
 import com.hack.kidhack.domain.model.Allowance
@@ -66,6 +67,14 @@ interface AuthRepository {
         role: Role,
         parentId: Long?,
     ): Session
+
+    /**
+     * 가입 전 아이디·이메일 중복 확인.
+     *
+     * 가입 폼의 「다음」에서 부른다. 마지막 단계에서야 409 를 받으면 약관·권한 화면을
+     * 다 지나온 뒤라 되돌아가기가 번거롭다.
+     */
+    suspend fun checkAvailability(loginId: String?, email: String?): Availability
 
     suspend fun login(loginId: String, password: String, preferredRole: Role? = null): Session
     suspend fun logout()

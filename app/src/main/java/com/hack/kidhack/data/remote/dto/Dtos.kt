@@ -745,6 +745,13 @@ data class AppControlUpdateRequest(
 /**
  * 문의 목록·등록 응답. **본문과 첨부는 없다** — 상세([InquiryDetailDto])에만 있다.
  */
+/** 가입 전 중복 확인 결과. 확인하지 않은 항목은 null 이다(자녀는 이메일 없이 가입한다). */
+@Serializable
+data class AvailabilityDto(
+    val loginIdAvailable: Boolean? = null,
+    val emailAvailable: Boolean? = null,
+)
+
 @Serializable
 data class InquiryDto(
     val id: Long,

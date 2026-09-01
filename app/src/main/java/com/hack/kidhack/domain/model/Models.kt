@@ -186,6 +186,16 @@ data class Comment(
     val createdAt: String,
 )
 
+/**
+ * 가입 전 중복 확인 결과.
+ *
+ * null 은 "확인하지 않았다"는 뜻이다 — 빈 값은 물어보지 않는다(자녀는 이메일이 선택).
+ */
+data class Availability(
+    val loginIdAvailable: Boolean? = null,
+    val emailAvailable: Boolean? = null,
+)
+
 /** 좋아요 토글 결과. 서버가 준 값을 그대로 쓴다. */
 data class LikeResult(val liked: Boolean, val likeCount: Int)
 
