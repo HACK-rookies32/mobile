@@ -13,6 +13,8 @@ import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.repository.AuthRepository
 import com.hack.kidhack.domain.repository.ChildOnboardingStore
 import com.hack.kidhack.domain.repository.PairingRepository
+import com.hack.kidhack.domain.repository.SessionRepository
+import com.hack.kidhack.domain.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,6 +59,8 @@ data class RegisterUiState(
 class RegisterViewModel(
     private val authRepository: AuthRepository,
     private val pairingRepository: PairingRepository,
+    private val userRepository: UserRepository,
+    private val sessionRepository: SessionRepository,
     private val onboardingStore: ChildOnboardingStore,
     private val platformController: ChildPlatformController,
     private val appContext: Context,
@@ -188,6 +192,23 @@ class RegisterViewModel(
         }
     }
 
+    /**
+     * 연결 직후의 세션을 서버 기준으로 다시 맞춘다.
+     *
+     * <p>`login()` 으로 받은 세션은 **연결 이전** 상태라 `parentId` 가 비어 있다. 그대로
+     * 넘기면 홈으로 가는 길목(`goAuthed`)이 "아직 부모가 없는 자녀"로 보고 「부모님 연결」
+     * 화면으로 또 보낸다 — 방금 연결했는데 다시 묻는 꼴이 된다.
+     *
+     * <p>서버 조회가 실패하면 원래 세션을 그대로 쓴다. 연결은 이미 됐으므로 최악이라도
+     * 페어링 화면이 한 번 더 뜰 뿐, 진행이 막히지는 않는다.
+     */
+    private suspend fun pairedSession(session: Session): Session {
+        val parentId = runCatching { userRepository.me().parentId }.getOrNull() ?: return session
+        val updated = session.copy(user = session.user.copy(parentId = parentId))
+        runCatching { sessionRepository.save(updated) }
+        return updated
+    }
+
     /** 가입 응답에는 토큰이 없다. 앱 시작하기에서 로그인해서 토큰을 받은 뒤 홈으로 보낸다. */
     fun startApp(onAuthed: (Session) -> Unit) {
         val s = _state.value
@@ -200,14 +221,16 @@ class RegisterViewModel(
             }.onSuccess { session ->
                 // 가입 2단계에서 받은 코드로 부모와 연결한다(로그인 직후라야 childId 로 인증됨).
                 // 코드가 틀리거나 만료됐어도 앱 진입은 막지 않는다 — 마이 → 「부모님 연결」에서 다시 넣을 수 있다.
+                var authed = session
                 if (role == Role.CHILD && s.pairingCode.length == 6) {
                     runCatching { pairingRepository.connect(s.pairingCode) }
+                        .onSuccess { authed = pairedSession(session) }
                 }
                 if (role == Role.CHILD) {
                     platformController.reevaluate()
                 }
-                _state.update { it.copy(loading = false, session = session) }
-                onAuthed(session)
+                _state.update { it.copy(loading = false, session = authed) }
+                onAuthed(authed)
             }.onFailure { t ->
                 _state.update {
                     it.copy(loading = false, error = t.userMessage("로그인에 실패했어요"))
