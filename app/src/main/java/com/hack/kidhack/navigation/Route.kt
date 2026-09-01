@@ -7,6 +7,8 @@ sealed class Route(val path: String) {
     data object Forgot : Route("forgot")
 
     data object ParentGraph : Route("parent")
+    data object ParentChildren : Route("parent/children")
+    data object ParentChildCare : Route("parent/childcare")
     data object ParentDashboard : Route("parent/dashboard")
     data object ParentLocation : Route("parent/location")
     data object ParentChat : Route("parent/chat")
@@ -84,7 +86,7 @@ data class TabItem(
 )
 
 val ParentTabs = listOf(
-    TabItem(Route.ParentDashboard, "대시보드", "📊"),
+    TabItem(Route.ParentChildren, "자녀관리", "👪"),
     TabItem(Route.ParentLocation, "위치", "📍"),
     TabItem(Route.ParentChat, "채팅", "💬"),
     TabItem(Route.ParentNotifications, "알림", "🔔"),

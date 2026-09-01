@@ -227,11 +227,8 @@ fun ParentMypageScreen(
     onOpenActivities: () -> Unit = {},
     onOpenChildAccount: () -> Unit = {},
     onOpenWithdraw: () -> Unit = {},
-    onOpenAppControl: () -> Unit = {},
-    onOpenScreenshot: () -> Unit = {},
     onOpenCamera: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
-    onOpenHarmful: () -> Unit = {},
     onOpenPairing: () -> Unit = {},
     onOpenCommunity: () -> Unit = {},
     onOpenNotice: () -> Unit = {},
@@ -384,11 +381,8 @@ fun ParentMypageScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
-            ListRow(stringResource(R.string.parent_mypage_app_control), leading = "🛡️", onClick = onOpenAppControl)
-            ListRow(stringResource(R.string.parent_mypage_screenshot), leading = "📸", onClick = onOpenScreenshot)
             ListRow(stringResource(R.string.parent_mypage_camera), leading = "📷", onClick = onOpenCamera)
             ListRow(stringResource(R.string.parent_mypage_child_profile), leading = "👦", onClick = onOpenProfile)
-            ListRow(stringResource(R.string.parent_mypage_harmful), leading = "🚫", onClick = onOpenHarmful)
             ListRow(stringResource(R.string.parent_mypage_pay), leading = "💳", onClick = onOpenPay)
             ListRow(stringResource(R.string.parent_mypage_child_account), leading = "🔓", onClick = onOpenChildAccount, showDivider = false)
         }

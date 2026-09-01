@@ -158,6 +158,7 @@ import com.hack.kidhack.feature.parent.CommunityWriteViewModel
 import com.hack.kidhack.feature.parent.ContactViewModel
 import com.hack.kidhack.feature.parent.EditProfileViewModel
 import com.hack.kidhack.feature.parent.AppUsageDetailViewModel
+import com.hack.kidhack.feature.parent.ChildCareViewModel
 import com.hack.kidhack.feature.parent.DashboardViewModel
 import com.hack.kidhack.feature.parent.GeofenceViewModel
 import com.hack.kidhack.feature.parent.HarmfulViewModel
@@ -367,6 +368,7 @@ val appModule = module {
     viewModel { RegisterViewModel(get(), get(), get(), get(), get(), get(), androidContext()) }
     viewModel { ForgotViewModel(get()) }
 
+    viewModel { ChildCareViewModel(get(), get()) }
     viewModel { DashboardViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { AppUsageDetailViewModel(get(), get(), get()) }
     viewModel { LocationViewModel(get(), get(), get(), get(), get()) }

@@ -1,6 +1,7 @@
 package com.hack.kidhack.core.designsystem.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +68,12 @@ fun ChildChips(
                 modifier = Modifier
                     .clip(RoundedCornerShape(99.dp))
                     .background(background)
+                    .then(
+                        // 안 고른 칩은 배경색이 옅어서 회색 화면 위에서는 칩인지 글자인지
+                        // 구분되지 않는다. 테두리를 둘러 어느 배경에서든 눌리는 것으로 보이게 한다.
+                        if (selected || onDark) Modifier
+                        else Modifier.border(1.dp, colors.border, RoundedCornerShape(99.dp))
+                    )
                     .clickable { onSelect(id) }
                     .padding(horizontal = 14.dp, vertical = 7.dp),
                 color = textColor,
