@@ -542,11 +542,13 @@ fun TxResponseDto.toDomain(): WalletTransaction = WalletTransaction(
     createdAt = createdAt.toShortDateTimeLabel(),
 )
 
-/** 내 지갑 응답 → 잔액만 담은 Wallet(원장·월합계는 별도 경로에서 쓴다). */
+/** 내 지갑 응답 → 잔액 + 이번 달 합계(원장은 [toDomain] 으로 따로 편다). */
 fun MyWalletResponse.toWallet(): Wallet = Wallet(
     walletId = "me",
     balance = balance.toInt(),
     updatedAt = "",
+    monthlyChargeTotal = monthlyChargeTotal.toInt(),
+    monthlySpendTotal = monthlySpendTotal.toInt(),
 )
 
 fun ChildWalletResponse.toWallet(): Wallet = Wallet(

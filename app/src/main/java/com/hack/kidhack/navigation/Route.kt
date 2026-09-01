@@ -37,7 +37,12 @@ sealed class Route(val path: String) {
     data object ParentScreenTime : Route("parent/screentime")
     data object ParentNotice : Route("parent/notice")
     data object ParentContact : Route("parent/contact")
+    /**
+     * 옛 「루키즈 페이」 화면. [ParentWallet] 로 대체돼 정상 내비게이션에서는 더 이상 닿지 않지만,
+     * 새 화면에서 빠진 것이 나올 때를 대비해 남겨 둔다.
+     */
     data object ParentPay : Route("parent/pay")
+    data object ParentWallet : Route("parent/wallet")
     data object ParentCards : Route("parent/cards")
 
     /**

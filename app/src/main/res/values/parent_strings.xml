@@ -364,4 +364,71 @@
     <string name="parent_report_week_under">약속보다 하루 %1$s 덜 사용했어요.</string>
     <string name="parent_day_summary_empty">오늘은 아직 기록된 일이 없어요.</string>
     <string name="parent_report_loaded_at">%1$s 기준 · 아래로 당기면 새로 받아옵니다</string>
+
+    <!-- 지갑 (루키즈 페이) -->
+    <string name="parent_wallet_title">루키즈 페이</string>
+    <string name="parent_wallet_tab_mine">내 지갑</string>
+    <string name="parent_wallet_tab_child">자녀 지갑</string>
+    <string name="parent_wallet_my_balance">내 지갑 잔액</string>
+    <string name="parent_wallet_detail_link">지갑 상세 · 자녀별 잔액</string>
+    <string name="parent_wallet_monthly_charge">이번 달 충전</string>
+    <string name="parent_wallet_monthly_spend">이번 달 사용</string>
+    <string name="parent_wallet_action_charge">충전</string>
+    <string name="parent_wallet_action_send">송금</string>
+    <string name="parent_wallet_action_recover">회수</string>
+    <string name="parent_wallet_amount_won">%1$s원</string>
+
+    <string name="parent_wallet_group_transactions">거래 내역</string>
+    <string name="parent_wallet_filter_all">전체</string>
+    <string name="parent_wallet_filter_out">보낸</string>
+    <string name="parent_wallet_filter_in">받은</string>
+    <string name="parent_wallet_filter_charge">충전·환불</string>
+    <string name="parent_wallet_no_transactions">아직 거래 내역이 없어요.</string>
+
+    <string name="parent_wallet_group_charges">충전 내역</string>
+    <string name="parent_wallet_no_charges">아직 충전한 적이 없어요.</string>
+    <string name="parent_wallet_charge_refund">환불</string>
+    <string name="parent_wallet_charge_cancel">취소</string>
+
+    <string name="parent_wallet_no_children">연결된 자녀가 없어요.</string>
+    <string name="parent_wallet_child_recent">%1$s · 최근 거래</string>
+    <string name="parent_wallet_child_transfers">이체 이력</string>
+    <string name="parent_wallet_child_payments">매장 결제 내역</string>
+    <string name="parent_wallet_no_payments">아직 매장에서 결제한 적이 없어요.</string>
+    <string name="parent_wallet_payment_cancel">취소</string>
+    <string name="parent_wallet_payment_cancelled">취소됨</string>
+
+    <string name="parent_wallet_sheet_charge_title">충전</string>
+    <string name="parent_wallet_sheet_charge_hint">등록한 카드로 내 지갑을 충전해요</string>
+    <string name="parent_wallet_sheet_charge_amount">충전 금액</string>
+    <string name="parent_wallet_sheet_charge_method">결제 수단</string>
+    <string name="parent_wallet_sheet_charge_no_card">등록된 카드가 없어요</string>
+    <string name="parent_wallet_sheet_charge_add_card">카드 등록하러 가기</string>
+    <string name="parent_wallet_sheet_charge_submit">%1$s원 충전하기</string>
+
+    <string name="parent_wallet_sheet_send_title">송금</string>
+    <string name="parent_wallet_sheet_send_hint">자녀 지갑으로 용돈을 보내요</string>
+    <string name="parent_wallet_sheet_send_target">받는 자녀</string>
+    <string name="parent_wallet_sheet_send_amount">보낼 금액</string>
+    <string name="parent_wallet_sheet_send_submit">%1$s원 보내기</string>
+
+    <string name="parent_wallet_sheet_recover_title">회수</string>
+    <string name="parent_wallet_sheet_recover_hint">자녀 지갑에서 내 지갑으로 되돌려요</string>
+    <string name="parent_wallet_sheet_recover_target">회수할 자녀</string>
+    <string name="parent_wallet_sheet_recover_amount">회수할 금액</string>
+    <string name="parent_wallet_sheet_recover_submit">%1$s원 회수하기</string>
+
+    <string name="parent_wallet_confirm_title">확인</string>
+    <string name="parent_wallet_confirm_ok">확인</string>
+    <string name="parent_wallet_confirm_cancel">취소</string>
+    <string name="parent_wallet_confirm_refund">%1$s원 충전을 환불할까요? 지갑 잔액에서 차감돼요.</string>
+    <string name="parent_wallet_confirm_cancel_charge">%1$s원 충전 주문을 취소할까요?</string>
+    <string name="parent_wallet_confirm_cancel_payment">%1$s 결제 %2$s원을 취소할까요? 자녀 지갑으로 환급돼요.</string>
+
+    <string name="parent_wallet_done_charge">충전했어요.</string>
+    <string name="parent_wallet_done_send">보냈어요.</string>
+    <string name="parent_wallet_done_recover">회수했어요.</string>
+    <string name="parent_wallet_done_refund">환불했어요.</string>
+    <string name="parent_wallet_done_cancel_charge">충전 주문을 취소했어요.</string>
+    <string name="parent_wallet_done_cancel_payment">결제를 취소했어요. 자녀 지갑으로 환급됐어요.</string>
 </resources>

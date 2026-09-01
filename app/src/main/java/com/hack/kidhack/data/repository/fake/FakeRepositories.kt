@@ -694,7 +694,8 @@ class FakeNoticeRepository : NoticeRepository {
 
 class FakeWalletRepository : WalletRepository {
     private var balance = 45_000
-    override suspend fun getMyWallet(): Wallet = Wallet("w-parent", balance, "방금")
+    override suspend fun getMyWallet(): Wallet =
+        Wallet("w-parent", balance, "방금", monthlyChargeTotal = 90_000, monthlySpendTotal = 32_000)
     override suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction> = listOf(
         WalletTransaction("tx1", "CHARGE", 50000, 50000, null, "08.15"),
         WalletTransaction("tx2", "TRANSFER_OUT", -5000, 45000, "101", "08.20")
@@ -717,6 +718,12 @@ class FakeWalletRepository : WalletRepository {
     override suspend fun getChildTransfers(childId: String, page: Int): List<WalletTransaction> = listOf(
         WalletTransaction("tf1", "TRANSFER_OUT", -5000, 40000, childId, "08.20"),
         WalletTransaction("tf2", "TRANSFER_IN", 2000, 42000, childId, "08.22"),
+    )
+
+    override suspend fun getChildTransactions(childId: String, type: String?, page: Int): List<WalletTransaction> = listOf(
+        WalletTransaction("ct1", "TRANSFER_IN", 20000, 20000, childId, "08.30"),
+        WalletTransaction("ct2", "PAYMENT", -3200, 16800, childId, "08.29"),
+        WalletTransaction("ct3", "TRANSFER_OUT", -3000, 13800, childId, "08.15"),
     )
 
     override suspend fun getChargeHistory(page: Int): List<com.hack.kidhack.domain.model.ChargeHistoryItem> = listOf(

@@ -389,7 +389,14 @@ data class InstalledApp(
 data class Wallet(
     val walletId: String,
     val balance: Int,
-    val updatedAt: String
+    val updatedAt: String,
+    /**
+     * 이번 달 충전 합계(원). 내 지갑 조회에만 담겨 온다 — 자녀 지갑 응답에는 없어 0 이다.
+     * 잔액만 보여 주면 "이번 달에 얼마나 넣고 얼마나 썼나"를 원장을 세어 봐야 알 수 있다.
+     */
+    val monthlyChargeTotal: Int = 0,
+    /** 이번 달 결제 합계(원, QR 매장결제). [monthlyChargeTotal] 과 같은 제약. */
+    val monthlySpendTotal: Int = 0,
 )
 
 data class WalletTransaction(

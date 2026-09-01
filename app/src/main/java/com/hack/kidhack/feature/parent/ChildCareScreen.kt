@@ -121,8 +121,13 @@ class ChildCareViewModel(
     }
 }
 
-/** 위는 연주황, 아래로 갈수록 흰색. 자녀관리의 두 화면이 같은 바탕을 쓴다. */
-private fun warmBackground(top: Color, bottom: Color): Brush =
+/**
+ * 위는 연주황, 아래로 갈수록 흰색.
+ *
+ * <p>자녀관리의 두 화면에서 시작해 마이페이지·지갑까지 같은 바탕을 쓴다. 주황 그라데이션
+ * 헤더를 걷어낸 자리를 대신하는 것이라, 새 화면을 만들 때도 이걸 쓴다.
+ */
+internal fun warmBackground(top: Color, bottom: Color): Brush =
     Brush.verticalGradient(0f to top, 0.55f to bottom, 1f to bottom)
 
 /**
@@ -288,12 +293,13 @@ private data class CareItem(
 private data class CareGroup(val titleRes: Int, val items: List<CareItem>)
 
 // 항목을 구별하는 파스텔 배경. 글자만 늘어놓으면 어느 줄이 무엇인지 매번 읽어야 한다.
-private val TintOrange = Color(0xFFFFE8D2)
-private val TintBlue = Color(0xFFDCEBFF)
-private val TintGreen = Color(0xFFD8F3E3)
-private val TintPurple = Color(0xFFE8E1FF)
-private val TintPink = Color(0xFFFFE0EC)
-private val TintYellow = Color(0xFFFFF0CC)
+// 부모 화면 전체가 같은 색을 써야 같은 뜻으로 읽히므로 패키지 안에서 함께 쓴다.
+internal val TintOrange = Color(0xFFFFE8D2)
+internal val TintBlue = Color(0xFFDCEBFF)
+internal val TintGreen = Color(0xFFD8F3E3)
+internal val TintPurple = Color(0xFFE8E1FF)
+internal val TintPink = Color(0xFFFFE0EC)
+internal val TintYellow = Color(0xFFFFF0CC)
 
 /**
  * 자녀 한 명의 설정 입구.

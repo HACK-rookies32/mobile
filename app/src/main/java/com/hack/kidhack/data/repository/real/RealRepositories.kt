@@ -687,6 +687,10 @@ class RealWalletRepository(
     override suspend fun getChildTransfers(childId: String, page: Int): List<WalletTransaction> =
         walletApi.childTransfers(childId.toServerId(), page = page).unwrap().content.map { it.toDomain() }
 
+    override suspend fun getChildTransactions(childId: String, type: String?, page: Int): List<WalletTransaction> =
+        walletApi.childTransactions(childId.toServerId(), type = type, page = page).unwrap()
+            .content.map { it.toDomain() }
+
     override suspend fun getChargeHistory(page: Int): List<com.hack.kidhack.domain.model.ChargeHistoryItem> =
         walletApi.chargeHistory(page = page).unwrap().content.map { it.toDomain() }
 

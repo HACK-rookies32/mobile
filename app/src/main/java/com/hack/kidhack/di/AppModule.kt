@@ -169,6 +169,7 @@ import com.hack.kidhack.feature.parent.NotificationsViewModel
 import com.hack.kidhack.feature.parent.PairingViewModel
 import com.hack.kidhack.feature.parent.ParentChatViewModel
 import com.hack.kidhack.feature.parent.PayViewModel
+import com.hack.kidhack.feature.parent.WalletViewModel
 import com.hack.kidhack.feature.terminal.StoreTerminalViewModel
 import com.hack.kidhack.feature.parent.CameraRequestViewModel
 import com.hack.kidhack.feature.parent.ScreenTimeViewModel
@@ -393,6 +394,7 @@ val appModule = module {
     viewModel { NoticeViewModel(get()) }
     viewModel { ContactViewModel(get<InquiryRepository>()) }
     viewModel { PayViewModel(get(), get(), get(), get()) }
+    viewModel { WalletViewModel(get(), get(), get(), get(), get()) }
     viewModel { CardViewModel(get()) }
     // 매장 단말 테스트 화면 (숨은 라우트, 디버그/시연용)
     viewModel { StoreTerminalViewModel(get()) }
