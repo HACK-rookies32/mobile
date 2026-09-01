@@ -170,6 +170,7 @@ import com.hack.kidhack.feature.parent.ParentChatViewModel
 import com.hack.kidhack.feature.parent.PayViewModel
 import com.hack.kidhack.feature.terminal.StoreTerminalViewModel
 import com.hack.kidhack.feature.parent.CameraRequestViewModel
+import com.hack.kidhack.feature.parent.ScreenTimeViewModel
 import com.hack.kidhack.feature.parent.ScreenshotViewModel
 import com.hack.kidhack.feature.child.ChildPairingViewModel
 import com.hack.kidhack.feature.child.chat.ChildChatViewModel
@@ -386,6 +387,7 @@ val appModule = module {
     viewModel { CommunityListViewModel(get()) }
     viewModel { params -> CommunityDetailViewModel(params.get(), get(), get()) }
     viewModel { params -> CommunityWriteViewModel(get(), params.get()) }
+    viewModel { ScreenTimeViewModel(get(), get(), get()) }
     viewModel { NoticeViewModel(get()) }
     viewModel { ContactViewModel(get<InquiryRepository>()) }
     viewModel { PayViewModel(get(), get(), get(), get()) }

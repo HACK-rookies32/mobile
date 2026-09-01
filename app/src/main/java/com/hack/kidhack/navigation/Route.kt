@@ -32,6 +32,7 @@ sealed class Route(val path: String) {
     data object ParentCommunityEdit : Route("parent/community/edit/{postId}") {
         fun create(postId: String) = "parent/community/edit/$postId"
     }
+    data object ParentScreenTime : Route("parent/screentime")
     data object ParentNotice : Route("parent/notice")
     data object ParentContact : Route("parent/contact")
     data object ParentPay : Route("parent/pay")

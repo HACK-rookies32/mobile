@@ -213,6 +213,7 @@ class AppControlViewModel(
 @Composable
 fun ParentAppControlScreen(
     onBack: () -> Unit = {},
+    onOpenScreenTime: () -> Unit = {},
     viewModel: AppControlViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -238,11 +239,7 @@ fun ParentAppControlScreen(
             }
         },
     ) {
-        DailyLimitCard(
-            current = state.dailyLimitMinutes,
-            saving = state.savingLimit,
-            onSave = viewModel::saveDailyLimit,
-        )
+        DailyLimitRow(current = state.dailyLimitMinutes, onClick = onOpenScreenTime)
 
         ParentLoadingOrError(state.loading && state.items.isEmpty(), state.error, viewModel::load)
         
@@ -398,55 +395,49 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * 자녀 하루 총 사용 한도.
+ * 하루 사용시간 약속으로 들어가는 줄.
  *
- * 아래 목록의 앱별 한도와는 별개다 — 이건 하루 전체 사용 시간이고, 자녀 앱이 이 값을 받아
- * 도달하면 다른 앱을 열지 못하게 막는다. 비워 두면 제한 없음이다.
+ * <p>설정 자체는 별도 화면(`ParentScreenTimeScreen`)에서 한다. 앱별 규칙 목록과 성격이
+ * 달라(이건 하루 전체, 아래는 앱 하나하나) 같은 화면에 섞어 두면 무엇을 바꾸는지
+ * 헷갈렸다. 여기서는 현재 값만 보여 준다.
  */
 @Composable
-private fun DailyLimitCard(current: Int?, saving: Boolean, onSave: (Int?) -> Unit) {
+private fun DailyLimitRow(current: Int?, onClick: () -> Unit) {
     val colors = LocalKidhackColors.current
-    var input by remember(current) { mutableStateOf(current?.toString().orEmpty()) }
+    KidCard(Modifier.clickable(onClick = onClick)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("⏳", fontSize = 20.sp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.parent_screentime_entry),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 14.sp,
+                    color = colors.text,
+                )
+                Text(
+                    text = if (current == null) {
+                        stringResource(R.string.parent_screentime_entry_off)
+                    } else {
+                        stringResource(R.string.parent_screentime_entry_value, formatMinutes(current))
+                    },
+                    color = colors.muted,
+                    fontSize = 12.sp,
+                )
+            }
+            Text("›", color = colors.border, fontSize = 18.sp)
+        }
+    }
+}
 
-    KidCard {
-        Text(
-            stringResource(R.string.parent_appcontrol_daily_limit),
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 14.sp,
-            color = colors.text,
-        )
-        Text(
-            stringResource(R.string.parent_appcontrol_daily_limit_desc),
-            color = colors.muted,
-            fontSize = 12.sp,
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            KidTextField(
-                value = input,
-                onValueChange = { v -> input = v.filter { it.isDigit() }.take(4) },
-                label = stringResource(R.string.parent_appcontrol_daily_limit_label),
-                placeholder = stringResource(R.string.parent_appcontrol_daily_limit_hint),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f),
-            )
-            KidButton(
-                text = if (saving) {
-                    stringResource(R.string.parent_appcontrol_daily_limit_saving)
-                } else {
-                    stringResource(R.string.parent_appcontrol_daily_limit_save)
-                },
-                onClick = { onSave(input.toIntOrNull()) },
-                enabled = !saving,
-            )
-        }
-        if (current == null) {
-            Text(
-                stringResource(R.string.parent_appcontrol_daily_limit_none),
-                color = colors.muted,
-                fontSize = 12.sp,
-            )
-        }
+/** 180 → "3시간", 90 → "1시간 30분", 45 → "45분". */
+private fun formatMinutes(minutes: Int): String {
+    val h = minutes / 60
+    val m = minutes % 60
+    return when {
+        h > 0 && m > 0 -> h.toString() + "시간 " + m + "분"
+        h > 0 -> h.toString() + "시간"
+        else -> m.toString() + "분"
     }
 }

@@ -43,6 +43,7 @@ import com.hack.kidhack.feature.child.onboarding.ChildStartRoute
 import com.hack.kidhack.feature.child.screenshot.ChildScreenshotScreen
 import com.hack.kidhack.feature.child.services.ChildServicesScreen
 import com.hack.kidhack.feature.parent.ParentAppControlScreen
+import com.hack.kidhack.feature.parent.ParentScreenTimeScreen
 import com.hack.kidhack.feature.parent.ParentAppUsageDetailScreen
 import com.hack.kidhack.feature.parent.ParentCardsScreen
 import com.hack.kidhack.feature.parent.ParentChatScreen
@@ -141,7 +142,19 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 )
             }
         }
-        composable(Route.ParentAppControl.path) { ParentShell(navController) { ParentAppControlScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentAppControl.path) {
+            ParentShell(navController) {
+                ParentAppControlScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenScreenTime = { navController.navigate(Route.ParentScreenTime.path) },
+                )
+            }
+        }
+        composable(Route.ParentScreenTime.path) {
+            ParentShell(navController) {
+                ParentScreenTimeScreen(onBack = { navController.popBackStack() })
+            }
+        }
         composable(Route.ParentScreenshot.path) { ParentShell(navController) { ParentScreenshotScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentCameraRequest.path) { ParentShell(navController) { ParentCameraRequestScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentChildProfile.path) { ParentShell(navController) { ParentChildProfileScreen(onBack = { navController.popBackStack() }) } }

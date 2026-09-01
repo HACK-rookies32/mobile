@@ -155,6 +155,22 @@
     <string name="parent_editprofile_saved">저장했어요</string>
 
     <string name="parent_appcontrol_title">앱 통제</string>
+    <!-- 하루 사용시간 약속 (별도 화면). 앱별 한도와 달리 하루 전체 사용 시간이다. -->
+    <string name="parent_screentime_title">하루 사용시간 약속</string>
+    <string name="parent_screentime_toggle">하루 사용시간 약속 사용</string>
+    <string name="parent_screentime_toggle_desc">오늘 하루 자녀가 모바일기기를 사용할 시간을 설정합니다.</string>
+    <string name="parent_screentime_how_long">얼마나 사용할까요?</string>
+    <string name="parent_screentime_unit_hour">시간</string>
+    <string name="parent_screentime_unit_minute">분</string>
+    <string name="parent_screentime_when_used_up">약속 시간을 모두 사용하면,</string>
+    <string name="parent_screentime_lock_title">기기를 잠급니다</string>
+    <string name="parent_screentime_lock_desc">약속한 시간을 다 쓰면 다른 앱을 열 수 없어요. 루키즈와 전화·설정은 그대로 쓸 수 있어서 자녀가 상황을 확인하고 부모님께 연락할 수 있습니다. 한도에 닿으면 부모님과 자녀 모두에게 알림이 갑니다.</string>
+    <string name="parent_screentime_save">저장하기</string>
+    <string name="parent_screentime_saving">저장 중…</string>
+    <string name="parent_screentime_saved">저장했어요. 자녀 기기에 곧 반영됩니다.</string>
+    <string name="parent_screentime_entry">하루 사용시간 약속</string>
+    <string name="parent_screentime_entry_off">설정 안 함</string>
+    <string name="parent_screentime_entry_value">%1$s 사용 가능</string>
     <string name="parent_appcontrol_daily_limit">하루 총 사용 한도</string>
     <string name="parent_appcontrol_daily_limit_desc">아래 앱별 한도와 별개예요. 한도에 닿으면 자녀 기기에서 다른 앱이 열리지 않아요.</string>
     <string name="parent_appcontrol_daily_limit_label">한도 (분)</string>
