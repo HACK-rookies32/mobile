@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -21,7 +23,7 @@ import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidCard
-import com.hack.kidhack.core.designsystem.component.PinCodeInput
+import com.hack.kidhack.core.designsystem.component.KidTextField
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
@@ -135,37 +137,43 @@ fun ChildPairingScreen(
             return@ChildScreenScaffold
         }
 
+        // 화면 구성을 가입 흐름의 「부모님과 연결」 단계와 맞춘다. 같은 일을 하는 두 화면이
+        // 서로 다르게 생기면 코드를 어디서 받아 어디에 넣는지 헷갈린다.
+        Text(
+            stringResource(R.string.child_pairing_desc),
+            color = colors.muted,
+            fontSize = 14.sp,
+        )
         KidCard {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("🔗", fontSize = 40.sp)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.child_pairing_prompt),
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBold,
-                    fontSize = 15.sp,
-                    color = colors.text,
-                )
-                Text(
-                    stringResource(R.string.child_pairing_desc),
-                    color = colors.muted,
-                    fontSize = 12.sp,
-                )
-                Spacer(Modifier.height(16.dp))
-                PinCodeInput(value = state.code, onValueChange = viewModel::onCode)
-                if (state.error != null) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(state.error!!, color = colors.danger, fontSize = 12.sp, fontWeight = FontBold)
-                }
-                Spacer(Modifier.height(16.dp))
-                KidButton(
-                    text = stringResource(if (state.loading) R.string.child_pairing_connecting else R.string.child_pairing_connect),
-                    onClick = viewModel::connect,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = state.canSubmit,
-                )
-            }
+            Text(
+                stringResource(R.string.child_pairing_guide_title),
+                color = colors.brandDark,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 14.sp,
+            )
+            Text(
+                stringResource(R.string.child_pairing_guide_desc),
+                color = colors.muted,
+                fontSize = 12.sp,
+            )
         }
+        KidTextField(
+            value = state.code,
+            onValueChange = viewModel::onCode,
+            label = stringResource(R.string.child_pairing_code_label),
+            placeholder = stringResource(R.string.child_pairing_code_placeholder),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        )
+        if (state.error != null) {
+            Text(state.error!!, color = colors.danger, fontSize = 12.sp, fontWeight = FontBold)
+        }
+        KidButton(
+            text = stringResource(if (state.loading) R.string.child_pairing_connecting else R.string.child_pairing_connect),
+            onClick = viewModel::connect,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = state.canSubmit,
+        )
         Text(
             stringResource(R.string.child_pairing_hint),
             color = colors.muted,

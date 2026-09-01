@@ -37,17 +37,18 @@ fun KidhackNavHost() {
      * 로그인·가입 직후 이동.
      *
      * 자녀 계정은 **가입 시점에 부모가 정해지지 않는다.** 부모가 발급한 6자리 코드를
-     * `POST /pairing/connect` 로 입력해야 서버가 `parent` 를 채운다. 그래서 아직 연결되지
-     * 않은 자녀(`parentId == null`)는 홈 대신 페어링 화면부터 보여 준다.
-     * (`GET /users/me` 의 `parentId` 로 판별한다.)
+     * `POST /pairing/connect` 로 입력해야 서버가 `parent` 를 채운다.
+     *
+     * 그 입력은 **가입 흐름의 「부모님과 연결」 단계에서만** 받는다. 예전에는 여기서도
+     * 아직 연결되지 않은 자녀를 페어링 화면으로 보냈는데, 가입 단계에서 코드를 넣어
+     * 연결한 자녀에게까지 같은 화면이 한 번 더 떠서 연결이 안 된 것처럼 보였다.
+     *
+     * 코드를 건너뛴 자녀는 마이 → 「부모님 연결」 에서 언제든 넣을 수 있다.
      */
     fun goAuthed(session: Session) {
         val dest = if (session.user.role == Role.PARENT) Route.ParentGraph.path else Route.ChildGraph.path
         navController.navigate(dest) {
             popUpTo(navController.graph.id) { inclusive = true }
-        }
-        if (session.user.role == Role.CHILD && session.user.parentId == null) {
-            navController.navigate(Route.ChildPairing.path)
         }
     }
 
