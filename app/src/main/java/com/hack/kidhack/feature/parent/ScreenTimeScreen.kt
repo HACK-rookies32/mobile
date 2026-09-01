@@ -45,6 +45,8 @@ import org.koin.androidx.compose.koinViewModel
 private const val DEFAULT_HOURS = 3
 
 data class ScreenTimeUiState(
+    /** 누구의 약속인지. 자녀가 여럿이면 화면 제목만으로는 구분되지 않는다. */
+    val childName: String = "",
     /** 약속을 쓰는지. 끄면 서버에 null(제한 없음)을 보낸다. */
     val enabled: Boolean = false,
     val hours: Int = DEFAULT_HOURS,
@@ -84,13 +86,15 @@ class ScreenTimeViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
-                val id = selectedChildRepository.resolveId(childRepository.children())
-                    ?: return@runCatching null
-                appControlRepository.screenTimeLimit(id)
-            }.onSuccess { limit ->
+                val children = childRepository.children()
+                val id = selectedChildRepository.resolveId(children) ?: return@runCatching null to ""
+                val name = children.firstOrNull { it.id == id }?.name.orEmpty()
+                appControlRepository.screenTimeLimit(id) to name
+            }.onSuccess { (limit, name) ->
                 _state.update {
                     it.copy(
                         loading = false,
+                        childName = name,
                         enabled = limit != null,
                         hours = limit?.let { m -> m / 60 } ?: DEFAULT_HOURS,
                         minutes = limit?.let { m -> m % 60 } ?: 0,
@@ -138,6 +142,15 @@ fun ParentScreenTimeScreen(
         header = { ParentHeaderBar(stringResource(R.string.parent_screentime_title), onBack) },
     ) {
         ParentLoadingOrError(state.loading, state.error, viewModel::load)
+
+        if (state.childName.isNotBlank()) {
+            Text(
+                stringResource(R.string.parent_screentime_for_child, state.childName),
+                color = colors.muted,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
 
         KidCard {
             Row(verticalAlignment = Alignment.CenterVertically) {

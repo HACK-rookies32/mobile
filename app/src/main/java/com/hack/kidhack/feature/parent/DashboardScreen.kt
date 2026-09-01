@@ -79,6 +79,8 @@ data class DashboardUiState(
     val lastLocationAt: String? = null,
     val usages: List<AppUsageStat> = emptyList(),
     val blockedAppCount: Int = 0,
+    /** 오늘 쓸 수 있는 시간(분). null 이면 약속을 안 걸어 둔 것이다. */
+    val dailyLimitMinutes: Int? = null,
     /** 보관함 전체. 화면에 그리는 건 아래 [notifications] 로 걸러 낸 것이다. */
     val allNotifications: List<AppNotification> = emptyList(),
     val loading: Boolean = true,
@@ -194,6 +196,8 @@ class DashboardViewModel(
             val blockedApps = runCatching {
                 appControlRepository.items(childId).count { it.blocked }
             }.getOrDefault(0)
+            // 하루 사용시간 약속. 안 걸어 뒀으면 null 이고, 그때는 카드를 그리지 않는다.
+            val dailyLimit = runCatching { appControlRepository.screenTimeLimit(childId) }.getOrNull()
             alertSync.sync()
             _state.update {
                 it.copy(
@@ -203,6 +207,7 @@ class DashboardViewModel(
                     selected = child,
                     usages = usages,
                     blockedAppCount = blockedApps,
+                    dailyLimitMinutes = dailyLimit,
                     lastLocation = dashboard.currentLocation?.label,
                     lastLocationAt = dashboard.currentLocation?.updatedAt?.takeLast(5),
                 )
@@ -402,6 +407,7 @@ fun ParentDashboardScreen(
                         StatCard("🛡️", stringResource(R.string.parent_dashboard_stat_blocked), "${state.blockedAppCount}개", Modifier.weight(1f))
                         StatCard("⚠️", stringResource(R.string.parent_dashboard_stat_alerts), "${alertCount}건", Modifier.weight(1f))
                     }
+                    ScreenTimePromiseCard(usedSeconds = totalSec, limitMinutes = state.dailyLimitMinutes)
                     KidCard {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -467,5 +473,85 @@ fun ParentDashboardScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * 오늘 얼마나 쓸 수 있고 얼마나 썼는지.
+ *
+ * <p>대시보드의 「스크린타임」 통계는 쓴 시간만 보여 줘서, 부모가 정한 약속에 견줘 많은지
+ * 적은지 알 수 없었다. 남은 시간을 같이 보여 준다.
+ *
+ * <p>약속을 안 걸어 뒀으면(null) 그리지 않는다 — 없는 한도에 대고 막대를 그리면
+ * 제한이 있는 것처럼 보인다.
+ */
+@Composable
+private fun ScreenTimePromiseCard(usedSeconds: Int, limitMinutes: Int?) {
+    if (limitMinutes == null || limitMinutes <= 0) return
+    val colors = LocalKidhackColors.current
+    val usedMinutes = usedSeconds / 60
+    val ratio = (usedMinutes.toFloat() / limitMinutes).coerceIn(0f, 1f)
+    val over = usedMinutes >= limitMinutes
+    val barColor = if (over) colors.danger else colors.brand
+
+    KidCard {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.parent_dashboard_promise_title),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 14.sp,
+                color = colors.text,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                stringResource(R.string.parent_dashboard_promise_limit, formatMinutesLabel(limitMinutes)),
+                color = colors.muted,
+                fontSize = 12.sp,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+                .clip(RoundedCornerShape(99.dp))
+                .background(colors.surface),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(ratio)
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(barColor),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = if (over) {
+                stringResource(R.string.parent_dashboard_promise_used_up, formatMinutesLabel(usedMinutes))
+            } else {
+                stringResource(
+                    R.string.parent_dashboard_promise_remaining,
+                    formatMinutesLabel(usedMinutes),
+                    formatMinutesLabel(limitMinutes - usedMinutes),
+                )
+            },
+            color = if (over) colors.danger else colors.muted,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 13.sp,
+        )
+    }
+}
+
+/** 180 → "3시간", 90 → "1시간 30분", 45 → "45분". */
+private fun formatMinutesLabel(minutes: Int): String {
+    val h = minutes / 60
+    val m = minutes % 60
+    return when {
+        h > 0 && m > 0 -> h.toString() + "시간 " + m + "분"
+        h > 0 -> h.toString() + "시간"
+        else -> m.toString() + "분"
     }
 }

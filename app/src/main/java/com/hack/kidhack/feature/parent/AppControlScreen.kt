@@ -44,6 +44,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
+import com.hack.kidhack.core.designsystem.component.ChildChips
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
@@ -69,6 +70,9 @@ import com.hack.kidhack.data.remote.userMessage
 enum class AppControlFilter { ALL, BLOCKED, ALLOWED, LIMITED }
 
 data class AppControlUiState(
+    /** 자녀 목록 (id to 이름). 이 화면의 모든 설정은 고른 자녀 한 명 기준이다. */
+    val children: List<Pair<String, String>> = emptyList(),
+    val selectedChildId: String? = null,
     val items: List<AppControlItem> = emptyList(),
     val installedApps: List<InstalledApp> = emptyList(),
     val selectedApp: InstalledApp? = null,
@@ -112,16 +116,40 @@ class AppControlViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
-                val id = selectedChildRepository.resolveId(childRepository.children())
-                    ?: return@runCatching emptyList<AppControlItem>() to null
+                val children = childRepository.children()
+                val id = selectedChildRepository.resolveId(children)
+                    ?: return@runCatching Triple(children, null, emptyList<AppControlItem>() to null)
                 // 총 한도는 부가 정보라 실패해도 규칙 목록은 그대로 보여 준다.
                 val limit = runCatching { appControlRepository.screenTimeLimit(id) }.getOrNull()
-                appControlRepository.items(id) to limit
-            }.onSuccess { (items, limit) ->
-                _state.update { it.copy(loading = false, items = items, dailyLimitMinutes = limit) }
+                Triple(children, id, appControlRepository.items(id) to limit)
+            }.onSuccess { (children, id, loaded) ->
+                val (items, limit) = loaded
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        children = children.map { c -> c.id to c.name },
+                        selectedChildId = id,
+                        items = items,
+                        dailyLimitMinutes = limit,
+                    )
+                }
             }.onFailure { t ->
                 _state.update { it.copy(loading = false, error = t.message) }
             }
+        }
+    }
+
+    /**
+     * 볼 자녀를 바꾼다.
+     *
+     * <p>고른 자녀는 앱 전체가 공유한다(대시보드·캡처·사용량도 같은 값을 본다). 화면마다
+     * 다른 자녀를 보고 있으면 부모가 다른 아이 설정을 건드리게 된다.
+     */
+    fun selectChild(childId: String) {
+        if (childId == _state.value.selectedChildId) return
+        viewModelScope.launch {
+            selectedChildRepository.select(childId)
+            load()
         }
     }
 
@@ -230,6 +258,16 @@ fun ParentAppControlScreen(
     ParentScreenScaffold(
         header = {
             ParentHeaderBar(stringResource(R.string.parent_appcontrol_title), onBack)
+            // 이 화면의 모든 설정이 자녀 한 명 기준이라, 무엇보다 먼저 누구인지 고르게 한다.
+            if (state.children.size >= 2) {
+                Spacer(Modifier.height(12.dp))
+                ChildChips(
+                    children = state.children,
+                    selectedId = state.selectedChildId,
+                    onSelect = viewModel::selectChild,
+                    onDark = true,
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(stringResource(R.string.parent_filter_all), state.filter == AppControlFilter.ALL) { viewModel.onFilter(AppControlFilter.ALL) }

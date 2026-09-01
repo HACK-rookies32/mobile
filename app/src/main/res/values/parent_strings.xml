@@ -155,8 +155,13 @@
     <string name="parent_editprofile_saved">저장했어요</string>
 
     <string name="parent_appcontrol_title">앱 통제</string>
+    <string name="parent_dashboard_promise_title">오늘 사용시간</string>
+    <string name="parent_dashboard_promise_limit">약속 %1$s</string>
+    <string name="parent_dashboard_promise_remaining">%1$s 사용 · %2$s 남음</string>
+    <string name="parent_dashboard_promise_used_up">%1$s 사용 · 약속 시간을 다 썼어요</string>
     <!-- 하루 사용시간 약속 (별도 화면). 앱별 한도와 달리 하루 전체 사용 시간이다. -->
     <string name="parent_screentime_title">하루 사용시간 약속</string>
+    <string name="parent_screentime_for_child">%1$s 의 약속이에요</string>
     <string name="parent_screentime_toggle">하루 사용시간 약속 사용</string>
     <string name="parent_screentime_toggle_desc">오늘 하루 자녀가 모바일기기를 사용할 시간을 설정합니다.</string>
     <string name="parent_screentime_how_long">얼마나 사용할까요?</string>
