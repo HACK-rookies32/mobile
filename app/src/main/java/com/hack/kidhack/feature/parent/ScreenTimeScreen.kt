@@ -1,20 +1,28 @@
 package com.hack.kidhack.feature.parent
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,7 +31,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
-import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.KidSwitch
 import com.hack.kidhack.core.designsystem.component.WheelGuides
 import com.hack.kidhack.core.designsystem.component.WheelPicker
@@ -130,6 +137,13 @@ class ScreenTimeViewModel(
     }
 }
 
+/**
+ * 하루 사용시간 약속 설정 화면.
+ *
+ * <p>다른 부모 화면과 달리 주황 헤더(`ParentScreenScaffold`)를 쓰지 않는다. 값 하나를
+ * 고르는 설정 화면이라, 색을 얹기보다 흰 시트 위에 얇은 선으로 구역을 나누는 편이
+ * 고르는 값에 집중된다. 카드를 여러 장 쌓지 않고 한 장 안에서 나누는 것도 같은 이유다.
+ */
 @Composable
 fun ParentScreenTimeScreen(
     onBack: () -> Unit = {},
@@ -138,59 +152,74 @@ fun ParentScreenTimeScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
 
-    ParentScreenScaffold(
-        header = { ParentHeaderBar(stringResource(R.string.parent_screentime_title), onBack) },
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.brandLight)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 12.dp),
     ) {
-        ParentLoadingOrError(state.loading, state.error, viewModel::load)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(colors.card),
+        ) {
+            TitleBar(title = stringResource(R.string.parent_screentime_title), onBack = onBack)
 
-        if (state.childName.isNotBlank()) {
-            Text(
-                stringResource(R.string.parent_screentime_for_child, state.childName),
-                color = colors.muted,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(start = 4.dp),
-            )
-        }
+            if (state.error != null) {
+                Text(
+                    text = state.error.orEmpty(),
+                    color = colors.danger,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+            }
 
-        KidCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+            Section {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.parent_screentime_toggle),
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 16.sp,
+                            color = colors.text,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            stringResource(R.string.parent_screentime_toggle_desc),
+                            color = colors.muted,
+                            fontSize = 13.sp,
+                            lineHeight = 19.sp,
+                        )
+                        if (state.childName.isNotBlank()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                stringResource(R.string.parent_screentime_for_child, state.childName),
+                                color = colors.muted,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    KidSwitch(checked = state.enabled, onCheckedChange = viewModel::onEnabled)
+                }
+            }
+
+            if (state.enabled) {
+                Hairline()
+                Section {
                     Text(
-                        stringResource(R.string.parent_screentime_toggle),
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBold,
-                        fontSize = 16.sp,
-                        color = colors.text,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        stringResource(R.string.parent_screentime_toggle_desc),
+                        stringResource(R.string.parent_screentime_how_long),
                         color = colors.muted,
                         fontSize = 13.sp,
                     )
                 }
-                Spacer(Modifier.width(12.dp))
-                KidSwitch(checked = state.enabled, onCheckedChange = viewModel::onEnabled)
-            }
-
-            if (state.enabled) {
-                Spacer(Modifier.height(16.dp))
-                HorizontalDivider(color = colors.border)
-                Spacer(Modifier.height(16.dp))
-
-                Text(
-                    stringResource(R.string.parent_screentime_how_long),
-                    color = colors.muted,
-                    fontSize = 13.sp,
-                )
-                Spacer(Modifier.height(8.dp))
                 // 강조선은 두 휠을 가로질러 한 줄로 긋는다. 휠마다 그리면 가운데가 끊겨 보인다.
                 Box(contentAlignment = Alignment.Center) {
                     WheelGuides()
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
+                    Row(Modifier.fillMaxWidth()) {
                         WheelPicker(
                             values = HOUR_VALUES,
                             value = state.hours,
@@ -209,59 +238,118 @@ fun ParentScreenTimeScreen(
                         )
                     }
                 }
-            }
-        }
+                Spacer(Modifier.height(20.dp))
+                Hairline()
 
-        if (state.enabled) {
-            Text(
-                stringResource(R.string.parent_screentime_when_used_up),
-                color = colors.muted,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(start = 4.dp),
-            )
-            KidCard {
-                Row(verticalAlignment = Alignment.Top) {
-                    Text("🔒", fontSize = 18.sp)
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            stringResource(R.string.parent_screentime_lock_title),
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontBold,
-                            fontSize = 14.sp,
-                            color = colors.text,
+                Section {
+                    Text(
+                        stringResource(R.string.parent_screentime_when_used_up),
+                        color = colors.muted,
+                        fontSize = 13.sp,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Row(verticalAlignment = Alignment.Top) {
+                        // 잠금이라는 결과를 작은 표식 하나로만 나타낸다. 카드나 색 블록을
+                        // 더하면 안내가 설정처럼 보여 고를 수 있는 것으로 오해된다.
+                        Box(
+                            Modifier
+                                .padding(top = 3.dp)
+                                .size(16.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(colors.brand),
                         )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            stringResource(R.string.parent_screentime_lock_desc),
-                            color = colors.muted,
-                            fontSize = 13.sp,
-                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                stringResource(R.string.parent_screentime_lock_title),
+                                fontFamily = KidhackFontFamily,
+                                fontWeight = FontBold,
+                                fontSize = 14.sp,
+                                color = colors.text,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                stringResource(R.string.parent_screentime_lock_desc),
+                                color = colors.muted,
+                                fontSize = 13.sp,
+                                lineHeight = 19.sp,
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        if (state.saved) {
-            Text(
-                stringResource(R.string.parent_screentime_saved),
-                color = colors.safe,
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(start = 4.dp),
-            )
+            Hairline()
+            Section {
+                if (state.saved) {
+                    Text(
+                        stringResource(R.string.parent_screentime_saved),
+                        color = colors.safe,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 13.sp,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
+                KidButton(
+                    text = stringResource(
+                        if (state.saving) R.string.parent_screentime_saving else R.string.parent_screentime_save
+                    ),
+                    onClick = viewModel::save,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = state.canSave,
+                )
+            }
         }
+        Spacer(Modifier.height(24.dp))
+    }
+}
 
-        KidButton(
-            text = stringResource(
-                if (state.saving) R.string.parent_screentime_saving else R.string.parent_screentime_save
-            ),
-            onClick = viewModel::save,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = state.canSave,
+/** 시트 안의 제목 줄. 뒤로가기는 왼쪽 끝, 제목은 가운데. */
+@Composable
+private fun TitleBar(title: String, onBack: () -> Unit) {
+    val colors = LocalKidhackColors.current
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "‹",
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .clip(RoundedCornerShape(50))
+                .clickable(onClick = onBack)
+                .padding(horizontal = 18.dp, vertical = 2.dp),
+            color = colors.text,
+            fontSize = 26.sp,
+        )
+        Text(
+            text = title,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 17.sp,
+            color = colors.text,
         )
     }
+}
+
+/** 구역 사이를 가르는 실선. 카드를 여러 장 쌓는 대신 한 장 안에서 나눈다. */
+@Composable
+private fun Hairline() {
+    HorizontalDivider(color = LocalKidhackColors.current.border.copy(alpha = 0.7f))
+}
+
+/** 시트 안 구역의 공통 여백. */
+@Composable
+private fun Section(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        content = content,
+    )
 }
 
 /** 하루를 넘기는 약속은 의미가 없다. */
