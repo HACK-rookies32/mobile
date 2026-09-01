@@ -46,6 +46,7 @@ data class PushMessage(
         private val COMMAND_TYPES = setOf(
             "SCREENSHOT_REQUESTED", "SCREEN_CAPTURE", "CAPTURE", "CAPTURE_REQUEST", "SCREENSHOT",
             "CAMERA_SHOT", "CAMERA", "CAMERA_REQUEST", "PHOTO",
+            "USAGE_REPORT_REQUESTED", "USAGE_REQUEST", "USAGE_REPORT",
         )
 
         /**

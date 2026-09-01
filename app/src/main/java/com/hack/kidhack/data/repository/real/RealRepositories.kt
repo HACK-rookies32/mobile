@@ -874,6 +874,10 @@ class RealAppUsageRepository(private val api: AppUsageApi) : AppUsageRepository 
     ): List<AppUsageStat> =
         api.list(childId, groupBy, from, to).unwrap().items.map { it.toDomain() }
 
+    override suspend fun requestReport(childId: String) {
+        api.requestReport(childId).unwrapOrNull()
+    }
+
     override suspend fun report(childId: String, usages: List<AppUsage>) {
         val recordedAt = java.time.Instant.now().toString()
         api.report(

@@ -44,6 +44,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
+import com.hack.kidhack.core.designsystem.component.ChildChips
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
@@ -69,6 +70,9 @@ import com.hack.kidhack.data.remote.userMessage
 enum class AppControlFilter { ALL, BLOCKED, ALLOWED, LIMITED }
 
 data class AppControlUiState(
+    /** 자녀 목록 (id to 이름). 이 화면의 모든 설정은 고른 자녀 한 명 기준이다. */
+    val children: List<Pair<String, String>> = emptyList(),
+    val selectedChildId: String? = null,
     val items: List<AppControlItem> = emptyList(),
     val installedApps: List<InstalledApp> = emptyList(),
     val selectedApp: InstalledApp? = null,
@@ -112,16 +116,40 @@ class AppControlViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching {
-                val id = selectedChildRepository.resolveId(childRepository.children())
-                    ?: return@runCatching emptyList<AppControlItem>() to null
+                val children = childRepository.children()
+                val id = selectedChildRepository.resolveId(children)
+                    ?: return@runCatching Triple(children, null, emptyList<AppControlItem>() to null)
                 // 총 한도는 부가 정보라 실패해도 규칙 목록은 그대로 보여 준다.
                 val limit = runCatching { appControlRepository.screenTimeLimit(id) }.getOrNull()
-                appControlRepository.items(id) to limit
-            }.onSuccess { (items, limit) ->
-                _state.update { it.copy(loading = false, items = items, dailyLimitMinutes = limit) }
+                Triple(children, id, appControlRepository.items(id) to limit)
+            }.onSuccess { (children, id, loaded) ->
+                val (items, limit) = loaded
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        children = children.map { c -> c.id to c.name },
+                        selectedChildId = id,
+                        items = items,
+                        dailyLimitMinutes = limit,
+                    )
+                }
             }.onFailure { t ->
                 _state.update { it.copy(loading = false, error = t.message) }
             }
+        }
+    }
+
+    /**
+     * 볼 자녀를 바꾼다.
+     *
+     * <p>고른 자녀는 앱 전체가 공유한다(대시보드·캡처·사용량도 같은 값을 본다). 화면마다
+     * 다른 자녀를 보고 있으면 부모가 다른 아이 설정을 건드리게 된다.
+     */
+    fun selectChild(childId: String) {
+        if (childId == _state.value.selectedChildId) return
+        viewModelScope.launch {
+            selectedChildRepository.select(childId)
+            load()
         }
     }
 
@@ -213,6 +241,7 @@ class AppControlViewModel(
 @Composable
 fun ParentAppControlScreen(
     onBack: () -> Unit = {},
+    onOpenScreenTime: () -> Unit = {},
     viewModel: AppControlViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -229,6 +258,16 @@ fun ParentAppControlScreen(
     ParentScreenScaffold(
         header = {
             ParentHeaderBar(stringResource(R.string.parent_appcontrol_title), onBack)
+            // 이 화면의 모든 설정이 자녀 한 명 기준이라, 무엇보다 먼저 누구인지 고르게 한다.
+            if (state.children.size >= 2) {
+                Spacer(Modifier.height(12.dp))
+                ChildChips(
+                    children = state.children,
+                    selectedId = state.selectedChildId,
+                    onSelect = viewModel::selectChild,
+                    onDark = true,
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(stringResource(R.string.parent_filter_all), state.filter == AppControlFilter.ALL) { viewModel.onFilter(AppControlFilter.ALL) }
@@ -238,11 +277,7 @@ fun ParentAppControlScreen(
             }
         },
     ) {
-        DailyLimitCard(
-            current = state.dailyLimitMinutes,
-            saving = state.savingLimit,
-            onSave = viewModel::saveDailyLimit,
-        )
+        DailyLimitRow(current = state.dailyLimitMinutes, onClick = onOpenScreenTime)
 
         ParentLoadingOrError(state.loading && state.items.isEmpty(), state.error, viewModel::load)
         
@@ -398,55 +433,49 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * 자녀 하루 총 사용 한도.
+ * 하루 사용시간 약속으로 들어가는 줄.
  *
- * 아래 목록의 앱별 한도와는 별개다 — 이건 하루 전체 사용 시간이고, 자녀 앱이 이 값을 받아
- * 도달하면 다른 앱을 열지 못하게 막는다. 비워 두면 제한 없음이다.
+ * <p>설정 자체는 별도 화면(`ParentScreenTimeScreen`)에서 한다. 앱별 규칙 목록과 성격이
+ * 달라(이건 하루 전체, 아래는 앱 하나하나) 같은 화면에 섞어 두면 무엇을 바꾸는지
+ * 헷갈렸다. 여기서는 현재 값만 보여 준다.
  */
 @Composable
-private fun DailyLimitCard(current: Int?, saving: Boolean, onSave: (Int?) -> Unit) {
+private fun DailyLimitRow(current: Int?, onClick: () -> Unit) {
     val colors = LocalKidhackColors.current
-    var input by remember(current) { mutableStateOf(current?.toString().orEmpty()) }
+    KidCard(Modifier.clickable(onClick = onClick)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("⏳", fontSize = 20.sp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.parent_screentime_entry),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 14.sp,
+                    color = colors.text,
+                )
+                Text(
+                    text = if (current == null) {
+                        stringResource(R.string.parent_screentime_entry_off)
+                    } else {
+                        stringResource(R.string.parent_screentime_entry_value, formatMinutes(current))
+                    },
+                    color = colors.muted,
+                    fontSize = 12.sp,
+                )
+            }
+            Text("›", color = colors.border, fontSize = 18.sp)
+        }
+    }
+}
 
-    KidCard {
-        Text(
-            stringResource(R.string.parent_appcontrol_daily_limit),
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 14.sp,
-            color = colors.text,
-        )
-        Text(
-            stringResource(R.string.parent_appcontrol_daily_limit_desc),
-            color = colors.muted,
-            fontSize = 12.sp,
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            KidTextField(
-                value = input,
-                onValueChange = { v -> input = v.filter { it.isDigit() }.take(4) },
-                label = stringResource(R.string.parent_appcontrol_daily_limit_label),
-                placeholder = stringResource(R.string.parent_appcontrol_daily_limit_hint),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f),
-            )
-            KidButton(
-                text = if (saving) {
-                    stringResource(R.string.parent_appcontrol_daily_limit_saving)
-                } else {
-                    stringResource(R.string.parent_appcontrol_daily_limit_save)
-                },
-                onClick = { onSave(input.toIntOrNull()) },
-                enabled = !saving,
-            )
-        }
-        if (current == null) {
-            Text(
-                stringResource(R.string.parent_appcontrol_daily_limit_none),
-                color = colors.muted,
-                fontSize = 12.sp,
-            )
-        }
+/** 180 → "3시간", 90 → "1시간 30분", 45 → "45분". */
+private fun formatMinutes(minutes: Int): String {
+    val h = minutes / 60
+    val m = minutes % 60
+    return when {
+        h > 0 && m > 0 -> h.toString() + "시간 " + m + "분"
+        h > 0 -> h.toString() + "시간"
+        else -> m.toString() + "분"
     }
 }

@@ -16,3 +16,15 @@ fun todayRange(): Pair<String, String> {
     val now = LocalDateTime.now()
     return start.toString() to now.toString()
 }
+
+/**
+ * 오늘을 포함한 최근 [days] 일. 0시부터 지금까지.
+ *
+ * <p>주간 보고서처럼 여러 날을 한꺼번에 볼 때 쓴다. 오늘을 끝에 두는 이유는 부모가
+ * "요즘 어떤지"를 보기 때문이다 — 지난주 월요일부터가 아니라 오늘까지가 기준이다.
+ */
+fun recentDaysRange(days: Int): Pair<String, String> {
+    val start = LocalDate.now().minusDays((days - 1).toLong()).atStartOfDay()
+    val now = LocalDateTime.now()
+    return start.toString() to now.toString()
+}

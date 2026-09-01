@@ -43,6 +43,7 @@ import com.hack.kidhack.feature.child.onboarding.ChildStartRoute
 import com.hack.kidhack.feature.child.screenshot.ChildScreenshotScreen
 import com.hack.kidhack.feature.child.services.ChildServicesScreen
 import com.hack.kidhack.feature.parent.ParentAppControlScreen
+import com.hack.kidhack.feature.parent.ParentScreenTimeScreen
 import com.hack.kidhack.feature.parent.ParentAppUsageDetailScreen
 import com.hack.kidhack.feature.parent.ParentCardsScreen
 import com.hack.kidhack.feature.parent.ParentChatScreen
@@ -51,7 +52,9 @@ import com.hack.kidhack.feature.parent.ParentCommunityDetailScreen
 import com.hack.kidhack.feature.parent.ParentCommunityScreen
 import com.hack.kidhack.feature.parent.ParentCommunityWriteScreen
 import com.hack.kidhack.feature.parent.ParentContactScreen
-import com.hack.kidhack.feature.parent.ParentDashboardScreen
+import com.hack.kidhack.feature.parent.ParentChildCareScreen
+import com.hack.kidhack.feature.parent.ParentChildrenScreen
+import com.hack.kidhack.feature.parent.ParentReportScreen
 import com.hack.kidhack.feature.parent.ParentEditProfileScreen
 import com.hack.kidhack.feature.parent.ParentGeofenceScreen
 import com.hack.kidhack.feature.parent.ParentHarmfulScreen
@@ -92,14 +95,31 @@ fun NavGraphBuilder.authGraph(
 }
 
 fun NavGraphBuilder.parentGraph(navController: NavHostController) {
-    navigation(startDestination = Route.ParentDashboard.path, route = Route.ParentGraph.path) {
-        parentTab(Route.ParentDashboard.path, navController) {
-            ParentDashboardScreen(
-                onOpenNotifications = { navController.navigate(Route.ParentNotifications.path) },
-                onOpenUsageDetail = { navController.navigate(Route.ParentAppUsageDetail.path) },
-                onOpenPairing = { navController.navigate(Route.ParentPairing.path) },
-                onOpenProfile = { navController.navigate(Route.ParentChildProfile.path) },
+    navigation(startDestination = Route.ParentChildren.path, route = Route.ParentGraph.path) {
+        parentTab(Route.ParentChildren.path, navController) {
+            ParentChildrenScreen(
+                onOpenChild = { navController.navigate(Route.ParentChildCare.path) },
+                onAddChild = { navController.navigate(Route.ParentPairing.path) },
             )
+        }
+        composable(Route.ParentChildCare.path) {
+            ParentShell(navController) {
+                ParentChildCareScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenReport = { navController.navigate(Route.ParentReport.path) },
+                    onOpenUsageDetail = { navController.navigate(Route.ParentAppUsageDetail.path) },
+                    onOpenScreenTime = { navController.navigate(Route.ParentScreenTime.path) },
+                    onOpenAppControl = { navController.navigate(Route.ParentAppControl.path) },
+                    onOpenScreenshot = { navController.navigate(Route.ParentScreenshot.path) },
+                    onOpenHarmful = { navController.navigate(Route.ParentHarmful.path) },
+                    onOpenGeofence = { navController.navigate(Route.ParentGeofence.path) },
+                )
+            }
+        }
+        composable(Route.ParentReport.path) {
+            ParentShell(navController) {
+                ParentReportScreen(onBack = { navController.popBackStack() })
+            }
         }
         parentTab(Route.ParentLocation.path, navController) {
             ParentLocationScreen(onOpenGeofence = { navController.navigate(Route.ParentGeofence.path) })
@@ -115,11 +135,8 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 onOpenActivities = { navController.navigate(Route.ParentActivities.path) },
                 onOpenChildAccount = { navController.navigate(Route.ParentChildAccount.path) },
                 onOpenWithdraw = { navController.navigate(Route.ParentWithdraw.path) },
-                onOpenAppControl = { navController.navigate(Route.ParentAppControl.path) },
-                onOpenScreenshot = { navController.navigate(Route.ParentScreenshot.path) },
                 onOpenCamera = { navController.navigate(Route.ParentCameraRequest.path) },
                 onOpenProfile = { navController.navigate(Route.ParentChildProfile.path) },
-                onOpenHarmful = { navController.navigate(Route.ParentHarmful.path) },
                 onOpenPairing = { navController.navigate(Route.ParentPairing.path) },
                 onOpenCommunity = { navController.navigate(Route.ParentCommunity.path) },
                 onOpenNotice = { navController.navigate(Route.ParentNotice.path) },
@@ -141,7 +158,19 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 )
             }
         }
-        composable(Route.ParentAppControl.path) { ParentShell(navController) { ParentAppControlScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentAppControl.path) {
+            ParentShell(navController) {
+                ParentAppControlScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenScreenTime = { navController.navigate(Route.ParentScreenTime.path) },
+                )
+            }
+        }
+        composable(Route.ParentScreenTime.path) {
+            ParentShell(navController) {
+                ParentScreenTimeScreen(onBack = { navController.popBackStack() })
+            }
+        }
         composable(Route.ParentScreenshot.path) { ParentShell(navController) { ParentScreenshotScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentCameraRequest.path) { ParentShell(navController) { ParentCameraRequestScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentChildProfile.path) { ParentShell(navController) { ParentChildProfileScreen(onBack = { navController.popBackStack() }) } }
@@ -151,7 +180,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 ParentPairingScreen(
                     onBack = { navController.popBackStack() },
                     onDone = {
-                        navController.navigate(Route.ParentDashboard.path) {
+                        navController.navigate(Route.ParentChildren.path) {
                             popUpTo(Route.ParentGraph.path)
                         }
                     },

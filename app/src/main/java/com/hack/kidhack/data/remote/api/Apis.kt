@@ -502,6 +502,13 @@ interface AppUsageApi {
     @POST("monitoring/usage")
     suspend fun report(@Body body: AppUsageReportRequest): ApiEnvelope<Int>
 
+    /**
+     * 자녀 기기에 「사용량을 지금 올려라」. 202 를 주고 끝나며, 실제 값은 자녀 앱이
+     * 곧이어 [report] 로 올려 완성된다. 자녀 기기가 꺼져 있으면 요청은 닿지 않는다.
+     */
+    @POST("monitoring/usage/{childId}/request")
+    suspend fun requestReport(@Path("childId") childId: String): ApiEnvelope<Unit>
+
     @GET("monitoring/usage/{childId}")
     suspend fun list(
         @Path("childId") childId: String,

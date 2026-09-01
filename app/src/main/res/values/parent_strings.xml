@@ -155,6 +155,28 @@
     <string name="parent_editprofile_saved">저장했어요</string>
 
     <string name="parent_appcontrol_title">앱 통제</string>
+    <string name="parent_dashboard_promise_title">오늘 사용시간</string>
+    <string name="parent_dashboard_promise_limit">약속 %1$s</string>
+    <string name="parent_dashboard_promise_remaining">%1$s 사용 · %2$s 남음</string>
+    <string name="parent_dashboard_promise_used_up">%1$s 사용 · 약속 시간을 다 썼어요</string>
+    <!-- 하루 사용시간 약속 (별도 화면). 앱별 한도와 달리 하루 전체 사용 시간이다. -->
+    <string name="parent_screentime_title">하루 사용시간 약속</string>
+    <string name="parent_screentime_for_child">%1$s 의 약속이에요</string>
+    <string name="parent_screentime_toggle">하루 사용시간 약속 사용</string>
+    <string name="parent_screentime_how_long">얼마나 사용할까요?</string>
+    <string name="parent_screentime_unit_hour">시간</string>
+    <string name="parent_screentime_unit_minute">분</string>
+    <string name="parent_screentime_when_used_up">약속 시간을 모두 사용하면,</string>
+    <string name="parent_screentime_lock_title">기기를 잠급니다</string>
+    <!-- 줄바꿈 위치를 직접 잡는다. 자동 줄바꿈은 "쓸 수 있어서 자녀가" 처럼 뒷 구절의
+         첫 어절을 앞줄에 매달아서, 읽을 때 의미 단위가 끊긴다. -->
+    <string name="parent_screentime_lock_desc">약속한 시간을 다 쓰면 다른 앱을 열 수 없어요.\n루키즈와 전화·설정은 그대로 쓸 수 있어서\n자녀가 상황을 확인하고 부모님께 연락할 수 있습니다.\n한도에 닿으면 부모님과 자녀 모두에게 알림이 갑니다.</string>
+    <string name="parent_screentime_save">저장하기</string>
+    <string name="parent_screentime_saving">저장 중…</string>
+    <string name="parent_screentime_saved">저장했어요. 자녀 기기에 곧 반영됩니다.</string>
+    <string name="parent_screentime_entry">하루 사용시간 약속</string>
+    <string name="parent_screentime_entry_off">설정 안 함</string>
+    <string name="parent_screentime_entry_value">%1$s 사용 가능</string>
     <string name="parent_appcontrol_daily_limit">하루 총 사용 한도</string>
     <string name="parent_appcontrol_daily_limit_desc">아래 앱별 한도와 별개예요. 한도에 닿으면 자녀 기기에서 다른 앱이 열리지 않아요.</string>
     <string name="parent_appcontrol_daily_limit_label">한도 (분)</string>
@@ -299,4 +321,47 @@
     <string name="parent_alert_default_title">새 알림이 도착했어요</string>
     <string name="parent_alert_permission_rationale">알림을 켜면 안전 구역 이탈·유해 사이트 차단을 바로 받아볼 수 있어요</string>
 
+    <!-- 자녀 관리 (부모 기능 입구) -->
+    <string name="parent_childcare_title">자녀 관리</string>
+    <string name="parent_childcare_tab_usage">사용 관리</string>
+    <string name="parent_childcare_tab_safety">안전 케어</string>
+    <string name="parent_childcare_group_status">사용 현황</string>
+    <string name="parent_childcare_group_promise">사용 약속</string>
+    <string name="parent_childcare_group_screen">화면 확인</string>
+    <string name="parent_childcare_group_online">온라인 안전</string>
+    <string name="parent_childcare_group_place">이동 안전</string>
+    <string name="parent_childcare_report">사용 리포트</string>
+    <string name="parent_childcare_report_desc">오늘 사용 시간과 최근 알림을 봅니다.</string>
+    <string name="parent_childcare_usage_detail">앱 사용 상세</string>
+    <string name="parent_childcare_usage_detail_desc">어떤 앱을 얼마나 썼는지 봅니다.</string>
+    <string name="parent_childcare_screentime">하루 사용시간 약속</string>
+    <string name="parent_childcare_screentime_desc">하루에 쓸 수 있는 시간을 정합니다.</string>
+    <string name="parent_childcare_appcontrol">앱 통제</string>
+    <string name="parent_childcare_appcontrol_desc">앱별로 잠그거나 시간을 정합니다.</string>
+    <string name="parent_childcare_screenshot">화면 캡처</string>
+    <string name="parent_childcare_screenshot_desc">지금 보고 있는 화면을 확인합니다.</string>
+    <string name="parent_childcare_harmful">유해사이트 관리</string>
+    <string name="parent_childcare_harmful_desc">막을 사이트를 등록합니다.</string>
+    <string name="parent_childcare_geofence">지정 장소</string>
+    <string name="parent_childcare_geofence_desc">드나들면 알림을 받을 곳을 정합니다.</string>
+    <string name="parent_childcare_pick_child">설정할 자녀를 골라 주세요.</string>
+    <string name="parent_childcare_add_child">자녀 추가</string>
+    <!-- 사용 리포트 -->
+    <string name="parent_report_title">사용 리포트</string>
+    <string name="parent_report_tab_daily">일일보고서</string>
+    <string name="parent_report_tab_weekly">주간보고서</string>
+    <string name="parent_report_today_used">오늘 사용한 시간</string>
+    <string name="parent_report_no_promise">하루 사용시간 약속을 아직 정하지 않았어요.</string>
+    <string name="parent_report_promise_left">약속 %1$s 중 %2$s 남았어요.</string>
+    <string name="parent_report_promise_over">약속한 시간을 모두 사용했어요.</string>
+    <string name="parent_report_top_apps_today">오늘 많이 사용한 앱</string>
+    <string name="parent_report_top_apps_week">이번 주 많이 사용한 앱</string>
+    <string name="parent_report_no_usage">아직 사용 기록이 없어요.</string>
+    <string name="parent_report_loading">불러오는 중…</string>
+    <string name="parent_report_day_summary">오늘 하루 요약</string>
+    <string name="parent_report_week_average">최근 7일 하루 평균</string>
+    <string name="parent_report_week_over">약속보다 하루 %1$s 더 사용했어요.</string>
+    <string name="parent_report_week_under">약속보다 하루 %1$s 덜 사용했어요.</string>
+    <string name="parent_day_summary_empty">오늘은 아직 기록된 일이 없어요.</string>
+    <string name="parent_report_loaded_at">%1$s 기준 · 아래로 당기면 새로 받아옵니다</string>
 </resources>

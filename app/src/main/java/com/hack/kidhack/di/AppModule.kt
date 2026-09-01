@@ -158,7 +158,8 @@ import com.hack.kidhack.feature.parent.CommunityWriteViewModel
 import com.hack.kidhack.feature.parent.ContactViewModel
 import com.hack.kidhack.feature.parent.EditProfileViewModel
 import com.hack.kidhack.feature.parent.AppUsageDetailViewModel
-import com.hack.kidhack.feature.parent.DashboardViewModel
+import com.hack.kidhack.feature.parent.ChildCareViewModel
+import com.hack.kidhack.feature.parent.ReportViewModel
 import com.hack.kidhack.feature.parent.GeofenceViewModel
 import com.hack.kidhack.feature.parent.HarmfulViewModel
 import com.hack.kidhack.feature.parent.LocationViewModel
@@ -170,6 +171,7 @@ import com.hack.kidhack.feature.parent.ParentChatViewModel
 import com.hack.kidhack.feature.parent.PayViewModel
 import com.hack.kidhack.feature.terminal.StoreTerminalViewModel
 import com.hack.kidhack.feature.parent.CameraRequestViewModel
+import com.hack.kidhack.feature.parent.ScreenTimeViewModel
 import com.hack.kidhack.feature.parent.ScreenshotViewModel
 import com.hack.kidhack.feature.child.ChildPairingViewModel
 import com.hack.kidhack.feature.child.chat.ChildChatViewModel
@@ -366,7 +368,8 @@ val appModule = module {
     viewModel { RegisterViewModel(get(), get(), get(), get(), get(), get(), androidContext()) }
     viewModel { ForgotViewModel(get()) }
 
-    viewModel { DashboardViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { ChildCareViewModel(get(), get(), get(), get()) }
+    viewModel { ReportViewModel(get(), get(), get(), get(), get()) }
     viewModel { AppUsageDetailViewModel(get(), get(), get()) }
     viewModel { LocationViewModel(get(), get(), get(), get(), get()) }
     viewModel { GeofenceViewModel(get(), get(), get(), get()) }
@@ -386,6 +389,7 @@ val appModule = module {
     viewModel { CommunityListViewModel(get()) }
     viewModel { params -> CommunityDetailViewModel(params.get(), get(), get()) }
     viewModel { params -> CommunityWriteViewModel(get(), params.get()) }
+    viewModel { ScreenTimeViewModel(get(), get(), get()) }
     viewModel { NoticeViewModel(get()) }
     viewModel { ContactViewModel(get<InquiryRepository>()) }
     viewModel { PayViewModel(get(), get(), get(), get()) }

@@ -894,6 +894,9 @@ class FakeAppUsageRepository(private val feed: MockNotificationFeed) : AppUsageR
         "DAY" -> FakeData.usagesByDay
         else -> FakeData.usages.map { AppUsageStat(it.appName, it.durationSec) }
     }
+    /** 목업에는 자녀 기기가 없다. 요청은 받되 아무 일도 일어나지 않는다. */
+    override suspend fun requestReport(childId: String) = Unit
+
     override suspend fun report(childId: String, usages: List<AppUsage>) {
         val totalMinutes = usages.sumOf { it.durationSec } / 60
         if (totalMinutes < DAILY_LIMIT_MINUTES) return

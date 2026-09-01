@@ -7,7 +7,9 @@ sealed class Route(val path: String) {
     data object Forgot : Route("forgot")
 
     data object ParentGraph : Route("parent")
-    data object ParentDashboard : Route("parent/dashboard")
+    data object ParentChildren : Route("parent/children")
+    data object ParentChildCare : Route("parent/childcare")
+    data object ParentReport : Route("parent/report")
     data object ParentLocation : Route("parent/location")
     data object ParentChat : Route("parent/chat")
     data object ParentNotifications : Route("parent/notifications")
@@ -32,6 +34,7 @@ sealed class Route(val path: String) {
     data object ParentCommunityEdit : Route("parent/community/edit/{postId}") {
         fun create(postId: String) = "parent/community/edit/$postId"
     }
+    data object ParentScreenTime : Route("parent/screentime")
     data object ParentNotice : Route("parent/notice")
     data object ParentContact : Route("parent/contact")
     data object ParentPay : Route("parent/pay")
@@ -83,7 +86,7 @@ data class TabItem(
 )
 
 val ParentTabs = listOf(
-    TabItem(Route.ParentDashboard, "대시보드", "📊"),
+    TabItem(Route.ParentChildren, "자녀관리", "👪"),
     TabItem(Route.ParentLocation, "위치", "📍"),
     TabItem(Route.ParentChat, "채팅", "💬"),
     TabItem(Route.ParentNotifications, "알림", "🔔"),
