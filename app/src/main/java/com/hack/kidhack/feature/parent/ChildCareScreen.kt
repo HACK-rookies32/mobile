@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -32,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -42,6 +44,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
+import com.hack.kidhack.background.alert.ParentChildWatcher
+import com.hack.kidhack.background.alert.ServerAlertSync
+import com.hack.kidhack.core.permission.KidhackPermissions
+import com.hack.kidhack.permissionRequester
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
@@ -73,6 +79,8 @@ data class ChildCareUiState(
 class ChildCareViewModel(
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
+    private val alertSync: ServerAlertSync,
+    private val childWatcher: ParentChildWatcher,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChildCareUiState())
@@ -90,6 +98,11 @@ class ChildCareViewModel(
                     it.copy(children = children.map { c -> c.id to c.name }, selectedChildId = id)
                 }
             }
+            // 부모가 앱을 열 때 서버에 쌓인 알림을 당겨 오고, 자녀 상태를 지금 판정한다.
+            // 15분 주기 워커를 기다리면 방금 벌어진 일을 한참 뒤에야 알게 된다.
+            // 전에는 대시보드가 첫 화면이라 거기서 했는데, 이제 이 화면이 첫 화면이다.
+            runCatching { alertSync.sync() }
+            runCatching { childWatcher.evaluateAll() }
         }
     }
 
@@ -128,6 +141,20 @@ fun ParentChildrenScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
+    val context = LocalContext.current
+    val permissions = permissionRequester()
+
+    // 안전 구역 이탈·유해 사이트 차단을 푸시로 받으려면 알림 권한이 필요하다(안드로이드 13+).
+    // 부모가 앱을 열면 처음 닿는 화면이 여기라 여기서 묻는다. 이미 거절해서 시스템
+    // 대화상자가 뜨지 않는 상태면 조용히 넘어간다.
+    LaunchedEffect(Unit) {
+        val permission = KidhackPermissions.notifications ?: return@LaunchedEffect
+        val activity = KidhackPermissions.findActivity(context) ?: return@LaunchedEffect
+        if (!KidhackPermissions.canShowSystemDialog(activity, permission)) return@LaunchedEffect
+        permissions.requestOne(permission) { granted ->
+            if (!granted) KidhackPermissions.recordDeny(context, permission)
+        }
+    }
 
     Column(
         modifier = Modifier

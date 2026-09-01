@@ -9,7 +9,7 @@ sealed class Route(val path: String) {
     data object ParentGraph : Route("parent")
     data object ParentChildren : Route("parent/children")
     data object ParentChildCare : Route("parent/childcare")
-    data object ParentDashboard : Route("parent/dashboard")
+    data object ParentReport : Route("parent/report")
     data object ParentLocation : Route("parent/location")
     data object ParentChat : Route("parent/chat")
     data object ParentNotifications : Route("parent/notifications")

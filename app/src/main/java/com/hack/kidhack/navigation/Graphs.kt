@@ -54,7 +54,7 @@ import com.hack.kidhack.feature.parent.ParentCommunityWriteScreen
 import com.hack.kidhack.feature.parent.ParentContactScreen
 import com.hack.kidhack.feature.parent.ParentChildCareScreen
 import com.hack.kidhack.feature.parent.ParentChildrenScreen
-import com.hack.kidhack.feature.parent.ParentDashboardScreen
+import com.hack.kidhack.feature.parent.ParentReportScreen
 import com.hack.kidhack.feature.parent.ParentEditProfileScreen
 import com.hack.kidhack.feature.parent.ParentGeofenceScreen
 import com.hack.kidhack.feature.parent.ParentHarmfulScreen
@@ -106,7 +106,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
             ParentShell(navController) {
                 ParentChildCareScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenReport = { navController.navigate(Route.ParentDashboard.path) },
+                    onOpenReport = { navController.navigate(Route.ParentReport.path) },
                     onOpenUsageDetail = { navController.navigate(Route.ParentAppUsageDetail.path) },
                     onOpenScreenTime = { navController.navigate(Route.ParentScreenTime.path) },
                     onOpenAppControl = { navController.navigate(Route.ParentAppControl.path) },
@@ -116,14 +116,9 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 )
             }
         }
-        composable(Route.ParentDashboard.path) {
+        composable(Route.ParentReport.path) {
             ParentShell(navController) {
-                ParentDashboardScreen(
-                    onOpenNotifications = { navController.navigate(Route.ParentNotifications.path) },
-                    onOpenUsageDetail = { navController.navigate(Route.ParentAppUsageDetail.path) },
-                    onOpenPairing = { navController.navigate(Route.ParentPairing.path) },
-                    onOpenProfile = { navController.navigate(Route.ParentChildProfile.path) },
-                )
+                ParentReportScreen(onBack = { navController.popBackStack() })
             }
         }
         parentTab(Route.ParentLocation.path, navController) {
@@ -185,7 +180,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 ParentPairingScreen(
                     onBack = { navController.popBackStack() },
                     onDone = {
-                        navController.navigate(Route.ParentDashboard.path) {
+                        navController.navigate(Route.ParentChildren.path) {
                             popUpTo(Route.ParentGraph.path)
                         }
                     },
