@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +56,9 @@ fun KidButton(
     val content: @Composable () -> Unit = {
         Text(
             text = text,
+            // 색을 직접 넘긴다. 테마의 labelLarge 에 진한 글자색이 박혀 있어서, 그냥 두면
+            // 버튼이 정한 contentColor(주황 배경 위 흰색)를 덮어써 어두운 글자가 나온다.
+            color = LocalContentColor.current,
             fontFamily = KidhackFontFamily,
             fontWeight = FontBold,
             fontSize = 14.sp,

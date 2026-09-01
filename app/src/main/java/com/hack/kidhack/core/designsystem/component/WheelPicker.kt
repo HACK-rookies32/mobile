@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
@@ -30,6 +32,9 @@ import kotlinx.coroutines.flow.map
 
 /** 한 줄 높이. 가운데 강조선 간격과 스크롤 계산이 모두 이 값을 기준으로 한다. */
 private val ITEM_HEIGHT = 44.dp
+
+/** 숫자 오른쪽 단위 글자가 차지하는 폭. 좌우 같은 폭을 비워 숫자를 가운데 고정한다. */
+private val LABEL_SLOT = 34.dp
 
 /** 위아래로 보이는 여백 줄 수. 2 면 가운데 1 줄 + 위아래 2 줄씩 = 5 줄이 보인다. */
 private const val EDGE_ITEMS = 2
@@ -97,6 +102,9 @@ fun WheelPicker(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
                 ) {
+                    // 단위는 오른쪽에만 붙지만 자리는 양쪽에 똑같이 비워 둔다. 한쪽만 두면
+                    // 가운데 줄에 단위가 나타나는 순간 숫자가 왼쪽으로 밀려 흔들려 보인다.
+                    if (label != null) Spacer(Modifier.width(LABEL_SLOT))
                     Text(
                         text = "%02d".format(values[index]),
                         fontFamily = KidhackFontFamily,
@@ -105,13 +113,19 @@ fun WheelPicker(
                         color = if (selected) colors.text else colors.muted,
                         textAlign = TextAlign.Center,
                     )
-                    if (label != null && selected) {
-                        Text(
-                            text = label,
-                            modifier = Modifier.padding(start = 6.dp),
-                            color = colors.muted,
-                            fontSize = 13.sp,
-                        )
+                    if (label != null) {
+                        Box(Modifier.width(LABEL_SLOT)) {
+                            if (selected) {
+                                Text(
+                                    text = label,
+                                    modifier = Modifier
+                                        .align(Alignment.CenterStart)
+                                        .padding(start = 6.dp),
+                                    color = colors.muted,
+                                    fontSize = 13.sp,
+                                )
+                            }
+                        }
                     }
                 }
             }
