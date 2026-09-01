@@ -457,7 +457,20 @@ data class StoreTerminalInfo(
 )
 
 /** 부모가 보낸 원격 요청 종류. Firebase 대신 WebSocket/폴링으로 전달된다. */
-enum class RemoteCommandType { SCREEN_CAPTURE, CAMERA_SHOT, UNKNOWN }
+enum class RemoteCommandType {
+    SCREEN_CAPTURE,
+    CAMERA_SHOT,
+
+    /**
+     * 사용량을 지금 서버로 올리라는 요청.
+     *
+     * <p>다른 명령과 달리 자녀에게 알리지 않는다. 부모가 사용 리포트를 새로고침할
+     * 때마다 나가는 요청이라, 알림을 띄우면 자녀 폰이 계속 울린다.
+     */
+    USAGE_REPORT,
+
+    UNKNOWN,
+}
 
 data class RemoteCommand(
     val requestId: String,

@@ -422,6 +422,8 @@ fun String?.toRemoteCommandType(): RemoteCommandType = when (this?.uppercase()) 
     // SCREENSHOT_REQUESTED = 서버 NotificationType(FCM data.type). 캡처 요청은 이 이름으로 온다.
     "SCREEN_CAPTURE", "CAPTURE", "CAPTURE_REQUEST", "SCREENSHOT", "SCREENSHOT_REQUESTED" -> RemoteCommandType.SCREEN_CAPTURE
     "CAMERA_SHOT", "CAMERA", "CAMERA_REQUEST", "PHOTO" -> RemoteCommandType.CAMERA_SHOT
+    // USAGE_REPORT_REQUESTED = 서버 NotificationType. 나머지는 소켓 계약 쪽 이름.
+    "USAGE_REPORT_REQUESTED", "USAGE_REQUEST", "USAGE_REPORT" -> RemoteCommandType.USAGE_REPORT
     else -> RemoteCommandType.UNKNOWN
 }
 

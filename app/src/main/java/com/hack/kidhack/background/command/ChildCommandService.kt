@@ -13,6 +13,7 @@ import com.hack.kidhack.background.ChildNotifications
 import com.hack.kidhack.core.common.KoreanParticles
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.domain.model.CommandAckStatus
+import com.hack.kidhack.background.usage.AppUsageWorker
 import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.SessionRepository
@@ -73,9 +74,15 @@ class ChildCommandService : Service() {
         scope.launch {
             commandRepository.observe().collect { command ->
                 if (command.type == RemoteCommandType.UNKNOWN) return@collect
-                notifier.notify(command)
-                // 알림은 지나가면 사라진다. 홈 탭 「최근 알림」에서 다시 볼 수 있게 기록해 둔다.
-                recordAlert(command)
+                if (command.type == RemoteCommandType.USAGE_REPORT) {
+                    // 조용히 처리한다. 부모가 리포트를 새로고침할 때마다 나가는 요청이라
+                    // 알림을 띄우면 자녀 폰이 계속 울린다.
+                    AppUsageWorker.enqueueNow(this@ChildCommandService)
+                } else {
+                    notifier.notify(command)
+                    // 알림은 지나가면 사라진다. 홈 탭 「최근 알림」에서 다시 볼 수 있게 기록해 둔다.
+                    recordAlert(command)
+                }
                 val childId = command.childId.ifBlank {
                     sessionRepository.current()?.user?.id.orEmpty()
                 }
@@ -104,7 +111,7 @@ class ChildCommandService : Service() {
                 body = getString(R.string.child_alert_request_from, who),
                 dedupeKey = ChildAlertStore.TYPE_CAMERA_REQUEST + "-" + command.requestId,
             )
-            RemoteCommandType.UNKNOWN -> Unit
+            RemoteCommandType.USAGE_REPORT, RemoteCommandType.UNKNOWN -> Unit
         }
     }
 

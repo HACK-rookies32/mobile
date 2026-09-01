@@ -13,6 +13,7 @@ import com.hack.kidhack.domain.model.CommandAckStatus
 import com.hack.kidhack.domain.model.RemoteCommand
 import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.model.Role
+import com.hack.kidhack.background.usage.AppUsageWorker
 import com.hack.kidhack.data.repository.toRemoteCommandType
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.NotificationRepository
@@ -99,9 +100,14 @@ class PushMessageRouter(
             requestedBy = message.requestedBy,
         )
         // ChildCommandService 의 소켓 처리와 동일한 3동작.
-        childCommandNotifier.notify(command)
-        recordChildAlert(command)
-        childCommandBus.post(command)
+        if (command.type == RemoteCommandType.USAGE_REPORT) {
+            // 조용히 처리한다 — 소켓 경로와 같은 이유다.
+            AppUsageWorker.enqueueNow(context)
+        } else {
+            childCommandNotifier.notify(command)
+            recordChildAlert(command)
+            childCommandBus.post(command)
+        }
         // 수신 ACK: 서버 알림 행을 읽음 처리한다(같은 요청이 폴링으로 다시 잡히지 않도록). 옛 ack 경로는 백업.
         if (command.requestId.isNotBlank()) {
             runCatching { notificationRepository.markRead(command.requestId) }
@@ -130,7 +136,7 @@ class PushMessageRouter(
                 body = context.getString(R.string.child_alert_request_from, who),
                 dedupeKey = ChildAlertStore.TYPE_CAMERA_REQUEST + "-" + command.requestId,
             )
-            RemoteCommandType.UNKNOWN -> Unit
+            RemoteCommandType.USAGE_REPORT, RemoteCommandType.UNKNOWN -> Unit
         }
     }
 

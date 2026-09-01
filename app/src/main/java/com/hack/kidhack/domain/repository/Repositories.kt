@@ -445,6 +445,15 @@ interface AppUsageRepository {
         to: String? = null,
     ): List<AppUsageStat>
     suspend fun report(childId: String, usages: List<AppUsage>)
+
+    /**
+     * 자녀 기기가 사용량을 지금 올리도록 요청한다(부모).
+     *
+     * <p>자녀 앱은 평소 1시간 주기로만 올린다. 부모가 리포트를 새로고침할 때 이 요청을
+     * 함께 보내야 방금까지의 사용시간이 반영된다. 자녀 기기가 꺼져 있거나 네트워크가
+     * 없으면 요청은 닿지 않고 마지막 값이 그대로 남는다.
+     */
+    suspend fun requestReport(childId: String)
 }
 
 interface AppControlRepository {
