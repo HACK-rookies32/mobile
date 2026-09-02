@@ -27,6 +27,7 @@ import com.hack.kidhack.data.remote.api.BlocklistApi
 import com.hack.kidhack.data.remote.api.CardApi
 import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
+import com.hack.kidhack.data.remote.api.FileApi
 import com.hack.kidhack.data.remote.api.ChildAlertApi
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
@@ -260,6 +261,7 @@ val appModule = module {
     single { get<Retrofit>().create(UserApi::class.java) }
     single { get<Retrofit>().create(PairingApi::class.java) }
     single { get<Retrofit>().create(ChildApi::class.java) }
+    single { get<Retrofit>().create(FileApi::class.java) }
     single { get<Retrofit>().create(LocationApi::class.java) }
     single { get<Retrofit>().create(DeviceApi::class.java) }
     single { get<Retrofit>().create(DashboardApi::class.java) }
@@ -295,7 +297,7 @@ val appModule = module {
     }
     single<UserRepository> { if (useMock) FakeUserRepository(get()) else RealUserRepository(get()) }
     single<PairingRepository> { if (useMock) FakePairingRepository() else RealPairingRepository(get()) }
-    single<ChildRepository> { if (useMock) FakeChildRepository() else RealChildRepository(get()) }
+    single<ChildRepository> { if (useMock) FakeChildRepository() else RealChildRepository(get(), get(), androidContext()) }
     single<LocationRepository> { if (useMock) FakeLocationRepository() else RealLocationRepository(get()) }
     single<DeviceRepository> { if (useMock) FakeDeviceRepository() else RealDeviceRepository(get(), androidContext()) }
     single<DashboardRepository> { if (useMock) FakeDashboardRepository(get(), get(), get()) else RealDashboardRepository(get()) }

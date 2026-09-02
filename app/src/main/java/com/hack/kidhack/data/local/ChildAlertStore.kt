@@ -222,6 +222,9 @@ class ChildAlertStore(
     companion object {
         const val TYPE_HARMFUL_BLOCK = "HARMFUL_BLOCK"
         const val TYPE_SCREEN_TIME = "SCREEN_TIME_LIMIT"
+
+        /** 부모가 걸어 둔 앱별 규칙에 막혔다. 총 스크린타임 한도와는 다른 사건이다. */
+        const val TYPE_APP_BLOCK = "APP_BLOCK"
         const val TYPE_CAPTURE_REQUEST = "CAPTURE_REQUEST"
         const val TYPE_CAMERA_REQUEST = "CAMERA_REQUEST"
         const val TYPE_SCHEDULED_CAPTURE = "SCHEDULED_CAPTURE"

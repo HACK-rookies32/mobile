@@ -21,6 +21,7 @@ import com.hack.kidhack.data.crypto.CardCrypto
 import com.hack.kidhack.core.common.KidhackJson
 import com.hack.kidhack.data.remote.api.ChatApi
 import com.hack.kidhack.data.remote.api.ChildApi
+import com.hack.kidhack.data.remote.api.FileApi
 import com.hack.kidhack.data.remote.api.CommandApi
 import com.hack.kidhack.data.remote.api.CommunityApi
 import com.hack.kidhack.data.remote.api.InquiryApi
@@ -372,7 +373,14 @@ class RealPairingRepository(private val api: PairingApi) : PairingRepository {
     }
 }
 
-class RealChildRepository(private val api: ChildApi) : ChildRepository {
+class RealChildRepository(
+    private val api: ChildApi,
+    private val fileApi: FileApi,
+    private val context: Context,
+) : ChildRepository {
+
+    /** 서버 업로드 분류. `/files/{category}` 의 경로 조각이다. */
+    private val profileCategory = "profile"
     override suspend fun children(): List<ChildProfile> = api.children().unwrap().map { it.toDomain() }
     override suspend fun child(childId: String): ChildProfile = api.child(childId).unwrap().toDomain()
     override suspend fun updateChild(
@@ -383,6 +391,10 @@ class RealChildRepository(private val api: ChildApi) : ChildRepository {
         childId,
         ChildUpdateRequest(nickname = nickname, profileImageUrl = profileImageUrl)
     ).unwrap().toDomain()
+
+    override suspend fun uploadProfileImage(uri: String): String =
+        fileApi.upload(profileCategory, context.filePart(uri)).unwrap().url
+
     override suspend fun unpair(childId: String) {
         api.unpair(childId).unwrapOrNull()
     }

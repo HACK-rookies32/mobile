@@ -140,6 +140,17 @@ interface ChildRepository {
     ): ChildProfile
 
     /**
+     * 프로필 사진을 서버에 올리고 공개 경로를 받는다.
+     *
+     * <p>갤러리에서 고른 `content://` 주소는 그 기기에서만 열린다. 그대로 저장하면 다른
+     * 기기에서도, 재설치 뒤에도 사진이 뜨지 않는다. 먼저 올려 받은 경로를
+     * [updateChild] 의 `profileImageUrl` 로 넘겨야 한다.
+     *
+     * @param uri 갤러리 또는 카메라가 준 `content://` 주소
+     */
+    suspend fun uploadProfileImage(uri: String): String
+
+    /**
      * 자녀 페어링 해제. **서버가 계정을 소프트 삭제까지 하므로 되돌릴 수 없다.**
      * 화면에서 「연결만 끊는다」는 인상을 주면 안 된다.
      */

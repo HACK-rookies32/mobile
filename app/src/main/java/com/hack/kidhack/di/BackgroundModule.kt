@@ -12,6 +12,7 @@ import com.hack.kidhack.background.command.ChildCommandNotifier
 import com.hack.kidhack.background.push.PushMessageRouter
 import com.hack.kidhack.background.push.PushTokenRegistrar
 import com.hack.kidhack.background.location.GpsStatusMonitor
+import com.hack.kidhack.background.usage.AppRuleWatcher
 import com.hack.kidhack.background.usage.AppUsageCollector
 import com.hack.kidhack.background.usage.ScreenTimeWatcher
 import org.koin.android.ext.koin.androidContext
@@ -22,6 +23,7 @@ val backgroundModule = module {
     single { ChildDeviceStatus(androidContext()) }
     single { AppUsageCollector(androidContext(), get(), get()) }
     single { ScreenTimeWatcher(get(), androidContext(), get(), get()) }
+    single { AppRuleWatcher(androidContext(), get(), get()) }
     single { ChildCommandNotifier(androidContext()) }
     single { PushTokenRegistrar(get(), get(), get()) }
     single { PushMessageRouter(androidContext(), get(), get(), get(), get(), get(), get(), get()) }

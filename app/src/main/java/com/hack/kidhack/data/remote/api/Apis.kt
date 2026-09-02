@@ -452,6 +452,24 @@ interface CommunityApi {
     suspend fun uploadAttachment(@Part file: MultipartBody.Part): ApiEnvelope<UploadedFileDto>
 }
 
+/**
+ * 공용 파일 업로드 (`POST /files/{category}`).
+ *
+ * <p>분류는 `community` / `inquiry` / `notice` / `profile` / `screenshot`. 응답의 `url` 을
+ * 그대로 저장 요청에 실어 보낸다.
+ *
+ * <p>커뮤니티·문의는 각자의 전용 업로드 엔드포인트를 쓰고 있어 그대로 둔다. 프로필 사진은
+ * 전용 엔드포인트가 없어 이쪽을 쓴다.
+ */
+interface FileApi {
+    @Multipart
+    @POST("files/{category}")
+    suspend fun upload(
+        @Path("category") category: String,
+        @Part file: MultipartBody.Part,
+    ): ApiEnvelope<UploadedFileDto>
+}
+
 interface ChatApi {
     /** PARENT 전용. 부모–자녀 조합의 방이 있으면 반환하고 없으면 생성한다(멱등). */
     @POST("chat/rooms")

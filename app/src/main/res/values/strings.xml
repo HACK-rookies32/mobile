@@ -32,4 +32,6 @@
     <string name="server_alert_channel">알림</string>
     <string name="server_alert_channel_desc">채팅·안전 알림처럼 바로 확인해야 하는 알림</string>
     <string name="terms_revision">2026.08.01 개정 · 시행</string>
+    <string name="app_rule_block_forbidden">%1$s 은(는) 지금 사용할 수 없어요</string>
+    <string name="app_rule_block_limit">%1$s 은(는) 오늘 %2$d분을 다 썼어요</string>
 </resources>

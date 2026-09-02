@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,14 +27,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -694,18 +690,15 @@ fun ParentChildCareScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    val childId = state.selectedChildId
+    val child = state.children.firstOrNull { it.id == childId }
 
-    val usageGroups = listOf(
+    // 탭을 두지 않고 이름표로만 가른다. 대시보드와 탭이 한 화면에 있으면 스크롤이 서로
+    // 다툰다 — 요약을 보려고 올리고 목록을 보려고 내리는데, 탭을 누르면 또 위로 튄다.
+    // 「사용 관리 / 안전 케어」라는 갈래는 이름표로 그대로 남는다.
+    val groups = listOf(
         CareGroup(
-            R.string.parent_childcare_group_status,
-            listOf(
-                CareItem(R.drawable.ic_report, R.string.parent_childcare_report, onClick = onOpenReport),
-                CareItem(R.drawable.ic_apps, R.string.parent_childcare_usage_detail, onClick = onOpenUsageDetail),
-            ),
-        ),
-        CareGroup(
-            R.string.parent_childcare_group_promise,
+            R.string.parent_childcare_tab_usage,
             listOf(
                 CareItem(
                     R.drawable.ic_clock,
@@ -719,44 +712,31 @@ fun ParentChildCareScreen(
                     state.setup.appControl,
                     onOpenAppControl,
                 ),
-            ),
-        ),
-        CareGroup(
-            R.string.parent_childcare_group_screen,
-            listOf(
+                CareItem(R.drawable.ic_apps, R.string.parent_childcare_usage_detail, onClick = onOpenUsageDetail),
                 CareItem(R.drawable.ic_capture, R.string.parent_childcare_screenshot, onClick = onOpenScreenshot),
             ),
         ),
-    )
-    val safetyGroups = listOf(
         CareGroup(
-            R.string.parent_childcare_group_online,
-            listOf(CareItem(
+            R.string.parent_childcare_tab_safety,
+            listOf(
+                CareItem(
                     R.drawable.ic_shield,
                     R.string.parent_childcare_harmful,
                     state.setup.harmful,
                     onOpenHarmful,
-                )),
-        ),
-        CareGroup(
-            R.string.parent_childcare_group_place,
-            listOf(CareItem(
+                ),
+                CareItem(
                     R.drawable.ic_place,
                     R.string.parent_childcare_geofence,
                     state.setup.places,
                     onOpenGeofence,
-                )),
+                ),
+            ),
         ),
-        // 마이페이지에 있던 자녀 항목을 여기로 옮겼다. 자녀 한 명에 매인 설정이라 자녀를
-        // 고른 뒤에 보는 것이 맞다 — 마이페이지에 두면 어느 아이 것인지 알 수 없었다.
+        // 자녀 프로필은 이름 옆 연필로 올라갔다. 여기 남는 것은 계정 하나뿐이다.
         CareGroup(
             R.string.parent_childcare_group_account,
             listOf(
-                CareItem(
-                    R.drawable.ic_person,
-                    R.string.parent_mypage_child_profile,
-                    onClick = onOpenChildProfile,
-                ),
                 CareItem(
                     R.drawable.ic_key,
                     R.string.parent_mypage_child_account,
@@ -773,11 +753,11 @@ fun ParentChildCareScreen(
             .statusBarsPadding(),
     ) {
         Row(
-            modifier = Modifier.padding(start = 8.dp, end = 20.dp, top = 8.dp, bottom = 10.dp),
+            modifier = Modifier.padding(start = 8.dp, end = 20.dp, top = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "‹",
+                text = "\u2039",
                 modifier = Modifier
                     .clip(RoundedCornerShape(99.dp))
                     .clickable(onClick = onBack)
@@ -789,94 +769,260 @@ fun ParentChildCareScreen(
                 text = state.selectedChildName,
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBlack,
-                fontSize = 21.sp,
+                fontSize = 18.sp,
+                letterSpacing = (-0.5).sp,
                 color = colors.text,
             )
         }
 
-        CareTabs(
-            titles = listOf(
-                stringResource(R.string.parent_childcare_tab_usage),
-                stringResource(R.string.parent_childcare_tab_safety),
-            ),
-            selected = tab,
-            onSelect = { tab = it },
-        )
-
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            (if (tab == 0) usageGroups else safetyGroups).forEach { group ->
+            ChildHero(
+                child = child,
+                status = childId?.let { state.statuses[it] },
+                onEditProfile = onOpenChildProfile,
+            )
+            TodayUsageTile(usage = childId?.let { state.usages[it] }, onOpenReport = onOpenReport)
+
+            groups.forEach { group ->
                 Text(
                     text = stringResource(group.titleRes),
-                    modifier = Modifier.padding(start = 24.dp, end = 20.dp, top = 18.dp, bottom = 8.dp),
-                    color = colors.muted,
+                    modifier = Modifier.padding(start = 22.dp, end = 20.dp, top = 26.dp, bottom = 6.dp),
+                    color = colors.subtle,
                     fontSize = 12.sp,
                     fontFamily = KidhackFontFamily,
                     fontWeight = FontBold,
                 )
-                Column(
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(colors.card)
-                        .border(1.dp, colors.border.copy(alpha = 0.6f), RoundedCornerShape(16.dp)),
-                ) {
-                    group.items.forEachIndexed { index, item ->
-                        if (index > 0) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(start = 56.dp),
-                                color = colors.border.copy(alpha = 0.6f),
-                            )
-                        }
-                        CareRow(item)
+                group.items.forEachIndexed { index, item ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 66.dp),
+                            color = colors.line,
+                        )
                     }
+                    CareRow(item)
                 }
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(28.dp))
         }
     }
 }
 
 /**
- * 두 갈래 탭.
+ * 화면 맨 위의 자녀.
  *
- * <p>화면 폭을 반씩 나눠 갖는 대신 글자 폭만큼만 차지하고 왼쪽에 붙는다. 탭이 둘뿐이라
- * 폭을 채우면 버튼처럼 보이고, 아래 카드 목록보다 무거워진다.
+ * <p>누구 화면인지를 사진으로 먼저 말한다. 아이가 둘이면 이름 한 줄만으로는 잘못 들어온
+ * 것을 알아채기 어렵다.
+ *
+ * <p>이름 오른쪽 연필이 자녀 프로필 관리로 간다. 전에는 「안전 케어」 탭 맨 아래에 묻혀
+ * 있었는데, 프로필은 안전과 아무 상관이 없다.
  */
 @Composable
-private fun CareTabs(titles: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+private fun ChildHero(child: ChildProfile?, status: ChildWatchStatus?, onEditProfile: () -> Unit) {
     val colors = LocalKidhackColors.current
     Row(
-        modifier = Modifier.padding(start = 20.dp, end = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 16.dp, top = 10.dp, bottom = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        titles.forEachIndexed { index, title ->
-            val active = index == selected
-            Column(
-                // 밑줄이 글자 폭에 맞아야 한다. 그냥 두면 밑줄이 남은 폭을 다 먹어서
-                // 두 번째 탭이 화면 밖으로 밀린다.
-                modifier = Modifier
-                    .width(IntrinsicSize.Max)
-                    .clickable { onSelect(index) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = title,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBold,
-                    fontSize = 15.sp,
-                    color = if (active) colors.text else colors.muted,
+        Box(
+            modifier = Modifier.size(58.dp).clip(CircleShape).background(colors.surface),
+            contentAlignment = Alignment.Center,
+        ) {
+            val photo = child?.profileImageUrl
+            if (photo.isNullOrBlank()) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_person),
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = colors.border,
                 )
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(99.dp))
-                        .background(if (active) colors.brand else Color.Transparent),
+            } else {
+                AsyncImage(
+                    model = photo,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
                 )
             }
         }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = child?.name.orEmpty(),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBlack,
+                fontSize = 19.sp,
+                letterSpacing = (-0.6).sp,
+                color = colors.text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(5.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 색만으로 알리면 색을 구별하기 어려운 부모에게는 없는 것과 같다. 점 옆의
+                // 글자가 같은 말을 한 번 더 한다.
+                val attention = status?.outsideFence == true || status?.stale == true
+                Box(
+                    Modifier
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when {
+                                status == null -> colors.border
+                                attention -> colors.brand
+                                else -> colors.safe
+                            },
+                        ),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = rowStatus(status),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = if (attention) FontBold else FontSemibold,
+                    fontSize = 12.sp,
+                    color = if (attention) colors.brandDark else colors.subtle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(colors.surface)
+                .clickable(onClick = onEditProfile),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_pencil),
+                contentDescription = stringResource(R.string.parent_mypage_child_profile),
+                modifier = Modifier.size(16.dp),
+                tint = colors.muted,
+            )
+        }
+    }
+}
+
+/**
+ * 오늘 사용 칸.
+ *
+ * <p>부모가 하루에 여러 번 들어오는 이유가 이 값인데, 전에는 「보고서」를 눌러야 나왔다.
+ * 칸을 누르면 사용 리포트(일일·주간)로 간다 — 그래서 목록의 「보고서」 줄은 없앴다.
+ * 같은 곳으로 가는 문이 둘일 필요가 없다.
+ */
+@Composable
+private fun TodayUsageTile(usage: ChildDayUsage?, onOpenReport: () -> Unit) {
+    val colors = LocalKidhackColors.current
+    val limitMinutes = usage?.limitMinutes?.takeIf { it > 0 }
+    val usedMinutes = usage?.let { it.usedSeconds / SECONDS_PER_MINUTE }
+    val over = limitMinutes != null && usedMinutes != null && usedMinutes >= limitMinutes
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(colors.surface)
+            .clickable(onClick = onOpenReport)
+            .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 15.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.parent_childcare_today_usage),
+                modifier = Modifier.weight(1f),
+                color = colors.muted,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 12.sp,
+            )
+            Text(
+                text = stringResource(R.string.parent_childcare_open_report),
+                color = colors.subtle,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 11.5.sp,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+
+        if (usage == null || usedMinutes == null) {
+            // 아직 못 받아 왔다. 0분으로 적으면 「모른다」가 「하나도 안 썼다」로 읽힌다.
+            Text(
+                text = stringResource(R.string.parent_childcare_row_loading),
+                color = colors.subtle,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBlack,
+                fontSize = 22.sp,
+                letterSpacing = (-0.8).sp,
+            )
+            return@Column
+        }
+
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = usageLabel(usage.usedSeconds),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBlack,
+                fontSize = 26.sp,
+                letterSpacing = (-1).sp,
+                color = if (over) colors.danger else colors.text,
+            )
+            if (limitMinutes != null) {
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = stringResource(
+                        R.string.parent_childcare_of_promise,
+                        usageLabel(limitMinutes * SECONDS_PER_MINUTE),
+                    ),
+                    modifier = Modifier.padding(bottom = 3.dp),
+                    color = colors.subtle,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+
+        // 약속을 안 걸어 뒀으면 견줄 기준이 없다. 기준 없는 막대는 얼마나 남았는지 말하는
+        // 것처럼 보이지만 실제로는 아무것도 말하지 않는다.
+        if (limitMinutes == null) return@Column
+
+        Spacer(Modifier.height(13.dp))
+        val ratio = (usedMinutes.toFloat() / limitMinutes).coerceIn(0f, 1f)
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(99.dp))
+                .background(colors.border.copy(alpha = 0.7f)),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(ratio)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(if (over) colors.danger else colors.brand),
+            )
+        }
+        Spacer(Modifier.height(9.dp))
+        val restMinutes = limitMinutes - usedMinutes
+        Text(
+            text = if (over) {
+                stringResource(
+                    R.string.parent_childcare_over_by,
+                    usageLabel(-restMinutes * SECONDS_PER_MINUTE),
+                )
+            } else {
+                stringResource(
+                    R.string.parent_childcare_left,
+                    usageLabel(restMinutes * SECONDS_PER_MINUTE),
+                )
+            },
+            color = if (over) colors.danger else colors.subtle,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 11.5.sp,
+        )
     }
 }
 

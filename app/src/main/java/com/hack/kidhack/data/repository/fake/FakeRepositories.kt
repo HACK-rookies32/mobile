@@ -292,6 +292,10 @@ class FakeChildRepository : ChildRepository {
         alias = nickname ?: child(childId).alias,
         profileImageUrl = profileImageUrl ?: child(childId).profileImageUrl,
     )
+
+    // 목 빌드에는 올릴 서버가 없다. 고른 주소를 그대로 돌려주면 화면 흐름은 확인된다.
+    override suspend fun uploadProfileImage(uri: String): String = uri
+
     override suspend fun unpair(childId: String) {
         delay(200)
         removed += childId
