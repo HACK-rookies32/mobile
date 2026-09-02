@@ -6,12 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,9 +17,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.annotation.DrawableRes
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +36,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,17 +45,28 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import coil3.compose.AsyncImage
 import com.hack.kidhack.R
+import com.hack.kidhack.background.alert.ChildWatchStatus
 import com.hack.kidhack.background.alert.ParentChildWatcher
 import com.hack.kidhack.background.alert.ServerAlertSync
+import com.hack.kidhack.core.common.todayRange
 import com.hack.kidhack.core.permission.KidhackPermissions
 import com.hack.kidhack.permissionRequester
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
+import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.domain.model.ChildProfile
+import com.hack.kidhack.domain.repository.AppControlRepository
+import com.hack.kidhack.domain.repository.AppUsageRepository
+import com.hack.kidhack.domain.repository.BlocklistRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,13 +75,56 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 data class ChildCareUiState(
-    val children: List<Pair<String, String>> = emptyList(),
+    val children: List<ChildProfile> = emptyList(),
+    /**
+     * 자녀 id → 지금 상태. 자녀 목록보다 늦게 도착하므로 그 사이에는 비어 있다.
+     *
+     * <p>타일 **차례는 이 값으로 바뀌지 않는다.** 격자에서 칸이 움직이면 늘 누르던 자리에
+     * 다른 아이가 와 있어서, 부모가 다른 아이 설정을 열게 된다.
+     */
+    val statuses: Map<String, ChildWatchStatus> = emptyMap(),
+    /**
+     * 자녀 id → 오늘 사용량. 상태와 마찬가지로 목록보다 늦게 도착한다.
+     *
+     * <p>없는 동안에는 막대를 그리지 않는다. 0% 로 그려 두면 「아직 모른다」가 「하나도 안
+     * 썼다」로 읽힌다.
+     */
+    val usages: Map<String, ChildDayUsage> = emptyMap(),
+    /**
+     * 고른 자녀가 **아직 안 걸어 둔** 설정들. 목록은 값을 적지 않고 이 빈자리만 알려 준다.
+     *
+     * <p>「5시간」인지 「3시간」인지는 들어가면 나온다. 목록에서 부모가 놓치는 것은 값이
+     * 아니라 **아예 손대지 않은 항목**이라, 그것만 짚는다.
+     */
+    val setup: ChildSetup = ChildSetup(),
     val selectedChildId: String? = null,
 ) {
     /** 화면 제목에 쓸 이름. 아직 못 불러왔으면 빈 값. */
     val selectedChildName: String
-        get() = children.firstOrNull { it.first == selectedChildId }?.second.orEmpty()
+        get() = children.firstOrNull { it.id == selectedChildId }?.name.orEmpty()
 }
+
+/**
+ * 자녀 한 명의 오늘 사용량.
+ *
+ * @param usedSeconds 오늘 쓴 시간. 앱별 집계를 합한 값이다.
+ * @param limitMinutes 하루 약속(분). null 이면 약속을 걸어 두지 않았다 — 그때는 견줄 기준이
+ *   없으므로 막대를 그리지 않고 쓴 시간만 적는다.
+ */
+data class ChildDayUsage(val usedSeconds: Int, val limitMinutes: Int?)
+
+/**
+ * 자녀별 설정이 채워져 있는지.
+ *
+ * <p>값이 **null 이면 「모른다」**다. 아직 못 불러왔거나 조회가 실패한 것을 「설정 안 함」
+ * 으로 적으면, 멀쩡히 걸어 둔 부모에게 거짓말이 된다. 모를 때는 아무 말도 하지 않는다.
+ */
+data class ChildSetup(
+    val screenTime: Boolean? = null,
+    val appControl: Boolean? = null,
+    val harmful: Boolean? = null,
+    val places: Boolean? = null,
+)
 
 /**
  * 자녀 고르기와 자녀별 설정 입구가 함께 쓰는 상태.
@@ -81,6 +137,9 @@ class ChildCareViewModel(
     private val selectedChildRepository: SelectedChildRepository,
     private val alertSync: ServerAlertSync,
     private val childWatcher: ParentChildWatcher,
+    private val appUsageRepository: AppUsageRepository,
+    private val appControlRepository: AppControlRepository,
+    private val blocklistRepository: BlocklistRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChildCareUiState())
@@ -90,20 +149,88 @@ class ChildCareViewModel(
 
     fun load() {
         viewModelScope.launch {
-            runCatching {
+            val loaded = runCatching {
                 val children = childRepository.children()
                 children to selectedChildRepository.resolveId(children)
-            }.onSuccess { (children, id) ->
+            }.getOrNull()
+            if (loaded != null) {
                 _state.update {
-                    it.copy(children = children.map { c -> c.id to c.name }, selectedChildId = id)
+                    it.copy(children = loaded.first, selectedChildId = loaded.second)
                 }
             }
             // 부모가 앱을 열 때 서버에 쌓인 알림을 당겨 오고, 자녀 상태를 지금 판정한다.
             // 15분 주기 워커를 기다리면 방금 벌어진 일을 한참 뒤에야 알게 된다.
             // 전에는 대시보드가 첫 화면이라 거기서 했는데, 이제 이 화면이 첫 화면이다.
             runCatching { alertSync.sync() }
-            runCatching { childWatcher.evaluateAll() }
+            // 판정에 드는 요청은 워처가 이미 보낸다. 방금 불러온 목록을 넘겨 같은 조회를
+            // 두 번 하지 않는다. 목록을 못 받았으면 워처가 스스로 부르게 둔다(null).
+            val known = loaded?.first ?: _state.value.children.takeIf { it.isNotEmpty() }
+            runCatching { childWatcher.evaluateAll(known) }
+                // 판정이 실패했다고 이미 그린 상태를 지우지는 않는다. 마지막으로 안 것을
+                // 그대로 두는 편이 「모름」으로 되돌아가는 것보다 낫다.
+                .onSuccess { statuses -> _state.update { it.copy(statuses = statuses) } }
+            loadUsage(known.orEmpty())
+            loadSetup()
         }
+    }
+
+    /**
+     * 고른 자녀가 안 걸어 둔 설정을 알아 온다.
+     *
+     * <p>고른 자녀 **한 명만** 본다. 목록 화면은 이 값을 쓰지 않으므로 자녀 수만큼 부르면
+     * 쓰지도 않을 요청이 늘어난다.
+     *
+     * <p>안전 구역은 워처가 판정하며 이미 세어 두었고([ChildWatchStatus.fenceCount]), 하루
+     * 약속도 [loadUsage] 가 받아 온 값에 들어 있다. 그래서 여기서 새로 묻는 것은 앱 통제와
+     * 유해사이트 둘뿐이고, 개수가 아니라 **비었는지만** 본다.
+     */
+    private suspend fun loadSetup() {
+        val childId = _state.value.selectedChildId ?: return
+        val fenceCount = _state.value.statuses[childId]?.fenceCount
+        val screenTime = _state.value.usages[childId]?.limitMinutes?.let { it > 0 }
+        val appControl = runCatching { appControlRepository.items(childId).isNotEmpty() }.getOrNull()
+        val harmful = runCatching { blocklistRepository.get(childId).isNotEmpty() }.getOrNull()
+        _state.update {
+            it.copy(
+                setup = ChildSetup(
+                    screenTime = screenTime,
+                    appControl = appControl,
+                    harmful = harmful,
+                    places = fenceCount?.let { count -> count > 0 },
+                ),
+            )
+        }
+    }
+
+    /**
+     * 자녀별 오늘 사용량과 하루 약속.
+     *
+     * <p>위치와 달리 워처가 판정에 쓰지 않는 값이라 여기서 따로 부른다. 자녀 한 명당 두
+     * 번(사용량·약속)이므로 **자녀끼리는 나란히** 보낸다 — 차례로 부르면 자녀가 셋일 때
+     * 여섯 번을 줄 세우게 된다.
+     *
+     * <p>한 명이 실패해도 나머지는 그린다. 실패한 자녀는 결과에서 빠지고, 화면은 그 줄의
+     * 막대를 그리지 않는다.
+     */
+    private suspend fun loadUsage(children: List<ChildProfile>) {
+        if (children.isEmpty()) return
+        val (from, to) = todayRange()
+        val loaded = coroutineScope {
+            children.map { child ->
+                async {
+                    runCatching {
+                        val used = appUsageRepository.list(child.id, "APP", from, to)
+                            .sumOf { it.durationSec }
+                        // 약속은 부가 정보다. 못 받아 와도 쓴 시간은 보여 준다.
+                        val limit = runCatching {
+                            appControlRepository.screenTimeLimit(child.id)
+                        }.getOrNull()
+                        child.id to ChildDayUsage(used, limit)
+                    }.getOrNull()
+                }
+            }.awaitAll().filterNotNull().toMap()
+        }
+        if (loaded.isNotEmpty()) _state.update { it.copy(usages = it.usages + loaded) }
     }
 
     /**
@@ -122,22 +249,12 @@ class ChildCareViewModel(
 }
 
 /**
- * 위는 연주황, 아래로 갈수록 흰색.
- *
- * <p>자녀관리의 두 화면에서 시작해 마이페이지·지갑까지 같은 바탕을 쓴다. 주황 그라데이션
- * 헤더를 걷어낸 자리를 대신하는 것이라, 새 화면을 만들 때도 이걸 쓴다.
- */
-internal fun warmBackground(top: Color, bottom: Color): Brush =
-    Brush.verticalGradient(0f to top, 0.55f to bottom, 1f to bottom)
-
-/**
  * 자녀 고르기. 자녀관리 탭의 첫 화면이다.
  *
  * <p>부모 설정은 거의 전부 자녀 한 명 기준이다. 전에는 화면 위 칩으로 자녀를 바꿨는데,
  * 칩은 눈에 잘 띄지 않아 다른 아이 설정을 건드리기 쉬웠다. 누구의 설정을 여는지 먼저
  * 고르게 하면 그 실수가 생기지 않는다.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ParentChildrenScreen(
     onOpenChild: () -> Unit = {},
@@ -164,7 +281,7 @@ fun ParentChildrenScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(warmBackground(colors.brandLight, colors.card))
+            .background(colors.card)
             .statusBarsPadding(),
     ) {
         Text(
@@ -182,7 +299,7 @@ fun ParentChildrenScreen(
             fontSize = 13.sp,
         )
 
-        // 남은 자리를 다 차지해서 칸들이 화면 한가운데 놓이게 한다. 제목 바로 아래에
+        // 남은 자리를 다 차지해서 줄들이 화면 한가운데 놓이게 한다. 제목 바로 아래에
         // 붙여 두면 아래쪽이 텅 비어 화면이 미완성처럼 보인다.
         Box(
             modifier = Modifier
@@ -190,86 +307,284 @@ fun ParentChildrenScreen(
                 .fillMaxWidth(),
             contentAlignment = Alignment.Center,
         ) {
-            // 가운데로 모아 한 줄에 둘씩. 하나면 가운데 하나, 셋이면 아래 줄로 접힌다.
-            FlowRow(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                maxItemsInEachRow = 2,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                state.children.forEach { (id, name) ->
-                    ChildTile(name = name) { viewModel.selectChild(id, onOpenChild) }
+                state.children.forEach { child ->
+                    ChildRow(
+                        child = child,
+                        status = state.statuses[child.id],
+                        usage = state.usages[child.id],
+                    ) { viewModel.selectChild(child.id, onOpenChild) }
                 }
-                AddChildTile(onClick = onAddChild)
+                AddChildRow(onClick = onAddChild)
             }
         }
     }
 }
 
 /**
- * 자녀 한 명을 나타내는 정사각 칸.
+ * 자녀 한 명을 나타내는 가로 줄.
  *
- * <p>목록 줄로 늘어놓으면 자녀가 설정 항목처럼 보인다. 정사각형으로 세워 두면 "누구"를
- * 고르는 화면이라는 것이 먼저 읽힌다.
+ * <p>전에는 정사각 칸이었다. 칸이 좁아 상태를 11자에서 잘라야 했고, 그 탓에 구역 밖일 때
+ * 시각을 버렸다. 가로로 눕히면 「안전 구역 밖 · 12분 전」이 한 줄에 들어가고, 남는 폭에
+ * 오늘 사용량 막대까지 들어간다.
+ *
+ * <p>부모가 앱을 여는 이유는 두 가지다 — 어디 있나, 얼마나 썼나. 한 줄이 둘 다 답한다.
+ * 얼굴 옆 점은 위치가 지금도 들어오는지를 말한다.
  */
 @Composable
-private fun ChildTile(name: String, onClick: () -> Unit) {
+private fun ChildRow(
+    child: ChildProfile,
+    status: ChildWatchStatus?,
+    usage: ChildDayUsage?,
+    onClick: () -> Unit,
+) {
     val colors = LocalKidhackColors.current
-    Column(
+    Row(
         modifier = Modifier
-            .width(TILE_SIZE)
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(20.dp))
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
             .background(colors.card)
-            .border(1.dp, colors.border.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
+            .border(1.dp, colors.border.copy(alpha = 0.6f), RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(contentAlignment = Alignment.BottomEnd) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(colors.brandLight),
+                contentAlignment = Alignment.Center,
+            ) {
+                val photo = child.profileImageUrl
+                if (photo.isNullOrBlank()) {
+                    Text(text = "👦", fontSize = 28.sp)
+                } else {
+                    AsyncImage(
+                        model = photo,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+            }
+            // 위치가 지금도 들어오는지. 흰 테두리를 둘러야 어떤 사진 위에서도 점으로 보인다.
+            Box(
+                modifier = Modifier
+                    .size(15.dp)
+                    .clip(CircleShape)
+                    .background(colors.card)
+                    .padding(2.5.dp)
+                    .clip(CircleShape)
+                    .background(if (status?.connected == true) colors.safe else DotOffline),
+            )
+        }
+
+        Spacer(Modifier.width(14.dp))
+
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = child.name,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 15.sp,
+                    color = colors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.width(8.dp))
+                val attention = status?.outsideFence == true
+                Text(
+                    text = rowStatus(status),
+                    modifier = Modifier.weight(1f, fill = false),
+                    fontFamily = KidhackFontFamily,
+                    // 색만으로 알리면 색을 구별하기 어려운 부모에게는 없는 것과 같다. 구역
+                    // 밖일 때는 글자 굵기로도 함께 말한다.
+                    fontWeight = if (attention) FontBold else FontSemibold,
+                    fontSize = 11.5.sp,
+                    color = if (attention) colors.brandDark else colors.muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.height(9.dp))
+            UsageBar(usage)
+        }
+
+        Text(text = "›", color = colors.muted, fontSize = 20.sp)
+    }
+}
+
+/**
+ * 오늘 사용량 막대.
+ *
+ * <p>아직 못 받아 왔으면 회색 자리만 둔다. 0% 막대로 그리면 「아직 모른다」가 「하나도 안
+ * 썼다」로 읽히고, 자리를 아예 비우면 값이 도착할 때 줄 높이가 튄다.
+ */
+@Composable
+private fun UsageBar(usage: ChildDayUsage?) {
+    val colors = LocalKidhackColors.current
+    if (usage == null) {
+        Box(
+            Modifier
+                .fillMaxWidth(0.45f)
+                .height(11.dp)
+                .clip(RoundedCornerShape(99.dp))
+                .background(colors.surface),
+        )
+        Spacer(Modifier.height(5.dp))
+        Text(
+            text = stringResource(R.string.parent_childcare_row_loading),
+            color = colors.muted.copy(alpha = 0.6f),
+            fontSize = 10.5.sp,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontSemibold,
+        )
+        return
+    }
+
+    val limitMinutes = usage.limitMinutes
+    // 약속을 안 걸어 뒀으면 견줄 기준이 없다. 막대 없이 쓴 시간만 적는다 — 기준 없는
+    // 막대는 얼마나 남았는지 말하는 것처럼 보이지만 실제로는 아무것도 말하지 않는다.
+    if (limitMinutes == null || limitMinutes <= 0) {
+        Text(
+            text = stringResource(
+                R.string.parent_childcare_row_used_only,
+                usageLabel(usage.usedSeconds),
+            ),
+            color = colors.muted,
+            fontSize = 10.5.sp,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontSemibold,
+        )
+        return
+    }
+
+    val usedMinutes = usage.usedSeconds / SECONDS_PER_MINUTE
+    val over = usedMinutes >= limitMinutes
+    val ratio = (usedMinutes.toFloat() / limitMinutes).coerceIn(0f, 1f)
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(6.dp)
+            .clip(RoundedCornerShape(99.dp))
+            .background(colors.brandLight),
     ) {
         Box(
-            modifier = Modifier
-                .size(64.dp)
+            Modifier
+                .fillMaxWidth(ratio)
+                .height(6.dp)
                 .clip(RoundedCornerShape(99.dp))
-                .background(colors.brandLight),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text = "👦", fontSize = 32.sp)
-        }
-        Spacer(Modifier.height(12.dp))
+                .background(if (over) colors.danger else colors.brand),
+        )
+    }
+    Spacer(Modifier.height(5.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(
-            text = name,
+            text = stringResource(
+                R.string.parent_childcare_row_used,
+                usageLabel(usage.usedSeconds),
+            ),
+            color = if (over) colors.danger else colors.muted,
+            fontSize = 10.5.sp,
             fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 15.sp,
-            color = colors.text,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            fontWeight = FontSemibold,
+        )
+        Text(
+            text = if (over) {
+                stringResource(R.string.parent_childcare_row_promise_over)
+            } else {
+                stringResource(
+                    R.string.parent_childcare_row_promise,
+                    usageLabel(limitMinutes * SECONDS_PER_MINUTE),
+                )
+            },
+            color = colors.muted,
+            fontSize = 10.5.sp,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontSemibold,
         )
     }
 }
 
-/** 자녀를 더 잇는 칸. 크기는 같지만 비워 두어 자녀 칸보다 눈에 덜 걸리게 한다. */
+/** 「1시간 22분」. 1분이 안 되면 초로 — 분으로 자르면 쓴 앱이 있는데 0분으로 보인다. */
+private fun usageLabel(totalSeconds: Int): String {
+    if (totalSeconds < SECONDS_PER_MINUTE) return totalSeconds.toString() + "초"
+    val minutes = totalSeconds / SECONDS_PER_MINUTE
+    val hours = minutes / MINUTES_PER_HOUR.toInt()
+    val rest = minutes % MINUTES_PER_HOUR.toInt()
+    return when {
+        hours > 0 && rest > 0 -> hours.toString() + "시간 " + rest + "분"
+        hours > 0 -> hours.toString() + "시간"
+        else -> minutes.toString() + "분"
+    }
+}
+
+private const val SECONDS_PER_MINUTE = 60
+
+/**
+ * 이름 옆에 붙는 지금 상태.
+ *
+ * <p>가로 줄이라 정사각 칸과 달리 「어디 · 언제」를 끝까지 담을 수 있다. 구역 밖일 때도
+ * 시각을 함께 말한다 — 12분 전과 두 시간 전은 부모가 할 일이 다르다.
+ */
 @Composable
-private fun AddChildTile(onClick: () -> Unit) {
+private fun rowStatus(status: ChildWatchStatus?): String {
+    val age = status?.ageMinutes ?: return stringResource(R.string.parent_childcare_tile_no_location)
+    if (status.stale) return stringResource(R.string.parent_childcare_tile_disconnected)
+    if (status.outsideFence) {
+        return stringResource(
+            R.string.parent_childcare_tile_place,
+            stringResource(R.string.parent_childcare_tile_outside),
+            ageText(age),
+        )
+    }
+    val place = status.placeName?.takeIf { it.isNotBlank() }
+    // 안전 구역을 하나도 등록하지 않았으면 말할 수 있는 것은 시각뿐이다.
+    return if (place == null) ageText(age)
+    else stringResource(R.string.parent_childcare_tile_place, place, ageText(age))
+}
+
+/** 「4분 전」. 기기 시계가 앞서 있으면 음수가 나오므로 그것도 「방금」으로 본다. */
+@Composable
+private fun ageText(minutes: Long): String = when {
+    minutes < 1 -> stringResource(R.string.parent_childcare_age_now)
+    minutes < MINUTES_PER_HOUR -> stringResource(R.string.parent_childcare_age_min, minutes.toInt())
+    minutes < MINUTES_PER_DAY ->
+        stringResource(R.string.parent_childcare_age_hour, (minutes / MINUTES_PER_HOUR).toInt())
+    else -> stringResource(R.string.parent_childcare_age_day, (minutes / MINUTES_PER_DAY).toInt())
+}
+
+private const val MINUTES_PER_HOUR = 60L
+private const val MINUTES_PER_DAY = 60L * 24
+
+/** 위치가 끊겼을 때의 점. 경고가 아니라 「모른다」라서 색상(hue)을 주지 않는다. */
+private val DotOffline = Color(0xFFC2C6CC)
+
+/** 자녀를 더 잇는 줄. 자녀 줄과 폭은 같지만 비워 두어 눈에 덜 걸리게 한다. */
+@Composable
+private fun AddChildRow(onClick: () -> Unit) {
     val colors = LocalKidhackColors.current
-    Column(
+    Row(
         modifier = Modifier
-            .width(TILE_SIZE)
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(20.dp))
-            .border(1.dp, colors.border, RoundedCornerShape(20.dp))
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, colors.border, RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+            .padding(vertical = 15.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = "+", color = colors.muted, fontSize = 30.sp)
-        Spacer(Modifier.height(6.dp))
         Text(
-            text = stringResource(R.string.parent_childcare_add_child),
+            text = stringResource(R.string.parent_childcare_add_child_row),
             fontFamily = KidhackFontFamily,
             fontWeight = FontBold,
             fontSize = 13.sp,
@@ -278,22 +593,26 @@ private fun AddChildTile(onClick: () -> Unit) {
     }
 }
 
-/** 칸 한 변. 두 개가 나란히 서고도 좌우 여백이 남는 크기. */
-private val TILE_SIZE = 152.dp
-
 /** 한 줄이 담는 것. 화면 본문에서 목록만 읽히도록 항목을 값으로 뺐다. */
 private data class CareItem(
-    val icon: String,
-    val tint: Color,
+    @DrawableRes val icon: Int,
     val titleRes: Int,
+    /**
+     * 이 설정이 채워져 있는지. null 이면 모르거나 「설정」이라는 개념이 없는 항목이다
+     * (사용 리포트처럼 보기만 하는 것). false 일 때만 줄 오른쪽에 「설정 안 함」이 붙는다.
+     */
+    val configured: Boolean? = null,
     val onClick: () -> Unit,
 )
 
 /** 묶음 하나. 레퍼런스처럼 작은 회색 이름 아래 카드 한 장으로 묶인다. */
 private data class CareGroup(val titleRes: Int, val items: List<CareItem>)
 
-// 항목을 구별하는 파스텔 배경. 글자만 늘어놓으면 어느 줄이 무엇인지 매번 읽어야 한다.
 // 부모 화면 전체가 같은 색을 써야 같은 뜻으로 읽히므로 패키지 안에서 함께 쓴다.
+//
+// 자녀 설정 목록은 더 이상 이 색들을 쓰지 않는다. 줄마다 색을 달리 주면 색이 뜻을 나르는
+// 것처럼 보이는데 실제로는 아무것도 가리키지 않아서, 자동으로 채운 화면처럼 읽혔다.
+// 지금은 아이콘 칸을 브랜드 한 가지 톤으로 통일한다. 지갑 화면은 이 색들을 계속 쓴다.
 internal val TintOrange = Color(0xFFFFE8D2)
 internal val TintBlue = Color(0xFFDCEBFF)
 internal val TintGreen = Color(0xFFD8F3E3)
@@ -334,39 +653,59 @@ fun ParentChildCareScreen(
         CareGroup(
             R.string.parent_childcare_group_status,
             listOf(
-                CareItem("📊", TintOrange, R.string.parent_childcare_report, onOpenReport),
-                CareItem("📱", TintBlue, R.string.parent_childcare_usage_detail, onOpenUsageDetail),
+                CareItem(R.drawable.ic_report, R.string.parent_childcare_report, onClick = onOpenReport),
+                CareItem(R.drawable.ic_apps, R.string.parent_childcare_usage_detail, onClick = onOpenUsageDetail),
             ),
         ),
         CareGroup(
             R.string.parent_childcare_group_promise,
             listOf(
-                CareItem("⏰", TintYellow, R.string.parent_childcare_screentime, onOpenScreenTime),
-                CareItem("🔒", TintPurple, R.string.parent_childcare_appcontrol, onOpenAppControl),
+                CareItem(
+                    R.drawable.ic_clock,
+                    R.string.parent_childcare_screentime,
+                    state.setup.screenTime,
+                    onOpenScreenTime,
+                ),
+                CareItem(
+                    R.drawable.ic_lock,
+                    R.string.parent_childcare_appcontrol,
+                    state.setup.appControl,
+                    onOpenAppControl,
+                ),
             ),
         ),
         CareGroup(
             R.string.parent_childcare_group_screen,
             listOf(
-                CareItem("📸", TintPink, R.string.parent_childcare_screenshot, onOpenScreenshot),
+                CareItem(R.drawable.ic_capture, R.string.parent_childcare_screenshot, onClick = onOpenScreenshot),
             ),
         ),
     )
     val safetyGroups = listOf(
         CareGroup(
             R.string.parent_childcare_group_online,
-            listOf(CareItem("🚫", TintPink, R.string.parent_childcare_harmful, onOpenHarmful)),
+            listOf(CareItem(
+                    R.drawable.ic_shield,
+                    R.string.parent_childcare_harmful,
+                    state.setup.harmful,
+                    onOpenHarmful,
+                )),
         ),
         CareGroup(
             R.string.parent_childcare_group_place,
-            listOf(CareItem("📍", TintGreen, R.string.parent_childcare_geofence, onOpenGeofence)),
+            listOf(CareItem(
+                    R.drawable.ic_place,
+                    R.string.parent_childcare_geofence,
+                    state.setup.places,
+                    onOpenGeofence,
+                )),
         ),
     )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(warmBackground(colors.brandLight, colors.card))
+            .background(colors.card)
             .statusBarsPadding(),
     ) {
         Row(
@@ -490,12 +829,18 @@ private fun CareRow(item: CareItem) {
     ) {
         Box(
             modifier = Modifier
-                .size(30.dp)
+                .size(32.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(item.tint),
+                .background(colors.brandLight),
             contentAlignment = Alignment.Center,
         ) {
-            Text(text = item.icon, fontSize = 15.sp)
+            Icon(
+                painter = painterResource(item.icon),
+                // 아이콘 옆에 이름이 그대로 있다. 읽어 줄 것을 두 번 말하지 않는다.
+                contentDescription = null,
+                modifier = Modifier.size(19.dp),
+                tint = colors.brandDark,
+            )
         }
         Spacer(Modifier.width(12.dp))
         Text(
@@ -506,6 +851,18 @@ private fun CareRow(item: CareItem) {
             fontSize = 14.sp,
             color = colors.text,
         )
+        // 값을 적지 않고 빈자리만 알린다. 잘 걸어 둔 줄까지 글자를 붙이면 여섯 줄이 모두
+        // 오른쪽에 무언가를 달고 있어 목록이 빽빽해진다.
+        if (item.configured == false) {
+            Text(
+                text = stringResource(R.string.parent_childcare_not_set),
+                modifier = Modifier.padding(end = 8.dp),
+                color = colors.muted.copy(alpha = 0.75f),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontSemibold,
+                fontSize = 12.sp,
+            )
+        }
         Text(text = "›", color = colors.muted, fontSize = 18.sp)
     }
 }

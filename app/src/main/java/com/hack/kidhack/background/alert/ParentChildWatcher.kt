@@ -25,6 +25,36 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
+ * 자녀 한 명의 「지금」. [ParentChildWatcher.evaluateAll] 판정의 부산물이다.
+ *
+ * <p>화면이 따로 계산하지 않고 이 값을 그대로 그린다. 그래야 알림과 화면이 언제나 같은
+ * 근거를 말한다 — 알림은 「안전 구역 이탈」인데 타일은 「집」이라고 하는 일이 없다.
+ * 판정에 드는 요청은 [ParentChildWatcher] 가 이미 보내므로 화면이 더 부를 것은 없다.
+ */
+data class ChildWatchStatus(
+    val childId: String,
+    /** 지금 들어와 있는 안전 구역 이름. 밖이거나 등록된 구역이 없으면 null. */
+    val placeName: String? = null,
+    /** 등록된 안전 구역이 있는데 그 어디에도 없다. 좌표를 못 읽어 판정을 건너뛴 경우는 false. */
+    val outsideFence: Boolean = false,
+    /** 마지막 위치를 받은 지 몇 분 됐는지. 위치를 한 번도 못 받았으면 null. */
+    val ageMinutes: Long? = null,
+    /** 위치 갱신이 30분 넘게 끊겼다. */
+    val stale: Boolean = false,
+    /**
+     * 등록된 안전 구역 수. 좌표를 못 읽어 구역을 조회하지 못했으면 null(모름)이다.
+     *
+     * <p>판정하느라 어차피 부르는 값이라 화면이 따로 물을 필요가 없다. 「모름」과 「없음」을
+     * 나눠 두는 이유는, 못 불러온 것을 「하나도 등록 안 함」으로 적으면 멀쩡히 등록해 둔
+     * 부모에게 거짓말이 되기 때문이다.
+     */
+    val fenceCount: Int? = null,
+) {
+    /** 위치가 지금도 들어오고 있는지. 타일의 연결 점이 이 값으로 켜지고 꺼진다. */
+    val connected: Boolean = ageMinutes != null && !stale
+}
+
+/**
  * 보호자 앱이 **스스로** 자녀 상태를 판정해 알림을 만든다.
  *
  * 자녀 기기와 보호자 기기는 서로를 직접 볼 수 없다. 원래대로라면 자녀가 보고한 사건을
@@ -56,24 +86,45 @@ class ParentChildWatcher(
     private val alertSync: ServerAlertSync,
 ) {
 
-    suspend fun evaluateAll() {
-        val children = runCatching { childRepository.children() }.getOrNull().orEmpty()
-        children.forEach { child -> runCatching { evaluate(child) } }
+    /**
+     * 자녀 전원을 판정하고 **자녀 id → 지금 상태**를 돌려준다.
+     *
+     * 한 명이 실패해도 나머지는 판정한다. 실패한 자녀는 결과에서 빠진다.
+     *
+     * @param children 이미 불러 둔 자녀 목록. 넘기지 않으면 여기서 부른다(주기 워커).
+     *   화면은 자기가 그리려고 이미 부른 목록을 넘겨서 같은 조회를 두 번 하지 않는다.
+     */
+    suspend fun evaluateAll(children: List<ChildProfile>? = null): Map<String, ChildWatchStatus> {
+        val targets = children ?: runCatching { childRepository.children() }.getOrNull().orEmpty()
+        return targets.mapNotNull { child ->
+            runCatching { child.id to evaluate(child) }.getOrNull()
+        }.toMap()
     }
 
-    private suspend fun evaluate(child: ChildProfile) {
+    private suspend fun evaluate(child: ChildProfile): ChildWatchStatus {
         // 자녀 기기가 직접 올린 사건이 가장 정확하다. 파생 판정보다 먼저 처리해
         // 같은 사건이 두 경로로 두 번 울리지 않게 한다.
         relayChildAlerts(child)
         val location = runCatching { locationRepository.history(child.id).firstOrNull() }.getOrNull()
+        var status = ChildWatchStatus(childId = child.id)
         if (location != null) {
             val fences = runCatching { placeRepository.list(child.id) }.getOrNull().orEmpty()
-            checkGeofence(child, location, fences)
-            checkLocationFreshness(child, location)
+            val fence = checkGeofence(child, location, fences)
+            val ageMinutes = parseInstant(location.recordedAt)
+                ?.let { (System.currentTimeMillis() - it) / 60_000L }
+            status = ChildWatchStatus(
+                childId = child.id,
+                placeName = (fence as? FenceResult.Inside)?.fence?.name,
+                outsideFence = fence is FenceResult.Outside,
+                ageMinutes = ageMinutes,
+                stale = checkLocationFreshness(child, ageMinutes),
+                fenceCount = fences.size,
+            )
         }
         val (usageFrom, usageTo) = todayRange()
         val usages = runCatching { appUsageRepository.list(child.id, "APP", usageFrom, usageTo) }.getOrNull()
         if (usages != null) checkUsage(child, usages)
+        return status
     }
 
     /**
@@ -107,14 +158,30 @@ class ParentChildWatcher(
         }
     }
 
+    /**
+     * 안전 구역 판정 결과.
+     *
+     * <p>「밖」과 「판정 못 함」을 반드시 구분한다. 등록된 구역이 없거나 좌표를 읽지 못한
+     * 것을 「밖」으로 뭉뚱그리면, 아무 잘못 없는 자녀 타일에 경고가 뜬다.
+     */
+    private sealed interface FenceResult {
+        /** 등록된 구역이 없거나 좌표를 읽지 못했다. */
+        data object Unknown : FenceResult
+
+        /** 등록된 구역이 있는데 어디에도 들어 있지 않다. */
+        data object Outside : FenceResult
+
+        data class Inside(val fence: Geofence) : FenceResult
+    }
+
     private suspend fun checkGeofence(
         child: ChildProfile,
         location: LocationPoint,
         fences: List<Geofence>,
-    ) {
-        if (fences.isEmpty()) return
-        val lat = location.lat.toDoubleOrNull() ?: return
-        val lng = location.lng.toDoubleOrNull() ?: return
+    ): FenceResult {
+        if (fences.isEmpty()) return FenceResult.Unknown
+        val lat = location.lat.toDoubleOrNull() ?: return FenceResult.Unknown
+        val lng = location.lng.toDoubleOrNull() ?: return FenceResult.Unknown
 
         val inside = fences.firstOrNull { fence ->
             val fLat = fence.lat.toDoubleOrNull()
@@ -137,7 +204,7 @@ class ParentChildWatcher(
                 )
             }
             store.setOutside(child.id, true)
-            return
+            return FenceResult.Outside
         }
 
         if (wasOutside) {
@@ -151,6 +218,7 @@ class ParentChildWatcher(
             }
             store.setOutside(child.id, false)
         }
+        return FenceResult.Inside(inside)
     }
 
     /**
@@ -159,12 +227,14 @@ class ParentChildWatcher(
      * 「갱신이 끊겼다」로 쓴다 — 실제로는 기기 꺼짐·네트워크 문제일 수도 있다.
      *
      * `recordedAt` 형식이 ISO-8601 이 아니면 판정을 건너뛴다(추측해서 틀린 알림을 보내지 않는다).
+     *
+     * @param ageMinutes 마지막 위치를 받은 지 몇 분 됐는지. 시각을 읽지 못했으면 null.
+     * @return 지금 끊긴 상태인지. 판정하지 못했으면 false.
      */
-    private suspend fun checkLocationFreshness(child: ChildProfile, location: LocationPoint) {
-        val recordedAt = parseInstant(location.recordedAt) ?: return
-        val ageMinutes = (System.currentTimeMillis() - recordedAt) / 60_000L
+    private suspend fun checkLocationFreshness(child: ChildProfile, ageMinutes: Long?): Boolean {
+        if (ageMinutes == null) return false
         val stale = ageMinutes >= STALE_MINUTES
-        if (stale == store.wasStale(child.id)) return
+        if (stale == store.wasStale(child.id)) return stale
         if (stale) {
             alertSync.emitLocal(
                 type = "GPS_OFF",
@@ -175,6 +245,7 @@ class ParentChildWatcher(
             )
         }
         store.setStale(child.id, stale)
+        return stale
     }
 
     private suspend fun checkUsage(child: ChildProfile, usages: List<AppUsageStat>) {

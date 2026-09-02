@@ -262,7 +262,7 @@ fun ParentMypageScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(warmBackground(colors.brandLight, colors.card))
+            .background(colors.card)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 16.dp),

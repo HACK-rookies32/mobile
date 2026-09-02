@@ -369,7 +369,7 @@ val appModule = module {
     viewModel { RegisterViewModel(get(), get(), get(), get(), get(), get(), androidContext()) }
     viewModel { ForgotViewModel(get()) }
 
-    viewModel { ChildCareViewModel(get(), get(), get(), get()) }
+    viewModel { ChildCareViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ReportViewModel(get(), get(), get(), get(), get()) }
     viewModel { AppUsageDetailViewModel(get(), get(), get()) }
     viewModel { LocationViewModel(get(), get(), get(), get(), get()) }
