@@ -111,18 +111,28 @@ fun RegisterScreen(
 
     AuthScaffold(
         header = {
-            Text("회원가입", color = Color.White, fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 24.sp)
-            Text("루키즈 가족이 되어보세요", color = Color.White.copy(alpha = 0.75f), fontSize = 14.sp)
-            if (role != null) {
-                Spacer(Modifier.height(16.dp))
-                val total = if (role == Role.CHILD) 5 else 3
-                val current = if (role == Role.CHILD) {
-                    (state.step - 1).coerceIn(0, total - 1)
-                } else {
-                    state.step.coerceAtMost(total - 1)
-                }
-                StepProgressBar(totalSteps = total, currentStep = current)
-            }
+            // 역할을 고르기 전에는 몇 단계인지 알 수 없다(부모 3, 자녀 5). 칸 수가 도중에
+            // 바뀌면 진행이 되감긴 것처럼 보이므로, 역할이 정해진 뒤의 칸 수를 쓴다.
+            val labels = stepLabels(role)
+            val current = state.step.coerceIn(0, labels.lastIndex)
+            StepProgressBar(totalSteps = labels.size, currentStep = current)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "${current + 1} / ${labels.size} · ${labels[current]}",
+                color = colors.brandDark,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 11.5.sp,
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                text = headerTitle(role, state.step, onDoneStep),
+                color = colors.text,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBlack,
+                fontSize = 23.sp,
+            )
+            Spacer(Modifier.height(10.dp))
         },
     ) {
         when {
@@ -156,49 +166,77 @@ fun RegisterScreen(
 @Composable
 private fun RoleStep(onParent: () -> Unit, onChild: () -> Unit, onLogin: () -> Unit) {
     val colors = LocalKidhackColors.current
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Text("어떤 분이세요?", fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 24.sp, color = colors.text)
-        Text("역할에 맞게 앱이 설정돼요", color = colors.muted, fontSize = 14.sp)
-    }
-    RoleCard("🛡️", "부모님", "자녀 위치·앱·유해사이트 모니터링,\n채팅, 루키즈 페이 등을 사용해요", onParent)
-    RoleCard("😊", "자녀", "부모님과 채팅, 내 보호 서비스 현황\n확인, 카메라 사용 등을 해요", onChild)
+    Text("역할에 따라 쓸 수 있는 기능이 달라요.", color = colors.muted, fontSize = 13.sp)
+    RoleCard("부모", "부모님", "자녀 위치와 사용 시간을 보고\n앱·사이트를 관리해요", onParent)
+    RoleCard("자녀", "자녀", "부모님과 채팅하고\n내 보호 서비스를 확인해요", onChild)
+    Spacer(Modifier.height(8.dp))
     Text(
         "이미 계정이 있으신가요? 로그인",
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onLogin),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onLogin).padding(vertical = 8.dp),
         textAlign = TextAlign.Center,
         color = colors.muted,
-        fontSize = 14.sp,
+        fontSize = 13.sp,
     )
 }
 
+/**
+ * 진행 바 칸마다 붙는 이름.
+ *
+ * <p>두 역할 모두 **역할 선택을 첫 칸으로 센다.** 자녀 쪽에서 그 칸을 빼면 역할을 고른
+ * 순간 「1 / 3 · 역할 선택」이 「1 / 5 · 정보 입력」으로 바뀌어, 한 걸음 나아갔는데 번호가
+ * 1로 되돌아간 것처럼 보인다.
+ */
+private fun stepLabels(role: Role?): List<String> = when (role) {
+    Role.CHILD -> listOf("역할 선택", "정보 입력", "부모님 연결", "약관 동의", "권한 허용")
+    else -> listOf("역할 선택", "정보 입력", "약관 동의")
+}
+
+/** 화면 제목. 단계마다 지금 할 일을 그대로 말한다. */
+private fun headerTitle(role: Role?, step: Int, done: Boolean): String = when {
+    done -> "가입이 끝났어요"
+    role == null -> "어떤 분이세요?"
+    step == 1 && role == Role.PARENT -> "부모님 계정을 만들어요"
+    step == 1 -> "자녀 계정을 만들어요"
+    step == 2 && role == Role.CHILD -> "부모님과 연결해요"
+    else -> "약관에 동의해 주세요"
+}
+
 @Composable
-private fun RoleCard(emoji: String, title: String, desc: String, onClick: () -> Unit) {
+private fun RoleCard(badge: String, title: String, desc: String, onClick: () -> Unit) {
     val colors = LocalKidhackColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(Color.White)
-            .border(2.dp, colors.border, RoundedCornerShape(16.dp))
+            .border(1.dp, colors.border, RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(20.dp),
+            .padding(17.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 이모지 대신 글자 표식. 이모지는 기기마다 크기·여백이 달라 카드 높이가 흔들린다.
         Box(
             modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(colors.brandLight),
             contentAlignment = Alignment.Center,
         ) {
-            Text(emoji, fontSize = 28.sp)
+            Text(
+                text = badge,
+                color = colors.brandDark,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 13.sp,
+            )
         }
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 18.sp, color = colors.text)
-            Text(desc, color = colors.muted, fontSize = 12.sp)
+            Text(title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 15.sp, color = colors.text)
+            Spacer(Modifier.height(3.dp))
+            Text(desc, color = colors.muted, fontSize = 11.5.sp, lineHeight = 16.sp)
         }
-        Text("›", color = colors.border, fontSize = 20.sp)
+        Text("›", color = colors.muted, fontSize = 19.sp)
     }
 }
 
@@ -212,7 +250,6 @@ private fun InfoStep(
     viewModel: RegisterViewModel,
 ) {
     val colors = LocalKidhackColors.current
-    Text(badge, color = colors.brandDark, fontWeight = FontBold, fontSize = 14.sp)
     KidTextField(state.loginId, viewModel::onLoginId, "아이디", placeholder = "로그인에 사용할 아이디")
     KidTextField(state.realName, viewModel::onRealName, "이름", placeholder = "이름을 입력하세요")
     KidTextField(

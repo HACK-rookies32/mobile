@@ -452,7 +452,7 @@ fun ParentWalletScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(warmBackground(colors.brandLight, colors.card))
+            .background(colors.card)
             .statusBarsPadding(),
     ) {
         ReportTitleBar(title = stringResource(R.string.parent_wallet_title), onBack = onBack)
