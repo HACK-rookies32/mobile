@@ -2,10 +2,11 @@ package com.hack.kidhack.feature.parent
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,12 +14,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,8 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -41,10 +47,11 @@ import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
-import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.KidTextField
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
+import com.hack.kidhack.core.designsystem.theme.FontSemibold
+import com.hack.kidhack.core.designsystem.theme.KidLineBreak
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.Card
@@ -146,124 +153,340 @@ class CardViewModel(
 }
 
 @OptIn(ExperimentalFoundationApi::class)
+/**
+ * 카드 관리.
+ *
+ * <p>카드 그림을 브랜드색 그라데이션으로 칠하고 있었다. 그러면 「이 앱이 발급한 카드」처럼
+ * 보이는데, 실제로는 사용자가 등록한 남의 카드다. 먹색 한 장으로 둔다.
+ *
+ * <p>삭제가 <b>길게 누르기</b>였다. 알아낼 방법이 없어 카드 오른쪽 위 「더 보기」로 꺼냈다.
+ */
 @Composable
 fun ParentCardsScreen(
     onBack: () -> Unit = {},
-    viewModel: CardViewModel = koinViewModel()
+    onOpenWallet: () -> Unit = {},
+    viewModel: CardViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
     var deleteCardId by remember { mutableStateOf<String?>(null) }
 
-    ParentScreenScaffold(
-        header = { ParentHeaderBar("카드 관리", onBack) }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.card)
+            .statusBarsPadding(),
     ) {
-        ParentLoadingOrError(state.loading && state.items.isEmpty(), state.error, viewModel::load)
-
-        if (!state.loading && state.items.isEmpty() && !state.adding) {
-            Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                Text("등록된 카드가 없어요", color = colors.muted)
-            }
-        }
-
-        state.items.forEach { card ->
-            KidCard(
-                modifier = Modifier.combinedClickable(
-                    onClick = {},
-                    onLongClick = { deleteCardId = card.cardId }
-                )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Brush.linearGradient(listOf(colors.brand, colors.brandDark)))
-                        .padding(24.dp)
-                ) {
-                    Column(Modifier.fillMaxSize()) {
-                        Text("ROOKIES PAY", color = Color.White.copy(alpha = 0.8f), fontWeight = FontBold, fontSize = 12.sp)
-                        Spacer(Modifier.height(12.dp))
-                        Box(Modifier.size(40.dp, 28.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.3f)))
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            text = "**** **** **** ${card.last4}",
-                            color = Color.White,
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontBold,
-                            fontSize = 20.sp,
-                            letterSpacing = 2.sp
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(card.ownerName, color = Color.White, fontSize = 14.sp)
-                            Text(card.expiry, color = Color.White, fontSize = 14.sp)
-                        }
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { deleteCardId = card.cardId }) {
-                        Text("삭제", color = colors.danger, fontWeight = FontBold)
-                    }
-                }
+                Text("\u2039", color = colors.text, fontSize = 26.sp)
             }
+            Text(
+                stringResource(R.string.parent_cards_title),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 16.sp,
+                color = colors.text,
+            )
         }
 
-        if (state.adding) {
-            KidCard {
-                Column(Modifier.fillMaxWidth().padding(8.dp)) {
-                    Text("새 카드 등록", fontWeight = FontBlack, fontSize = 18.sp, color = colors.text)
-                    Spacer(Modifier.height(16.dp))
-                    
-                    KidTextField(state.cardNumber, viewModel::onCardNumber, "카드번호", placeholder = "16자리 숫자", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        KidTextField(state.expiry, viewModel::onExpiry, "유효기간", placeholder = "MM/YY", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                        KidTextField(state.cvc, viewModel::onCvc, "CVC", placeholder = "3자리", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    }
-                    
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        KidTextField(state.cardPassword2, viewModel::onCardPassword2, "비밀번호", placeholder = "앞 2자리", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                        KidTextField(state.birthDate, viewModel::onBirthDate, "생년월일", placeholder = "YYMMDD", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    }
-                    
-                    KidTextField(state.ownerName, viewModel::onOwnerName, "소유자 이름", placeholder = "실명 입력")
-                    
-                    Spacer(Modifier.height(24.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        KidButton("취소", { viewModel.toggleAdding(false) }, Modifier.weight(1f), variant = KidButtonVariant.Ghost)
-                        KidButton("저장하기", viewModel::register, Modifier.weight(2f))
-                    }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Text(
+                stringResource(R.string.parent_cards_lead),
+                modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 6.dp, bottom = 18.dp),
+                color = colors.muted,
+                fontSize = 13.sp,
+                lineHeight = 21.sp,
+                style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
+            )
+
+            if (state.loading && state.items.isEmpty()) {
+                Box(Modifier.padding(horizontal = 22.dp)) {
+                    ParentLoadingOrError(true, state.error, viewModel::load)
+                }
+            } else if (state.error != null) {
+                Box(Modifier.padding(horizontal = 22.dp)) {
+                    ParentLoadingOrError(false, state.error, viewModel::load)
                 }
             }
-        } else {
-            KidButton("+ 카드 추가", { viewModel.toggleAdding(true) }, Modifier.fillMaxWidth(), variant = KidButtonVariant.Secondary)
+
+            state.items.forEach { card ->
+                CreditCard(card = card, onMore = { deleteCardId = card.cardId })
+                Spacer(Modifier.height(12.dp))
+            }
+
+            if (state.adding) {
+                AddCardForm(state = state, viewModel = viewModel)
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(colors.surface)
+                        .clickable { viewModel.toggleAdding(true) },
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_plus),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = colors.muted,
+                    )
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        stringResource(R.string.parent_cards_add),
+                        color = colors.muted,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 13.5.sp,
+                    )
+                }
+
+                Text(
+                    stringResource(R.string.parent_cards_group),
+                    modifier = Modifier.padding(start = 22.dp, top = 30.dp, bottom = 4.dp),
+                    color = colors.subtle,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 12.sp,
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 22.dp), color = colors.line)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onOpenWallet)
+                        .padding(horizontal = 22.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.parent_cards_go_wallet),
+                        modifier = Modifier.weight(1f),
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 14.5.sp,
+                        letterSpacing = (-0.25).sp,
+                        color = colors.text,
+                    )
+                    Text("\u203a", color = colors.border, fontSize = 17.sp)
+                }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 22.dp), color = colors.line)
+            }
+
+            Spacer(Modifier.height(30.dp))
         }
-        
-        Spacer(Modifier.height(16.dp))
     }
 
-    // 삭제 확인 다이얼로그
     deleteCardId?.let { id ->
         AlertDialog(
             onDismissRequest = { deleteCardId = null },
-            title = { Text("카드 삭제", fontWeight = FontBold) },
-            text = { Text("정말 이 카드를 삭제하시겠습니까?") },
+            containerColor = colors.card,
+            title = {
+                Text(
+                    stringResource(R.string.parent_cards_delete_title),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBlack,
+                    fontSize = 17.sp,
+                    color = colors.text,
+                )
+            },
+            text = {
+                Text(
+                    stringResource(R.string.parent_cards_delete_message),
+                    color = colors.muted,
+                    fontSize = 13.5.sp,
+                    lineHeight = 21.sp,
+                )
+            },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.delete(id)
-                        deleteCardId = null
-                    }
-                ) {
-                    Text("삭제", color = colors.danger, fontWeight = FontBold)
+                TextButton({ viewModel.delete(id); deleteCardId = null }) {
+                    Text(
+                        stringResource(R.string.parent_cards_delete),
+                        color = colors.danger,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                    )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { deleteCardId = null }) {
-                    Text("취소", color = colors.muted)
+                TextButton({ deleteCardId = null }) {
+                    Text(
+                        stringResource(R.string.parent_cards_cancel),
+                        color = colors.muted,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                    )
                 }
-            }
+            },
         )
+    }
+}
+
+/** 등록된 카드 한 장. 번호는 뒤 네 자리만 서버가 준다. */
+@Composable
+private fun CreditCard(card: Card, onMore: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(CardInk)
+            .padding(start = 22.dp, end = 12.dp, top = 20.dp, bottom = 18.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "ROOKIES PAY",
+                modifier = Modifier.weight(1f),
+                color = Color.White.copy(alpha = 0.5f),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 10.5.sp,
+                letterSpacing = 1.6.sp,
+            )
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onMore),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_more),
+                    contentDescription = stringResource(R.string.parent_community_more),
+                    modifier = Modifier.size(18.dp),
+                    tint = Color.White.copy(alpha = 0.6f),
+                )
+            }
+        }
+        Spacer(Modifier.height(26.dp))
+        Text(
+            text = "\u2022\u2022\u2022\u2022  \u2022\u2022\u2022\u2022  \u2022\u2022\u2022\u2022  ${card.last4}",
+            color = Color.White,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 17.sp,
+            letterSpacing = 1.4.sp,
+        )
+        Spacer(Modifier.height(15.dp))
+        Row(Modifier.fillMaxWidth().padding(end = 10.dp)) {
+            Text(
+                card.ownerName,
+                modifier = Modifier.weight(1f),
+                color = Color.White.copy(alpha = 0.65f),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontSemibold,
+                fontSize = 11.5.sp,
+            )
+            Text(
+                card.expiry,
+                color = Color.White.copy(alpha = 0.65f),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontSemibold,
+                fontSize = 11.5.sp,
+            )
+        }
+    }
+}
+
+/** 카드 그림 바탕. 브랜드 주황을 쓰면 앱이 발급한 카드처럼 보인다. */
+private val CardInk = Color(0xFF1C2026)
+
+/** 새 카드 등록 폼. */
+@Composable
+private fun ColumnScope.AddCardForm(state: CardUiState, viewModel: CardViewModel) {
+    val colors = LocalKidhackColors.current
+    val numberOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+
+    Text(
+        stringResource(R.string.parent_cards_new),
+        modifier = Modifier.padding(start = 22.dp, bottom = 6.dp),
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBlack,
+        fontSize = 17.sp,
+        color = colors.text,
+    )
+    Column(
+        modifier = Modifier.padding(horizontal = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        KidTextField(
+            state.cardNumber,
+            viewModel::onCardNumber,
+            stringResource(R.string.parent_cards_number),
+            placeholder = stringResource(R.string.parent_cards_number_hint),
+            keyboardOptions = numberOptions,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            KidTextField(
+                state.expiry,
+                viewModel::onExpiry,
+                stringResource(R.string.parent_cards_expiry),
+                placeholder = "MM/YY",
+                modifier = Modifier.weight(1f),
+                keyboardOptions = numberOptions,
+            )
+            KidTextField(
+                state.cvc,
+                viewModel::onCvc,
+                "CVC",
+                placeholder = stringResource(R.string.parent_cards_cvc_hint),
+                modifier = Modifier.weight(1f),
+                keyboardOptions = numberOptions,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            KidTextField(
+                state.cardPassword2,
+                viewModel::onCardPassword2,
+                stringResource(R.string.parent_cards_password),
+                placeholder = stringResource(R.string.parent_cards_password_hint),
+                modifier = Modifier.weight(1f),
+                keyboardOptions = numberOptions,
+            )
+            KidTextField(
+                state.birthDate,
+                viewModel::onBirthDate,
+                stringResource(R.string.parent_cards_birth),
+                placeholder = "YYMMDD",
+                modifier = Modifier.weight(1f),
+                keyboardOptions = numberOptions,
+            )
+        }
+        KidTextField(
+            state.ownerName,
+            viewModel::onOwnerName,
+            stringResource(R.string.parent_cards_owner),
+            placeholder = stringResource(R.string.parent_cards_owner_hint),
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            KidButton(
+                text = stringResource(R.string.parent_cards_cancel),
+                onClick = { viewModel.toggleAdding(false) },
+                modifier = Modifier.weight(1f),
+                variant = KidButtonVariant.Secondary,
+            )
+            KidButton(
+                text = stringResource(R.string.parent_cards_save),
+                onClick = viewModel::register,
+                modifier = Modifier.weight(2f),
+                enabled = !state.loading,
+            )
+        }
     }
 }

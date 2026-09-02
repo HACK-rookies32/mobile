@@ -30,6 +30,7 @@ import com.hack.kidhack.domain.model.QrPaymentHistoryItem
 import com.hack.kidhack.domain.model.StoreTerminalInfo
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
+import com.hack.kidhack.domain.model.ChatMessagePage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildDashboard
@@ -798,8 +799,13 @@ class FakeChatRepository(
         ChatRoom("room-jia", "이지아", "아직 대화가 없어요", "", unreadCount = 0, parentId = 1L, childId = 102L),
     )
 
-    override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> =
-        store[roomId] ?: emptyList()
+    override suspend fun messages(roomId: String, before: String?, size: Int): ChatMessagePage =
+        ChatMessagePage(
+            messages = store[roomId] ?: emptyList(),
+            // 목 데이터는 대화가 짧아 다음 장이 없다.
+            hasMore = false,
+            oldestSentAt = null,
+        )
 
     override fun observeMessages(roomId: String): Flow<ChatMessage> = incoming.asSharedFlow()
 

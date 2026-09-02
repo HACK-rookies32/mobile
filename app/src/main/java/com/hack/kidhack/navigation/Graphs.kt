@@ -249,7 +249,14 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 )
             }
         }
-        composable(Route.ParentCards.path) { ParentShell(navController) { ParentCardsScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentCards.path) {
+            ParentShell(navController) {
+                ParentCardsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenWallet = { navController.navigate(Route.ParentWallet.path) },
+                )
+            }
+        }
         // 매장 단말 테스트 화면 — 숨은 라우트(회원 앱 정상 내비게이션에 없음, 디버그/시연 전용).
         composable(Route.StoreTerminal.path) {
             StoreTerminalScreen(onBack = { navController.popBackStack() })

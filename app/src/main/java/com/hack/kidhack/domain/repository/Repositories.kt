@@ -20,6 +20,7 @@ import com.hack.kidhack.domain.model.QrPaymentHistoryItem
 import com.hack.kidhack.domain.model.StoreTerminalInfo
 import com.hack.kidhack.domain.model.Charge
 import com.hack.kidhack.domain.model.ChatMessage
+import com.hack.kidhack.domain.model.ChatMessagePage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildAlertEvent
 import com.hack.kidhack.domain.model.ChildDashboard
@@ -423,12 +424,13 @@ interface ChatRepository {
     suspend fun getOrCreateRoom(parentId: Long, childId: Long): ChatRoom
     suspend fun rooms(): List<ChatRoom>
     /**
-     * 방의 메시지를 **오래된 → 최신** 순으로. 화면이 아래를 최신으로 그린다.
+     * 방의 메시지 한 장을 **오래된 → 최신** 순으로. 화면이 아래를 최신으로 그린다.
      * (서버는 최신순으로 주고 구현에서 뒤집는다.)
      *
-     * 커서 페이징이라 [before] 에 직전 응답의 가장 오래된 시각을 넘기면 그 이전을 준다.
+     * 커서 페이징이라 [before] 에 직전 응답의 [ChatMessagePage.oldestSentAt] 을 넘기면
+     * 그 이전 장을 준다.
      */
-    suspend fun messages(roomId: String, before: String? = null, size: Int = 30): List<ChatMessage>
+    suspend fun messages(roomId: String, before: String? = null, size: Int = 30): ChatMessagePage
     fun observeMessages(roomId: String): Flow<ChatMessage>
     suspend fun send(roomId: String, content: String): ChatMessage
     suspend fun markRead(roomId: String, lastMessageId: String? = null)

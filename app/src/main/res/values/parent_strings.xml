@@ -49,6 +49,9 @@
     <string name="parent_geofence_delete">삭제</string>
     <string name="parent_geofence_radius_unit">%1$dm</string>
 
+    <string name="parent_chat_no_message">아직 대화가 없어요</string>
+    <string name="parent_chat_load_older">지난 대화 더 보기</string>
+    <string name="parent_chat_loading_older">불러오는 중…</string>
     <string name="parent_chat_title">채팅</string>
     <string name="parent_chat_input_hint">메시지 입력...</string>
     <string name="parent_chat_send">→</string>
@@ -251,6 +254,8 @@
     <string name="parent_harmful_category_count">키워드 %1$d개</string>
     <string name="parent_harmful_saving">저장 중…</string>
 
+    <string name="parent_pairing_copy">코드 복사</string>
+    <string name="parent_pairing_step">STEP %1$d / %2$d</string>
     <string name="parent_pairing_title">자녀 기기 연결</string>
     <string name="parent_pairing_install_title">자녀 기기에</string>
     <string name="parent_pairing_install_highlight">루키즈 앱을 설치해주세요</string>
@@ -304,6 +309,24 @@
 
     <string name="parent_notice_title">공지사항</string>
 
+    <string name="parent_contact_create">문의하기</string>
+    <string name="parent_contact_edit">수정</string>
+    <string name="parent_contact_delete">삭제</string>
+    <string name="parent_contact_submit">등록</string>
+    <string name="parent_contact_empty">아직 남긴 문의가 없어요</string>
+    <string name="parent_contact_load_more">이전 문의 더 보기</string>
+    <string name="parent_contact_answered">답변완료</string>
+    <string name="parent_contact_waiting">답변대기</string>
+    <string name="parent_contact_loading">불러오는 중…</string>
+    <string name="parent_contact_load_failed">문의를 불러오지 못했어요</string>
+    <string name="parent_contact_field_title">제목</string>
+    <string name="parent_contact_field_title_hint">무엇이 궁금하신가요?</string>
+    <string name="parent_contact_field_content">내용</string>
+    <string name="parent_contact_field_content_hint">겪으신 일을 자세히 적어 주시면 빠르게 도와드릴 수 있어요.</string>
+    <string name="parent_contact_field_photo">사진</string>
+    <string name="parent_contact_field_link">링크 (선택)</string>
+    <string name="parent_contact_answer_from">루키즈 고객센터</string>
+    <string name="parent_contact_received">%1$s 접수</string>
     <string name="parent_contact_title">관리자 문의</string>
 
     <string name="parent_pay_title">루키즈 페이</string>
@@ -480,4 +503,24 @@
     <string name="parent_wallet_done_refund">환불했어요.</string>
     <string name="parent_wallet_done_cancel_charge">충전 주문을 취소했어요.</string>
     <string name="parent_wallet_done_cancel_payment">결제를 취소했어요. 자녀 지갑으로 환급됐어요.</string>
+    <string name="parent_cards_title">카드 관리</string>
+    <string name="parent_cards_lead">충전할 때 쓸 카드예요. 결제는 등록된 카드로만 됩니다.</string>
+    <string name="parent_cards_add">카드 추가</string>
+    <string name="parent_cards_group">등록된 카드로 할 수 있는 일</string>
+    <string name="parent_cards_go_wallet">지갑 충전</string>
+    <string name="parent_cards_new">새 카드 등록</string>
+    <string name="parent_cards_number">카드번호</string>
+    <string name="parent_cards_number_hint">16자리 숫자</string>
+    <string name="parent_cards_expiry">유효기간</string>
+    <string name="parent_cards_cvc_hint">3자리</string>
+    <string name="parent_cards_password">비밀번호</string>
+    <string name="parent_cards_password_hint">앞 2자리</string>
+    <string name="parent_cards_birth">생년월일</string>
+    <string name="parent_cards_owner">소유자 이름</string>
+    <string name="parent_cards_owner_hint">실명 입력</string>
+    <string name="parent_cards_save">저장하기</string>
+    <string name="parent_cards_cancel">취소</string>
+    <string name="parent_cards_delete">삭제</string>
+    <string name="parent_cards_delete_title">카드를 지울까요?</string>
+    <string name="parent_cards_delete_message">지운 카드로는 충전할 수 없어요. 다시 등록하면 됩니다.</string>
 </resources>

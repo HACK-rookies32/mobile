@@ -78,7 +78,7 @@ class ChildChatViewModel(
                     ?: error("부모님이 아직 대화를 시작하지 않았어요")
                 cachedRoom = room
                 boundChildUserId = user.id
-                val messages = chatRepository.messages(room.id)
+                val messages = chatRepository.messages(room.id).messages
                 room to messages
             }.onSuccess { (room, messages) ->
                 _state.update {
@@ -144,7 +144,7 @@ class ChildChatViewModel(
             observeJob?.cancel()
             _state.update { it.copy(loading = true, error = null, room = room) }
             runCatching {
-                chatRepository.messages(room.id)
+                chatRepository.messages(room.id).messages
             }.onSuccess { messages ->
                 _state.update {
                     it.copy(loading = false, room = room, messages = messages, error = null)

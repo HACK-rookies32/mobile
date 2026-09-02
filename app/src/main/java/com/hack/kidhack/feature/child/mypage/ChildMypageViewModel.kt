@@ -52,7 +52,7 @@ class ChildMypageViewModel(
             // 부모가 채팅을 한 번도 열지 않으면 페어링이 돼 있어도 「없음」으로 보였다.
             val rooms = runCatching { chatRepository.rooms() }.getOrDefault(emptyList())
             val chatCount = rooms.firstOrNull()
-                ?.let { room -> runCatching { chatRepository.messages(room.id).size }.getOrDefault(0) }
+                ?.let { room -> runCatching { chatRepository.messages(room.id).messages.size }.getOrDefault(0) }
                 ?: 0
             // 서비스 현황 탭과 같은 값을 보여야 하므로 동일한 수집기를 쓴다.
             val usage = usageCollector.todayUsage()

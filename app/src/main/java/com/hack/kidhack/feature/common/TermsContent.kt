@@ -5,6 +5,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import com.hack.kidhack.core.designsystem.theme.FontBlack
+import com.hack.kidhack.core.designsystem.theme.KidLineBreak
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,9 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hack.kidhack.R
-import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.theme.FontBold
-import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 
@@ -171,61 +178,94 @@ private val TERMS_ARTICLES = listOf(
  *
  * 호출부의 스캐폴드 안에 그대로 펼쳐지도록 [ColumnScope] 확장으로 둔다.
  */
+/** 조 이름만. 위쪽 이동 칩이 쓴다. */
+val TermsArticleTitles: List<String> = TERMS_ARTICLES.map { it.title }
+
+/**
+ * 약관 본문.
+ *
+ * <p>조마다 카드를 씌우던 것을 걷었다. 약관은 <b>끝까지 읽는 글</b>이라, 상자 열두 개로
+ * 잘라 두면 어디까지 읽었는지 놓친다. 조 사이는 구분선 하나면 된다.
+ *
+ * @param onArticleTop 조가 놓인 세로 위치. 위쪽 이동 칩이 그 자리로 스크롤하는 데 쓴다.
+ *   자녀 화면처럼 칩이 없으면 넘기지 않아도 된다.
+ */
 @Composable
-fun ColumnScope.TermsBody() {
+fun ColumnScope.TermsBody(onArticleTop: (index: Int, y: Int) -> Unit = { _, _ -> }) {
     val colors = LocalKidhackColors.current
 
-    TERMS_ARTICLES.forEach { article ->
-        KidCard {
+    TERMS_ARTICLES.forEachIndexed { index, article ->
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onGloballyPositioned { onArticleTop(index, it.positionInParent().y.toInt()) }
+                .padding(top = if (index == 0) 4.dp else 22.dp),
+        ) {
             Text(
                 article.title,
                 fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
+                fontWeight = FontBlack,
                 fontSize = 15.sp,
-                color = colors.brandDark,
+                letterSpacing = (-0.35).sp,
+                color = colors.text,
             )
-            Spacer(Modifier.height(8.dp))
             article.paragraphs.forEach { paragraph ->
-                Text(paragraph, fontSize = 13.sp, color = colors.text, lineHeight = 20.sp)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    paragraph,
+                    fontSize = 13.sp,
+                    color = colors.muted,
+                    lineHeight = 24.sp,
+                    style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
+                )
             }
-            article.table.forEachIndexed { index, row ->
-                if (index == 0) Spacer(Modifier.height(2.dp))
-                Column(Modifier.padding(vertical = 6.dp)) {
+            article.table.forEachIndexed { rowIndex, row ->
+                Spacer(Modifier.height(if (rowIndex == 0) 14.dp else 10.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colors.surface)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                ) {
                     Text(
                         row.category,
                         fontFamily = KidhackFontFamily,
-                        fontWeight = FontSemibold,
-                        fontSize = 13.sp,
-                        color = colors.brand,
+                        fontWeight = FontBold,
+                        fontSize = 12.5.sp,
+                        color = colors.text,
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(6.dp))
                     TermsTableField(label = "수집 항목", value = row.items)
                     TermsTableField(label = "이용 목적", value = row.purpose)
                 }
-                if (index != article.table.lastIndex) {
-                    HorizontalDivider(color = colors.border)
-                }
             }
+        }
+        if (index != TERMS_ARTICLES.lastIndex) {
+            Spacer(Modifier.height(22.dp))
+            HorizontalDivider(color = colors.line)
         }
     }
 
-    KidCard {
-        Text(
-            stringResource(R.string.terms_appendix),
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 15.sp,
-            color = colors.brandDark,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.terms_effective),
-            fontSize = 13.sp,
-            color = colors.text,
-            lineHeight = 20.sp,
-        )
-    }
+    Spacer(Modifier.height(22.dp))
+    HorizontalDivider(color = colors.line)
+    Spacer(Modifier.height(22.dp))
+    Text(
+        stringResource(R.string.terms_appendix),
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBlack,
+        fontSize = 15.sp,
+        letterSpacing = (-0.35).sp,
+        color = colors.text,
+    )
+    Spacer(Modifier.height(10.dp))
+    Text(
+        stringResource(R.string.terms_effective),
+        fontSize = 13.sp,
+        color = colors.muted,
+        lineHeight = 24.sp,
+        style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
+    )
     Spacer(Modifier.height(8.dp))
 }
 
@@ -235,7 +275,7 @@ private fun TermsTableField(label: String, value: String) {
     Text(
         "$label · $value",
         fontSize = 12.sp,
-        color = colors.muted,
-        lineHeight = 18.sp,
+        color = colors.subtle,
+        lineHeight = 19.sp,
     )
 }

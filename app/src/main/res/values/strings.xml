@@ -31,4 +31,5 @@
     <string name="screen_time_block_toast">오늘 사용 시간이 끝났어요. 내일 다시 만나요!</string>
     <string name="server_alert_channel">알림</string>
     <string name="server_alert_channel_desc">채팅·안전 알림처럼 바로 확인해야 하는 알림</string>
+    <string name="terms_revision">2026.08.01 개정 · 시행</string>
 </resources>

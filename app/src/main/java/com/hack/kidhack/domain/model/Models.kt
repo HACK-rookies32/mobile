@@ -288,6 +288,21 @@ data class ChatMessage(
     val sentAt: String,
 )
 
+/**
+ * 메시지 한 장.
+ *
+ * <p>채팅만 커서 페이징이다. 다음 장을 받으려면 [oldestSentAt] 을 `before` 로 넘긴다.
+ * 서버가 이미 이렇게 내려 주는데 앱이 [messages] 만 꺼내 쓰고 있어, 최근 한 장 뒤로는
+ * 볼 방법이 없었다.
+ */
+data class ChatMessagePage(
+    /** 오래된 → 최신 순. 화면이 아래를 최신으로 그린다. */
+    val messages: List<ChatMessage>,
+    val hasMore: Boolean,
+    /** 이 장에서 가장 오래된 메시지의 시각. 다음 장의 `before` 가 된다. */
+    val oldestSentAt: String?,
+)
+
 data class Payment(
     val id: String,
     val description: String,
