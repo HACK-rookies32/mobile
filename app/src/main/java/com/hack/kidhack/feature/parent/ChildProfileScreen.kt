@@ -1,15 +1,13 @@
 package com.hack.kidhack.feature.parent
 
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.launch
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,30 +15,31 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -48,15 +47,14 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.hack.kidhack.R
-import com.hack.kidhack.core.designsystem.component.KidButton
-import com.hack.kidhack.core.designsystem.component.KidButtonVariant
-import com.hack.kidhack.core.designsystem.component.KidCard
-import com.hack.kidhack.core.designsystem.component.KidTextField
+import com.hack.kidhack.core.common.RemoteUrl
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
+import com.hack.kidhack.core.designsystem.theme.KidLineBreak
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.data.remote.userMessage
 import com.hack.kidhack.domain.model.ChildProfile
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
@@ -74,10 +72,17 @@ data class ChildProfileUiState(
     val birthDate: String = "",
     val profileImageUrl: String? = null,
     val showPhotoOptions: Boolean = false,
+    /** 사진을 서버로 올리는 중. 그동안 저장을 막는다 — 올리기 전에 저장하면 옛 사진이 남는다. */
+    val uploading: Boolean = false,
     val saved: Boolean = false,
     val loading: Boolean = true,
     val error: String? = null,
-)
+) {
+    /** 고친 것이 있는지. 없으면 저장 버튼을 꺼 둔다. */
+    val dirty: Boolean
+        get() = child != null &&
+            (alias != child.alias.orEmpty() || profileImageUrl != child.profileImageUrl)
+}
 
 class ChildProfileViewModel(
     private val childRepository: ChildRepository,
@@ -93,14 +98,27 @@ class ChildProfileViewModel(
     
     fun togglePhotoOptions(show: Boolean) = _state.update { it.copy(showPhotoOptions = show) }
 
+    /**
+     * 고른 사진을 **서버에 올리고** 받은 경로를 담는다.
+     *
+     * <p>전에는 갤러리가 준 `content://` 주소를 그대로 넣었다. 그 주소는 이 기기에서만
+     * 열리므로, 저장은 되지만 다른 기기에서도 재설치 뒤에도 사진이 뜨지 않았다.
+     */
     fun onPhotoSelected(uri: Uri?) {
-        // TODO: Backend Integration - 실제 서버 연동 시 이미지를 서버에 업로드하고 반환된 URL을 저장해야 함
-        _state.update { it.copy(profileImageUrl = uri?.toString(), showPhotoOptions = false) }
-    }
-
-    fun onPhotoCaptured(bitmap: Bitmap?) {
-        // TODO: Backend Integration - 캡처된 비트맵을 서버에 업로드
-        _state.update { it.copy(showPhotoOptions = false) }
+        val picked = uri?.toString() ?: run {
+            _state.update { it.copy(showPhotoOptions = false) }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(showPhotoOptions = false, uploading = true, error = null, saved = false) }
+            runCatching { childRepository.uploadProfileImage(picked) }
+                .onSuccess { url -> _state.update { it.copy(uploading = false, profileImageUrl = url) } }
+                .onFailure { t ->
+                    _state.update {
+                        it.copy(uploading = false, error = t.userMessage("사진을 올리지 못했어요"))
+                    }
+                }
+        }
     }
 
     fun load() {
@@ -160,7 +178,14 @@ class ChildProfileViewModel(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * 자녀 프로필 수정.
+ *
+ * <p>서버가 받는 것은 <b>별명과 사진 둘뿐</b>이다(`ChildUpdateRequest{nickname, profileImageUrl}`).
+ * 전에는 넷을 똑같은 입력 상자로 그려 놓고 이름·생년월일만 회색으로 꺼 뒀는데, 그러면
+ * 「지금은 못 고치지만 언젠가 고칠 수 있는 값」처럼 보인다. 바꿀 수 있는 것과 가입할 때
+ * 정해진 것을 묶음으로 갈랐다.
+ */
 @Composable
 fun ParentChildProfileScreen(
     onBack: () -> Unit = {},
@@ -168,113 +193,265 @@ fun ParentChildProfileScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
+    val context = LocalContext.current
     val child = state.child
 
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         viewModel.onPhotoSelected(uri)
     }
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        viewModel.onPhotoCaptured(bitmap)
-    }
 
-    ParentScreenScaffold(
-        header = { ParentHeaderBar(stringResource(R.string.parent_profile_title), onBack) },
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.card)
+            .statusBarsPadding(),
     ) {
-        ParentLoadingOrError(state.loading && child == null, state.error, viewModel::load)
-        if (child != null) {
-            KidCard {
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        Modifier
-                            .size(80.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Brush.linearGradient(listOf(colors.brand, colors.brandDark))),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(state.profileImageUrl.takeIf { !it.isNullOrBlank() } ?: R.drawable.ic_launcher_foreground)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(state.name.ifBlank { child.name }, fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 20.sp, color = colors.text)
-                    // 나이/학년 라벨은 서버가 주지 않는다. 별명이 있으면 그걸 보여 준다.
-                    child.alias?.takeIf { it.isNotBlank() && it != child.name }?.let {
-                        Text(it, color = colors.muted, fontSize = 14.sp)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    KidButton(
-                        text = stringResource(R.string.parent_profile_change_photo),
-                        onClick = { viewModel.togglePhotoOptions(true) },
-                        variant = KidButtonVariant.Secondary
-                    )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 10.dp, top = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("\u2039", color = colors.text, fontSize = 26.sp)
+            }
+            Text(
+                stringResource(R.string.parent_profile_title),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 16.sp,
+                color = colors.text,
+            )
+            Spacer(Modifier.weight(1f))
+            // 고친 것이 없거나 사진을 올리는 중이면 눌리지 않는다.
+            val canSave = state.dirty && !state.uploading && !state.loading
+            Text(
+                text = stringResource(R.string.parent_profile_save),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .then(if (canSave) Modifier.clickable(onClick = viewModel::save) else Modifier)
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                color = if (canSave) colors.brandDark else colors.border,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 14.sp,
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            if (state.loading && child == null || state.error != null) {
+                Box(Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
+                    ParentLoadingOrError(state.loading && child == null, state.error, viewModel::load)
                 }
             }
-            KidCard {
-                Text(stringResource(R.string.parent_profile_basic), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
-                Spacer(Modifier.height(8.dp))
-                // 서버가 수정 대상으로 받는 건 별명뿐이다. 이름·생년월일은 가입 정보라
-                // 부모가 바꿀 수 없어 읽기 전용으로 보여 준다.
-                KidTextField(
-                    value = state.name,
-                    onValueChange = {},
-                    label = stringResource(R.string.parent_profile_name),
-                    enabled = false,
-                )
-                KidTextField(state.alias, viewModel::onAlias, stringResource(R.string.parent_profile_alias))
-                KidTextField(
-                    value = state.birthDate,
-                    onValueChange = {},
-                    label = stringResource(R.string.parent_profile_birth),
-                    enabled = false,
-                )
-            }
-            if (state.saved) {
-                Text("성공적으로 저장되었습니다", color = colors.safe, fontSize = 12.sp, fontWeight = FontBold)
-            }
-            KidButton(stringResource(R.string.parent_profile_save), viewModel::save, Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-        }
-    }
+            if (child == null) return@Column
 
-    if (state.showPhotoOptions) {
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.togglePhotoOptions(false) },
-            sheetState = rememberModalBottomSheetState()
-        ) {
-            Column(Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
+            // 사진은 카메라 배지로 바로 고른다. 「사진 변경」 버튼과 이모지 시트를 걷었다.
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    Box(
+                        modifier = Modifier.size(88.dp).clip(CircleShape).background(colors.surface),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        val photo = state.profileImageUrl
+                        when {
+                            state.uploading -> CircularProgressIndicator(
+                                Modifier.size(22.dp),
+                                color = colors.brand,
+                                strokeWidth = 2.dp,
+                            )
+                            photo.isNullOrBlank() -> Icon(
+                                painter = painterResource(R.drawable.ic_person),
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp),
+                                tint = colors.border,
+                            )
+                            else -> AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(RemoteUrl.absolute(photo))
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(colors.card)
+                            .border(1.dp, colors.border, CircleShape)
+                            .clickable(enabled = !state.uploading) { galleryLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_camera),
+                            contentDescription = stringResource(R.string.parent_profile_change_photo),
+                            modifier = Modifier.size(15.dp),
+                            tint = colors.muted,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
                 Text(
-                    "프로필 사진 변경",
-                    modifier = Modifier.padding(16.dp),
-                    fontWeight = FontBold,
-                    fontSize = 18.sp
+                    text = child.name,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBlack,
+                    fontSize = 19.sp,
+                    letterSpacing = (-0.5).sp,
+                    color = colors.text,
                 )
-                HorizontalDivider(color = colors.border)
-                PhotoOptionRow("📸", "카메라로 촬영") { cameraLauncher.launch() }
-                PhotoOptionRow("🖼️", "갤러리에서 선택") { galleryLauncher.launch("image/*") }
+                if (state.alias.isNotBlank() && state.alias != child.name) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(state.alias, color = colors.subtle, fontSize = 12.5.sp, fontWeight = FontSemibold)
+                }
             }
+
+            FieldGroup(stringResource(R.string.parent_profile_editable))
+            AliasField(value = state.alias, onValueChange = viewModel::onAlias)
+            Hint(stringResource(R.string.parent_profile_alias_hint))
+
+            FieldGroup(stringResource(R.string.parent_profile_fixed))
+            ReadOnlyRow(stringResource(R.string.parent_profile_name), child.name)
+            ReadOnlyRow(
+                stringResource(R.string.parent_profile_birth),
+                state.birthDate.ifBlank { stringResource(R.string.parent_profile_unknown) },
+            )
+            Hint(stringResource(R.string.parent_profile_fixed_hint))
+
+            if (state.saved) {
+                Text(
+                    text = stringResource(R.string.parent_profile_saved),
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
+                    color = colors.safe,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 12.5.sp,
+                )
+            }
+            Spacer(Modifier.height(28.dp))
         }
     }
 }
 
+/** 묶음 이름. 바꿀 수 있는 값과 정해진 값을 이 이름으로 가른다. */
 @Composable
-private fun PhotoOptionRow(icon: String, label: String, onClick: () -> Unit) {
+private fun FieldGroup(title: String) {
+    Text(
+        text = title,
+        modifier = Modifier.padding(start = 22.dp, top = 26.dp, bottom = 4.dp),
+        color = LocalKidhackColors.current.subtle,
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBold,
+        fontSize = 12.sp,
+    )
+}
+
+/** 라벨 아래 설명. 왜 못 바꾸는지, 이 값이 어디에 쓰이는지를 여기서 말한다. */
+@Composable
+private fun Hint(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 10.dp),
+        color = LocalKidhackColors.current.subtle,
+        fontSize = 11.5.sp,
+        lineHeight = 19.sp,
+        style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
+    )
+}
+
+/** 별명 한 줄. 서버가 고쳐 주는 유일한 글자값이라 테두리 없이 밑줄만 둔다. */
+@Composable
+private fun AliasField(value: String, onValueChange: (String) -> Unit) {
     val colors = LocalKidhackColors.current
     Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(icon, fontSize = 24.sp)
-        Spacer(Modifier.width(16.dp))
-        Text(label, color = colors.text, fontWeight = FontSemibold, fontSize = 15.sp)
+        Text(
+            text = stringResource(R.string.parent_profile_alias),
+            modifier = Modifier.width(82.dp),
+            color = colors.subtle,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 13.sp,
+        )
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.weight(1f).padding(vertical = 15.dp),
+            textStyle = TextStyle(
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 14.5.sp,
+                color = colors.text,
+            ),
+            cursorBrush = SolidColor(colors.brand),
+            singleLine = true,
+            decorationBox = { inner ->
+                if (value.isEmpty()) {
+                    Text(
+                        stringResource(R.string.parent_profile_alias_placeholder),
+                        color = colors.border,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 14.5.sp,
+                    )
+                }
+                inner()
+            },
+        )
     }
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 22.dp), color = colors.line)
 }
 
+/**
+ * 못 바꾸는 값 한 줄.
+ *
+ * <p>꺼진 입력 상자 대신 자물쇠를 단다. 상자로 두면 눌러 보고 나서야 못 고치는 줄 안다.
+ */
+@Composable
+private fun ReadOnlyRow(label: String, value: String) {
+    val colors = LocalKidhackColors.current
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.width(82.dp),
+            color = colors.subtle,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 13.sp,
+        )
+        Text(
+            text = value,
+            modifier = Modifier.weight(1f),
+            color = colors.subtle,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontSemibold,
+            fontSize = 14.5.sp,
+        )
+        Icon(
+            painter = painterResource(R.drawable.ic_lock),
+            contentDescription = null,
+            modifier = Modifier.size(14.dp),
+            tint = colors.border,
+        )
+    }
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 22.dp), color = colors.line)
+}

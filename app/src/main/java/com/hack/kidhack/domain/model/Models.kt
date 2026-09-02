@@ -367,6 +367,8 @@ fun childAlertTypeToParent(type: String): String? = when (type.trim().uppercase(
     "GEOFENCE_EXIT" -> "LOCATION"
     "GEOFENCE_ENTER" -> "ARRIVAL"
     "SCREEN_TIME_LIMIT" -> "APP_USAGE"
+    // 앱별 차단도 서버에는 「앱 사용」으로 간다. 서버에 따로 종류가 없다.
+    "APP_BLOCK" -> "APP_USAGE"
     "GPS_OFF" -> "GPS_OFF"
     else -> null
 }

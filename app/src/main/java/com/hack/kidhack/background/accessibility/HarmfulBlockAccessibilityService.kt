@@ -13,6 +13,7 @@ import android.widget.Toast
 import com.hack.kidhack.R
 import com.hack.kidhack.background.ChildAlertUploadWorker
 import com.hack.kidhack.core.common.HarmfulKeywordMatcher
+import com.hack.kidhack.background.usage.AppRuleWatcher
 import com.hack.kidhack.background.usage.ScreenTimeWatcher
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.domain.model.BlocklistItem
@@ -25,7 +26,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
-import java.time.Instant
+import java.time.LocalDate
 
 /**
  * 접근성 기반 유해 페이지·키워드 차단 (REQ-M-11).
@@ -44,6 +45,7 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
     private val sessionRepository: SessionRepository by inject()
     private val alertStore: ChildAlertStore by inject()
     private val screenTimeWatcher: ScreenTimeWatcher by inject()
+    private val appRuleWatcher: AppRuleWatcher by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
@@ -62,9 +64,19 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
     @Volatile
     private var lastScreenTimeBlockAt: Long = 0L
 
+    /** 앱별 차단도 같은 이유로 겹친다. 다른 앱을 열면 바로 알려야 하므로 앱까지 함께 본다. */
+    @Volatile
+    private var lastAppBlockPackage: String? = null
+
+    @Volatile
+    private var lastAppBlockAt: Long = 0L
+
     override fun onServiceConnected() {
         super.onServiceConnected()
-        scope.launch { refreshBlocklist(force = true) }
+        scope.launch {
+            refreshBlocklist(force = true)
+            appRuleWatcher.refreshRules()
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -81,6 +93,16 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
         // 페어링·채팅까지 막혀 버리므로 예외가 반드시 필요하다.
         if (screenTimeWatcher.limitReached) {
             blockForScreenTime()
+            return
+        }
+
+        // 부모가 이 앱 하나에 걸어 둔 규칙. 총 한도와 달리 앱마다 다르므로 지금 열린
+        // 패키지를 그때그때 물어본다.
+        if (appRuleWatcher.rulesStale()) {
+            scope.launch { appRuleWatcher.refreshRules() }
+        }
+        appRuleWatcher.blockReasonFor(source)?.let { reason ->
+            blockForAppRule(source, reason)
             return
         }
 
@@ -206,6 +228,50 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * 부모가 막아 둔 앱을 열었을 때.
+     *
+     * <p>스크린타임 차단과 같은 방식으로 홈으로 내보내되 <b>말이 다르다</b> — 「오늘 다 썼다」와
+     * 「이 앱은 쓸 수 없다」는 자녀가 할 수 있는 일이 다르다.
+     *
+     * <p>같은 앱을 연달아 열면 안내가 겹쳐 뜨므로 앱마다 최소 간격을 둔다.
+     */
+    private fun blockForAppRule(packageName: String, reason: AppRuleWatcher.Block) {
+        val now = System.currentTimeMillis()
+        if (packageName == lastAppBlockPackage && now - lastAppBlockAt < APP_BLOCK_THROTTLE_MS) return
+        lastAppBlockPackage = packageName
+        lastAppBlockAt = now
+
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        val message = when (reason) {
+            is AppRuleWatcher.Block.Forbidden ->
+                getString(R.string.app_rule_block_forbidden, reason.appName)
+            is AppRuleWatcher.Block.LimitReached ->
+                getString(R.string.app_rule_block_limit, reason.appName, reason.limitMinutes)
+        }
+        if (Settings.canDrawOverlays(this)) showOverlay(message) else {
+            Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
+        }
+
+        scope.launch {
+            // 자녀 홈 「최근 알림」에 남긴다. 앱마다 하루 한 번이면 충분하다 — 막힐 때마다
+            // 쌓으면 목록이 같은 줄로 가득 찬다.
+            val recorded = alertStore.record(
+                type = ChildAlertStore.TYPE_APP_BLOCK,
+                title = when (reason) {
+                    is AppRuleWatcher.Block.Forbidden -> "사용할 수 없는 앱이에요"
+                    is AppRuleWatcher.Block.LimitReached -> "오늘 쓸 수 있는 시간을 다 썼어요"
+                },
+                body = message,
+                // 앱마다 하루 한 번. 막힐 때마다 쌓으면 목록이 같은 줄로 가득 찬다.
+                dedupeKey = ChildAlertStore.TYPE_APP_BLOCK + "-" + packageName + "-" + LocalDate.now(),
+                dedupeWindowMs = Long.MAX_VALUE,
+            )
+            // 보호자에게도 나른다(docs/child-push-contract.md 4절).
+            if (recorded) ChildAlertUploadWorker.enqueueNow(this@HarmfulBlockAccessibilityService)
+        }
+    }
+
     private fun showBlock(keyword: String) {
         val message = getString(R.string.harmful_block_toast, keyword)
         if (Settings.canDrawOverlays(this)) {
@@ -247,6 +313,9 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
 
         /** 홈으로 보낸 직후 같은 안내가 쏟아지지 않도록 두는 최소 간격. */
         private const val SCREEN_TIME_BLOCK_THROTTLE_MS = 3_000L
+
+        /** 같은 앱을 연달아 열 때 안내가 겹치지 않게. 다른 앱이면 바로 알린다. */
+        private const val APP_BLOCK_THROTTLE_MS = 3_000L
 
         private val EXEMPT_PACKAGES = setOf(
             "com.android.systemui",

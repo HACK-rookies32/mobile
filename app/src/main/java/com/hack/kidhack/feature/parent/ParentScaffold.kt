@@ -132,10 +132,22 @@ fun ParentLoadingOrError(
     }
 }
 
+/**
+ * 「1시간 22분」.
+ *
+ * <p>전에는 `2h 14m` 로 적었다. 앱의 다른 곳은 모두 한국어라 이 화면만 말이 달랐다.
+ * 1분이 안 되면 초로 적는다 — 분으로 자르면 30초를 쓴 앱과 아예 안 쓴 앱이 같은 글자가 된다.
+ */
 internal fun formatDuration(sec: Int): String {
-    val h = sec / 3600
-    val m = (sec % 3600) / 60
-    return if (h > 0) "${h}h ${m}m" else "${m}m"
+    if (sec < 60) return sec.toString() + "초"
+    val minutes = sec / 60
+    val hours = minutes / 60
+    val rest = minutes % 60
+    return when {
+        hours > 0 && rest > 0 -> hours.toString() + "시간 " + rest + "분"
+        hours > 0 -> hours.toString() + "시간"
+        else -> minutes.toString() + "분"
+    }
 }
 
 internal fun formatWon(amount: Int): String =
