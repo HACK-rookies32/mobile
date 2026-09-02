@@ -471,6 +471,10 @@ data class PostDto(
     val authorNickname: String = "",
     val title: String = "",
     val content: String = "",
+    /** 목록에만 오는 본문 앞부분. 상세 응답에는 없다. */
+    val contentPreview: String? = null,
+    /** 목록에만 오는 첫 사진 경로. 사진이 없으면 null. */
+    val thumbnail: String? = null,
     /** 첨부 공개 경로. `/api/files/community/{filename}` 형태의 상대 경로다. */
     val attachments: List<String> = emptyList(),
     val links: List<String> = emptyList(),

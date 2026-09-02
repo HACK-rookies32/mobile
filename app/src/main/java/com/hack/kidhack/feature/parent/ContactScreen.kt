@@ -2,26 +2,36 @@ package com.hack.kidhack.feature.parent
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,9 +39,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -42,11 +59,12 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.hack.kidhack.R
 import com.hack.kidhack.core.common.RemoteUrl
-import com.hack.kidhack.core.designsystem.component.KidButton
-import com.hack.kidhack.core.designsystem.component.KidButtonVariant
-import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.KidTextField
+import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
+import com.hack.kidhack.core.designsystem.theme.FontSemibold
+import com.hack.kidhack.core.designsystem.theme.KidLineBreak
+import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.Inquiry
 import com.hack.kidhack.domain.model.InquiryDetail
@@ -238,6 +256,12 @@ class ContactViewModel(
     }
 }
 
+/**
+ * 1:1 문의.
+ *
+ * <p>목록·작성·상세가 한 화면 안에서 갈린다(`pane`). 헤더 왼쪽이 <b>✕</b> 였는데, 마이페이지
+ * 에서 들어온 화면이라 닫기 표시는 어디로 돌아가는지 알려 주지 않는다. 뒤로 가기로 바꿨다.
+ */
 @Composable
 fun ParentContactScreen(
     onBack: () -> Unit = {},
@@ -251,198 +275,561 @@ fun ParentContactScreen(
         viewModel.addAttachment(uri)
     }
 
-    ParentScreenScaffold(
-        header = {
-            val title = when (state.pane) {
-                ContactPane.INQUIRY_LIST -> stringResource(R.string.parent_contact_title)
-                ContactPane.INQUIRY_CREATE ->
-                    if (state.editingId == null) "1:1 문의하기" else "문의 수정"
-                ContactPane.INQUIRY_DETAIL -> "문의 상세"
-            }
-            ParentHeaderBar(title) {
-                // 목록이 첫 화면이라 여기서는 화면을 닫고, 안쪽에서는 목록으로 돌아간다.
-                if (state.pane == ContactPane.INQUIRY_LIST) {
-                    IconButton(onClick = onBack) { Text("✕", color = Color.White) }
+    // 안쪽 화면에서 뒤로 가면 목록으로. 여기서 막지 않으면 문의를 쓰다 말고 화면이 닫힌다.
+    BackHandler(enabled = state.pane != ContactPane.INQUIRY_LIST) {
+        viewModel.open(ContactPane.INQUIRY_LIST)
+    }
+    val leaveInner = { viewModel.open(ContactPane.INQUIRY_LIST) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.card)
+            .statusBarsPadding(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 10.dp, top = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { if (state.pane == ContactPane.INQUIRY_LIST) onBack() else leaveInner() },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (state.pane == ContactPane.INQUIRY_CREATE) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_close),
+                        contentDescription = stringResource(R.string.parent_back),
+                        modifier = Modifier.size(19.dp),
+                        tint = colors.text,
+                    )
                 } else {
+                    Text("‹", color = colors.text, fontSize = 26.sp)
+                }
+            }
+            if (state.pane == ContactPane.INQUIRY_CREATE) {
+                Text(
+                    text = stringResource(
+                        if (state.editingId == null) R.string.parent_contact_create
+                        else R.string.parent_contact_edit,
+                    ),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 16.sp,
+                    color = colors.text,
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            when (state.pane) {
+                // 폭 전체 「+ 새로운 문의하기」 버튼이 목록 위를 가로막고 있었다.
+                ContactPane.INQUIRY_LIST -> HeaderAction(
+                    label = stringResource(R.string.parent_contact_create),
+                    enabled = true,
+                    onClick = viewModel::startCreate,
+                )
+                ContactPane.INQUIRY_CREATE -> HeaderAction(
+                    label = stringResource(R.string.parent_contact_submit),
+                    enabled = state.title.isNotBlank() && state.content.isNotBlank() &&
+                        !state.loading && !state.uploading,
+                    onClick = viewModel::submit,
+                )
+                ContactPane.INQUIRY_DETAIL -> Unit
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            if (state.error != null) {
+                Text(
+                    state.error.orEmpty(),
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
+                    color = colors.danger,
+                    fontSize = 13.sp,
+                )
+            }
+            when (state.pane) {
+                ContactPane.INQUIRY_LIST -> InquiryList(state, viewModel)
+                ContactPane.INQUIRY_CREATE -> InquiryForm(state, viewModel, context) {
+                    fileLauncher.launch("image/*")
+                }
+                ContactPane.INQUIRY_DETAIL -> InquiryDetailBody(state, viewModel, context)
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/** 헤더 오른쪽 글자 버튼. 쓸 수 없을 때는 눌리지 않고 색만 가라앉는다. */
+@Composable
+private fun HeaderAction(label: String, enabled: Boolean, onClick: () -> Unit) {
+    val colors = LocalKidhackColors.current
+    Text(
+        text = label,
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        color = if (enabled) colors.brandDark else colors.border,
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBold,
+        fontSize = 14.sp,
+    )
+}
+
+/* ---- 목록 ---- */
+
+@Composable
+private fun ColumnScope.InquiryList(state: ContactUiState, viewModel: ContactViewModel) {
+    val colors = LocalKidhackColors.current
+    Text(
+        text = stringResource(R.string.parent_contact_title),
+        modifier = Modifier.padding(start = 22.dp, top = 6.dp, bottom = 18.dp),
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBlack,
+        fontSize = 25.sp,
+        letterSpacing = (-1).sp,
+        color = colors.text,
+    )
+
+    if (state.inquiries.isEmpty() && !state.loading) {
+        Text(
+            stringResource(R.string.parent_contact_empty),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 44.dp),
+            color = colors.muted,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+        )
+    }
+
+    state.inquiries.forEachIndexed { index, inquiry ->
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { viewModel.openDetail(inquiry) }
+                .padding(horizontal = 22.dp, vertical = 16.dp),
+        ) {
+            // 상태를 제목 위로 올린다. 목록을 훑을 때 먼저 알고 싶은 것이 「답이 왔나」인데,
+            // 오른쪽 끝에 두면 제목을 지나 눈이 되돌아온다.
+            AnswerState(answered = inquiry.answered)
+            Spacer(Modifier.height(7.dp))
+            Text(
+                inquiry.title,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 15.sp,
+                lineHeight = 21.sp,
+                letterSpacing = (-0.3).sp,
+                color = colors.text,
+                style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(inquiry.createdAt.toDisplayDate(), color = colors.subtle, fontSize = 11.5.sp, fontWeight = FontSemibold)
+        }
+        if (index != state.inquiries.lastIndex) {
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 22.dp), color = colors.line)
+        }
+    }
+
+    if (state.hasMore) {
+        Text(
+            text = stringResource(R.string.parent_contact_load_more),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = viewModel::loadMore)
+                .padding(vertical = 16.dp),
+            color = colors.muted,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/** 답변 상태 — 점 하나와 글자. 알약보다 가벼워 제목을 누르지 않는다. */
+@Composable
+private fun AnswerState(answered: Boolean) {
+    val colors = LocalKidhackColors.current
+    val tint = if (answered) colors.safe else colors.subtle
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(5.dp).clip(CircleShape).background(tint))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            stringResource(if (answered) R.string.parent_contact_answered else R.string.parent_contact_waiting),
+            color = tint,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 11.5.sp,
+        )
+    }
+}
+
+/* ---- 작성 ---- */
+
+@Composable
+private fun ColumnScope.InquiryForm(
+    state: ContactUiState,
+    viewModel: ContactViewModel,
+    context: android.content.Context,
+    onPickImage: () -> Unit,
+) {
+    val colors = LocalKidhackColors.current
+
+    UnderlineField(
+        label = stringResource(R.string.parent_contact_field_title),
+        value = state.title,
+        onValueChange = viewModel::onTitle,
+        hint = stringResource(R.string.parent_contact_field_title_hint),
+        fontSize = 16.sp,
+        weight = FontBold,
+        singleLine = true,
+    )
+    UnderlineField(
+        label = stringResource(R.string.parent_contact_field_content),
+        value = state.content,
+        onValueChange = viewModel::onContent,
+        hint = stringResource(R.string.parent_contact_field_content_hint),
+        fontSize = 14.5.sp,
+        weight = FontSemibold,
+        singleLine = false,
+        minHeight = 140.dp,
+        underline = false,
+    )
+
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp), color = colors.line)
+
+    FieldLabel(stringResource(R.string.parent_contact_field_photo))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 22.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        state.attachments.forEach { path ->
+            Box(Modifier.size(72.dp)) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(RemoteUrl.absolute(path))
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(13.dp)),
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(5.dp)
+                        .size(19.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .clickable { viewModel.removeAttachment(path) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_close),
+                        contentDescription = stringResource(R.string.parent_community_attach_remove),
+                        modifier = Modifier.size(10.dp),
+                        tint = Color.White,
+                    )
+                }
+            }
+        }
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(colors.surface)
+                .then(if (state.uploading) Modifier else Modifier.clickable(onClick = onPickImage)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (state.uploading) {
+                CircularProgressIndicator(Modifier.size(18.dp), color = colors.brand, strokeWidth = 2.dp)
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_image),
+                        contentDescription = null,
+                        modifier = Modifier.size(19.dp),
+                        tint = colors.subtle,
+                    )
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        "←",
+                        stringResource(R.string.parent_community_attach_photo),
+                        color = colors.subtle,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 10.5.sp,
+                    )
+                }
+            }
+        }
+    }
+
+    // 서버가 링크를 하나만 받는다. 여러 개를 담던 예전 UI 는 저장되지 않았다.
+    UnderlineField(
+        label = stringResource(R.string.parent_contact_field_link),
+        value = state.linkUrl,
+        onValueChange = viewModel::onLinkUrl,
+        hint = "https://",
+        fontSize = 14.5.sp,
+        weight = FontSemibold,
+        singleLine = true,
+    )
+}
+
+@Composable
+private fun FieldLabel(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.padding(start = 22.dp, top = 20.dp, bottom = 9.dp),
+        color = LocalKidhackColors.current.subtle,
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBold,
+        fontSize = 12.sp,
+    )
+}
+
+/**
+ * 라벨 + 밑줄 입력칸.
+ *
+ * <p>[KidTextField] 는 사각 테두리를 두른다. 한 화면에 네 개를 쌓으면 서식이 내용보다
+ * 커진다. 라벨은 위에 작게 두고 아래에 선 하나만 남긴다.
+ */
+@Composable
+private fun UnderlineField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    hint: String,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    weight: FontWeight,
+    singleLine: Boolean,
+    minHeight: Dp = 0.dp,
+    underline: Boolean = true,
+) {
+    val colors = LocalKidhackColors.current
+    FieldLabel(label)
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp)
+            .heightIn(min = minHeight),
+        textStyle = TextStyle(
+            fontFamily = KidhackFontFamily,
+            fontWeight = weight,
+            fontSize = fontSize,
+            lineHeight = fontSize * 1.7f,
+            color = colors.text,
+            lineBreak = KidLineBreak,
+        ),
+        cursorBrush = SolidColor(colors.brand),
+        singleLine = singleLine,
+        decorationBox = { inner ->
+            Column {
+                Box(Modifier.padding(bottom = if (underline) 11.dp else 0.dp)) {
+                    if (value.isEmpty()) {
+                        Text(
+                            hint,
+                            color = colors.border,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = weight,
+                            fontSize = fontSize,
+                        )
+                    }
+                    inner()
+                }
+                if (underline) {
+                    Box(
                         Modifier
-                            .clip(CircleShape)
-                            .clickable { viewModel.open(ContactPane.INQUIRY_LIST) }
-                            .padding(8.dp),
-                        color = Color.White,
-                        fontSize = 20.sp
+                            .fillMaxWidth()
+                            .height(1.5.dp)
+                            .background(if (value.isEmpty()) colors.border else colors.text),
                     )
                 }
             }
         },
-    ) {
-        if (state.error != null) {
-            KidCard { Text(state.error.orEmpty(), color = colors.danger, fontSize = 13.sp) }
-        }
-        when (state.pane) {
-            ContactPane.INQUIRY_LIST -> {
-                KidButton("+ 새로운 문의하기", viewModel::startCreate, Modifier.fillMaxWidth())
-                Spacer(Modifier.height(16.dp))
-                if (state.inquiries.isEmpty() && !state.loading) {
-                    Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                        Text("문의 내역이 없습니다.", color = colors.muted)
-                    }
-                }
-                state.inquiries.forEach { inquiry ->
-                    KidCard(Modifier.clickable { viewModel.openDetail(inquiry) }) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(inquiry.title, fontWeight = FontBold, fontSize = 14.sp)
-                                Text(inquiry.createdAt.toDisplayDate(), color = colors.muted, fontSize = 12.sp)
-                            }
-                            Text(
-                                if (inquiry.answered) "답변완료" else "답변대기",
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(if (inquiry.answered) colors.safe.copy(0.1f) else colors.surface)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                                color = if (inquiry.answered) colors.safe else colors.muted,
-                                fontWeight = FontBold,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                }
-                if (state.hasMore) {
-                    KidButton("더 보기", viewModel::loadMore, Modifier.fillMaxWidth(), KidButtonVariant.Secondary)
-                }
-            }
+    )
+}
 
-            ContactPane.INQUIRY_CREATE -> {
-                KidTextField(state.title, viewModel::onTitle, "문의 제목", placeholder = "제목을 입력하세요")
-                KidTextField(
-                    value = state.content,
-                    onValueChange = viewModel::onContent,
-                    label = "문의 내용",
-                    placeholder = "문의하실 내용을 상세히 적어주세요",
-                    singleLine = false,
-                    minLines = 6
-                )
+/* ---- 상세 ---- */
 
-                Spacer(Modifier.height(16.dp))
-                Text("첨부파일", fontWeight = FontBold, fontSize = 14.sp)
-                if (state.uploading) {
-                    Text("올리는 중…", color = colors.muted, fontSize = 12.sp)
-                }
-                Spacer(Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        Box(
-                            Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(colors.surface)
-                                .clickable(enabled = !state.uploading) { fileLauncher.launch("image/*") },
-                            contentAlignment = Alignment.Center
-                        ) { Text("📷") }
-                    }
-                    items(state.attachments) { path ->
-                        Box(Modifier.size(60.dp)) {
-                            // 서버가 준 상대 경로라 그대로는 못 연다. origin 을 붙여 띄운다.
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(RemoteUrl.absolute(path))
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
-                            )
-                            IconButton({ viewModel.removeAttachment(path) }, Modifier.align(Alignment.TopEnd).size(20.dp)) {
-                                Text("✕", color = Color.White, fontSize = 10.sp, modifier = Modifier.background(Color.Black.copy(0.5f), CircleShape))
-                            }
-                        }
-                    }
-                }
+@Composable
+private fun ColumnScope.InquiryDetailBody(
+    state: ContactUiState,
+    viewModel: ContactViewModel,
+    context: android.content.Context,
+) {
+    val colors = LocalKidhackColors.current
+    val detail = state.detail
+    if (detail == null) {
+        Text(
+            stringResource(if (state.loading) R.string.parent_contact_loading else R.string.parent_contact_load_failed),
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+            color = colors.muted,
+            fontSize = 13.sp,
+        )
+        return
+    }
 
-                Spacer(Modifier.height(12.dp))
-                // 서버가 링크를 하나만 받는다. 여러 개를 담던 예전 UI 는 저장되지 않았다.
-                KidTextField(state.linkUrl, viewModel::onLinkUrl, "관련 링크", placeholder = "https://…")
+    Box(Modifier.padding(start = 22.dp, top = 6.dp)) { AnswerState(answered = detail.answered) }
+    Text(
+        detail.title,
+        modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 12.dp),
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBlack,
+        fontSize = 21.sp,
+        lineHeight = 29.sp,
+        letterSpacing = (-0.7).sp,
+        color = colors.text,
+        style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
+    )
+    // 기다리는 사람이 알고 싶은 것은 「얼마나 지났나」다. 「답변을 기다리는 중입니다」보다
+    // 접수된 날짜가 쓸모 있다.
+    Text(
+        stringResource(R.string.parent_contact_received, detail.createdAt.toDisplayDate()),
+        modifier = Modifier.padding(start = 22.dp, top = 9.dp),
+        color = colors.subtle,
+        fontSize = 11.5.sp,
+        fontWeight = FontSemibold,
+    )
+    Text(
+        detail.content,
+        modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 18.dp),
+        color = colors.text,
+        fontSize = 14.5.sp,
+        lineHeight = 26.sp,
+        style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
+    )
 
-                Spacer(Modifier.height(24.dp))
-                KidButton(
-                    if (state.editingId == null) "문의 제출하기" else "수정 저장하기",
-                    viewModel::submit,
-                    Modifier.fillMaxWidth(),
-                    enabled = !state.loading && !state.uploading,
+    if (detail.attachments.isNotEmpty()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            detail.attachments.forEach { path ->
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(RemoteUrl.absolute(path))
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(104.dp).clip(RoundedCornerShape(14.dp)),
                 )
             }
-
-            ContactPane.INQUIRY_DETAIL -> {
-                val detail = state.detail
-                if (detail == null) {
-                    Text(
-                        if (state.loading) "불러오는 중…" else "문의를 불러오지 못했어요",
-                        color = colors.muted,
-                        fontSize = 13.sp,
-                    )
-                } else {
-                    KidCard {
-                        Text(detail.title, fontWeight = FontBold, fontSize = 16.sp)
-                        Text(detail.createdAt.toDisplayDate(), color = colors.muted, fontSize = 12.sp)
-                        Spacer(Modifier.height(12.dp))
-                        Text(detail.content, fontSize = 14.sp)
-
-                        if (detail.attachments.isNotEmpty()) {
-                            Spacer(Modifier.height(12.dp))
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(detail.attachments) { path ->
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(context)
-                                            .data(RemoteUrl.absolute(path))
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.size(100.dp).clip(RoundedCornerShape(8.dp))
-                                    )
-                                }
-                            }
-                        }
-                        if (!detail.linkUrl.isNullOrBlank()) {
-                            Spacer(Modifier.height(12.dp))
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    val url = RemoteUrl.absolute(detail.linkUrl.filterNot { ch -> ch.isWhitespace() })
-                                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-                                },
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text("🔗", fontSize = 12.sp)
-                                Spacer(Modifier.width(6.dp))
-                                Text(detail.linkUrl, color = colors.brand, fontSize = 13.sp, maxLines = 1)
-                            }
-                        }
-                    }
-
-                    // 답변이 달리면 서버가 수정·삭제를 막는다(400). 그때는 버튼을 감춘다.
-                    if (!detail.answered) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            KidButton("수정", viewModel::startEdit, Modifier.weight(1f), KidButtonVariant.Secondary)
-                            KidButton("삭제", viewModel::delete, Modifier.weight(1f), KidButtonVariant.Danger)
-                        }
-                    }
-
-                    Text("관리자 답변", Modifier.padding(vertical = 12.dp), fontWeight = FontBold, fontSize = 14.sp)
-                    val answer = detail.answer
-                    if (answer == null) {
-                        KidCard { Text("답변을 기다리는 중입니다.", color = colors.muted, fontSize = 13.sp) }
-                    } else {
-                        KidCard {
-                            Column {
-                                Text(answer.createdAt.toDisplayDate(), color = colors.muted, fontSize = 11.sp)
-                                Spacer(Modifier.height(6.dp))
-                                Text(answer.content, fontSize = 14.sp)
-                            }
-                        }
-                    }
-                }
-            }
         }
-        Spacer(Modifier.height(8.dp))
+    }
+
+    if (!detail.linkUrl.isNullOrBlank()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 22.dp, end = 22.dp, top = 12.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.surface)
+                .clickable {
+                    val url = RemoteUrl.absolute(detail.linkUrl.filterNot { ch -> ch.isWhitespace() })
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                }
+                .padding(horizontal = 13.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_link),
+                contentDescription = null,
+                modifier = Modifier.size(15.dp),
+                tint = colors.muted,
+            )
+            Spacer(Modifier.width(9.dp))
+            Text(
+                detail.linkUrl,
+                color = colors.muted,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 12.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+
+    // 답변이 달리면 서버가 수정·삭제를 막는다(400). 그때는 버튼을 감춘다.
+    if (!detail.answered) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 22.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Text(
+                stringResource(R.string.parent_contact_edit),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = viewModel::startEdit)
+                    .padding(vertical = 4.dp),
+                color = colors.muted,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 13.sp,
+            )
+            Text(
+                stringResource(R.string.parent_contact_delete),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = viewModel::delete)
+                    .padding(vertical = 4.dp),
+                color = colors.danger,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 13.sp,
+            )
+        }
+    } else {
+        Spacer(Modifier.height(30.dp))
+    }
+
+    val answer = detail.answer
+    if (answer != null) {
+        // 내 문의는 그냥 글로, 답변만 옅은 바탕에 담는다. 카드 두 장을 쌓으면 누가 한
+        // 말인지 제목을 읽어야 안다.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(colors.surface)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.parent_contact_answer_from),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBlack,
+                    fontSize = 12.5.sp,
+                    color = colors.text,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(answer.createdAt.toDisplayDate(), color = colors.subtle, fontSize = 11.sp, fontWeight = FontSemibold)
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                answer.content,
+                color = colors.text,
+                fontSize = 14.sp,
+                lineHeight = 25.sp,
+                style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
+            )
+        }
     }
 }
 

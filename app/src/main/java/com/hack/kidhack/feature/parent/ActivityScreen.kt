@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,12 +24,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidCard
@@ -45,7 +45,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
-import org.koin.androidx.compose.koinViewModel
 
 /**
  * 내 활동 내역 (`GET /users/me/activities`).
@@ -72,33 +71,32 @@ class ActivityViewModel(
     fun selectFilter(type: ActivityType) = _filter.update { type }
 }
 
+/**
+ * 내 활동 본문 — 내가 쓴 글·댓글·좋아요.
+ *
+ * <p>커뮤니티 활동 기록이라 커뮤니티 탭 안에 있다. 계정 설정에 두면 「내 계정을 손보는
+ * 일」과 섞인다.
+ */
 @Composable
-fun ParentActivityScreen(
-    onBack: () -> Unit = {},
-    onOpenPost: (String) -> Unit = {},
-    viewModel: ActivityViewModel = koinViewModel(),
+internal fun ColumnScope.ActivityBody(
+    filter: ActivityType,
+    activities: LazyPagingItems<Activity>,
+    onFilter: (ActivityType) -> Unit,
+    onOpenPost: (String) -> Unit,
 ) {
     val colors = LocalKidhackColors.current
-    val filter by viewModel.filter.collectAsStateWithLifecycle()
-    val activities = viewModel.activities.collectAsLazyPagingItems()
-
-    ParentScreenScaffold(
-        header = { ParentHeaderBar(stringResource(R.string.parent_activity_title), onBack) },
-        scrollable = false,
-        contentPadding = PaddingValues(0.dp),
-    ) {
         Row(
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             FilterChip(stringResource(R.string.parent_activity_filter_post), filter == ActivityType.POST) {
-                viewModel.selectFilter(ActivityType.POST)
+                onFilter(ActivityType.POST)
             }
             FilterChip(stringResource(R.string.parent_activity_filter_comment), filter == ActivityType.COMMENT) {
-                viewModel.selectFilter(ActivityType.COMMENT)
+                onFilter(ActivityType.COMMENT)
             }
             FilterChip(stringResource(R.string.parent_activity_filter_like), filter == ActivityType.LIKE) {
-                viewModel.selectFilter(ActivityType.LIKE)
+                onFilter(ActivityType.LIKE)
             }
         }
 
@@ -146,8 +144,8 @@ fun ParentActivityScreen(
                 }
             }
         }
-    }
 }
+
 
 @Composable
 private fun ActivityRow(activity: Activity, onOpenPost: (String) -> Unit) {

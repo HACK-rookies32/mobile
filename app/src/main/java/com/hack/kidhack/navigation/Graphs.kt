@@ -1,11 +1,13 @@
 package com.hack.kidhack.navigation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -14,6 +16,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -49,9 +53,10 @@ import com.hack.kidhack.feature.parent.ParentCardsScreen
 import com.hack.kidhack.feature.parent.ParentChatScreen
 import com.hack.kidhack.feature.parent.ParentChildProfileScreen
 import com.hack.kidhack.feature.parent.ParentCommunityDetailScreen
-import com.hack.kidhack.feature.parent.ParentCommunityScreen
+import com.hack.kidhack.feature.parent.ParentCommunityHubScreen
 import com.hack.kidhack.feature.parent.ParentCommunityWriteScreen
 import com.hack.kidhack.feature.parent.ParentContactScreen
+import com.hack.kidhack.feature.parent.ParentAccountSettingsScreen
 import com.hack.kidhack.feature.parent.ParentChildCareScreen
 import com.hack.kidhack.feature.parent.ParentChildrenScreen
 import com.hack.kidhack.feature.parent.ParentReportScreen
@@ -59,11 +64,11 @@ import com.hack.kidhack.feature.parent.ParentEditProfileScreen
 import com.hack.kidhack.feature.parent.ParentGeofenceScreen
 import com.hack.kidhack.feature.parent.ParentHarmfulScreen
 import com.hack.kidhack.feature.parent.ParentLocationScreen
-import com.hack.kidhack.feature.parent.ParentActivityScreen
 import com.hack.kidhack.feature.parent.ParentChildAccountScreen
 import com.hack.kidhack.feature.parent.ParentWithdrawScreen
 import com.hack.kidhack.feature.parent.ParentMypageScreen
 import com.hack.kidhack.feature.parent.ParentNoticeScreen
+import com.hack.kidhack.feature.parent.ParentNotificationSettingsScreen
 import com.hack.kidhack.feature.parent.ParentNotificationsScreen
 import com.hack.kidhack.feature.parent.ParentPairingScreen
 import com.hack.kidhack.feature.parent.ParentPayScreen
@@ -101,6 +106,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
             ParentChildrenScreen(
                 onOpenChild = { navController.navigate(Route.ParentChildCare.path) },
                 onAddChild = { navController.navigate(Route.ParentPairing.path) },
+                onOpenNotifications = { navController.navigate(Route.ParentNotifications.path) },
             )
         }
         composable(Route.ParentChildCare.path) {
@@ -114,6 +120,8 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                     onOpenScreenshot = { navController.navigate(Route.ParentScreenshot.path) },
                     onOpenHarmful = { navController.navigate(Route.ParentHarmful.path) },
                     onOpenGeofence = { navController.navigate(Route.ParentGeofence.path) },
+                    onOpenChildProfile = { navController.navigate(Route.ParentChildProfile.path) },
+                    onOpenChildAccount = { navController.navigate(Route.ParentChildAccount.path) },
                 )
             }
         }
@@ -131,34 +139,32 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
         }
         parentTab(Route.ParentMypage.path, navController) {
             ParentMypageScreen(
-                onOpenEditProfile = { navController.navigate(Route.ParentEditProfile.path) },
-                onOpenNotifications = { navController.navigate(Route.ParentNotifications.path) },
-                onOpenActivities = { navController.navigate(Route.ParentActivities.path) },
-                onOpenChildAccount = { navController.navigate(Route.ParentChildAccount.path) },
-                onOpenWithdraw = { navController.navigate(Route.ParentWithdraw.path) },
-                onOpenCamera = { navController.navigate(Route.ParentCameraRequest.path) },
-                onOpenProfile = { navController.navigate(Route.ParentChildProfile.path) },
+                onOpenAccountSettings = { navController.navigate(Route.ParentAccountSettings.path) },
                 onOpenPairing = { navController.navigate(Route.ParentPairing.path) },
-                onOpenCommunity = { navController.navigate(Route.ParentCommunity.path) },
-                onOpenNotice = { navController.navigate(Route.ParentNotice.path) },
                 onOpenContact = { navController.navigate(Route.ParentContact.path) },
                 onOpenWallet = { navController.navigate(Route.ParentWallet.path) },
                 onOpenCards = { navController.navigate(Route.ParentCards.path) },
                 onOpenTerms = { navController.navigate(Route.ParentTerms.path) },
             )
         }
-        composable(Route.ParentEditProfile.path) { ParentShell(navController) { ParentEditProfileScreen(onBack = { navController.popBackStack() }) } }
-        composable(Route.ParentChildAccount.path) { ParentShell(navController) { ParentChildAccountScreen(onBack = { navController.popBackStack() }) } }
-        composable(Route.ParentWithdraw.path) { ParentShell(navController) { ParentWithdrawScreen(onBack = { navController.popBackStack() }) } }
-        composable(Route.ParentActivities.path) {
+        composable(Route.ParentAccountSettings.path) {
             ParentShell(navController) {
-                ParentActivityScreen(
+                ParentAccountSettingsScreen(
                     onBack = { navController.popBackStack() },
-                    // 활동 항목을 누르면 해당 커뮤니티 글로 간다.
-                    onOpenPost = { navController.navigate(Route.ParentCommunityDetail.create(it)) },
+                    onOpenEditProfile = { navController.navigate(Route.ParentEditProfile.path) },
+                    onOpenNotificationSettings = { navController.navigate(Route.ParentNotificationSettings.path) },
+                    onWithdraw = { navController.navigate(Route.ParentWithdraw.path) },
                 )
             }
         }
+        composable(Route.ParentNotificationSettings.path) {
+            ParentShell(navController) {
+                ParentNotificationSettingsScreen(onBack = { navController.popBackStack() })
+            }
+        }
+        composable(Route.ParentEditProfile.path) { ParentShell(navController) { ParentEditProfileScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentChildAccount.path) { ParentShell(navController) { ParentChildAccountScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentWithdraw.path) { ParentShell(navController) { ParentWithdrawScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentAppControl.path) {
             ParentShell(navController) {
                 ParentAppControlScreen(
@@ -188,13 +194,11 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 )
             }
         }
-        composable(Route.ParentCommunity.path) {
-            ParentShell(navController) {
-                ParentCommunityScreen(
-                    onOpenPost = { navController.navigate(Route.ParentCommunityDetail.create(it)) },
-                    onWrite = { navController.navigate(Route.ParentCommunityWrite.path) },
-                )
-            }
+        parentTab(Route.ParentCommunity.path, navController) {
+            ParentCommunityHubScreen(
+                onOpenPost = { navController.navigate(Route.ParentCommunityDetail.create(it)) },
+                onWrite = { navController.navigate(Route.ParentCommunityWrite.path) },
+            )
         }
         composable(Route.ParentCommunityDetail.path) { entry ->
             val postId = entry.arguments?.getString("postId").orEmpty()
@@ -245,7 +249,14 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 )
             }
         }
-        composable(Route.ParentCards.path) { ParentShell(navController) { ParentCardsScreen(onBack = { navController.popBackStack() }) } }
+        composable(Route.ParentCards.path) {
+            ParentShell(navController) {
+                ParentCardsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenWallet = { navController.navigate(Route.ParentWallet.path) },
+                )
+            }
+        }
         // 매장 단말 테스트 화면 — 숨은 라우트(회원 앱 정상 내비게이션에 없음, 디버그/시연 전용).
         composable(Route.StoreTerminal.path) {
             StoreTerminalScreen(onBack = { navController.popBackStack() })
@@ -448,7 +459,14 @@ private fun TabShell(
                                     restoreState = !isCameraTab
                                 }
                             },
-                            icon = { Text(tab.emoji, fontSize = 18.sp) },
+                            icon = {
+                                Icon(
+                                    painter = painterResource(tab.icon),
+                                    // 바로 아래 이름표가 같은 말을 한다.
+                                    contentDescription = null,
+                                    modifier = Modifier.size(21.dp),
+                                )
+                            },
                             label = {
                                 Text(
                                     tab.label,

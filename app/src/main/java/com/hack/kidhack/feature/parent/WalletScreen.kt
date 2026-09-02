@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,6 +60,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
+import com.hack.kidhack.core.designsystem.component.KidButton
+import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
@@ -600,18 +604,20 @@ private fun ChildWalletTab(state: WalletUiState, viewModel: WalletViewModel) {
     val selected = state.selectedChild ?: return
     Spacer(Modifier.height(16.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        WalletActionButton(
-            label = stringResource(R.string.parent_wallet_action_send),
-            primary = true,
+        // 카드 밖에 홀로 서는 버튼이라 앱 공용 버튼을 그대로 쓴다.
+        KidButton(
+            text = stringResource(R.string.parent_wallet_action_send),
+            onClick = { viewModel.openSheet(WalletSheet.Send, selected.id) },
             modifier = Modifier.weight(1f),
             enabled = !state.working,
-        ) { viewModel.openSheet(WalletSheet.Send, selected.id) }
-        WalletActionButton(
-            label = stringResource(R.string.parent_wallet_action_recover),
-            primary = false,
+        )
+        KidButton(
+            text = stringResource(R.string.parent_wallet_action_recover),
+            onClick = { viewModel.openSheet(WalletSheet.Recover, selected.id) },
             modifier = Modifier.weight(1f),
+            variant = KidButtonVariant.Secondary,
             enabled = !state.working && selected.balance > 0,
-        ) { viewModel.openSheet(WalletSheet.Recover, selected.id) }
+        )
     }
 
     GroupLabel(stringResource(R.string.parent_wallet_child_recent, selected.name))
@@ -672,100 +678,128 @@ internal fun WalletBalanceCard(
     onDetail: (() -> Unit)? = null,
 ) {
     val colors = LocalKidhackColors.current
-    WalletCard(modifier = modifier) {
-        Text(
-            text = stringResource(R.string.parent_wallet_my_balance),
-            color = colors.muted,
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 12.sp,
-        )
-        Spacer(Modifier.height(3.dp))
-        Text(
-            text = "₩ " + formatWon(wallet?.balance ?: 0),
-            color = colors.brand,
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBlack,
-            fontSize = 27.sp,
-        )
+    WalletCard(modifier = modifier, contentPadding = PaddingValues(0.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.parent_wallet_my_balance),
+                    modifier = Modifier.weight(1f),
+                    color = colors.muted,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 12.sp,
+                )
+                // 「자세히」를 위로 올려 카드 아래쪽을 액션에 온전히 내준다. 아래에 두면
+                // 구분선 + 링크가 한 층 더 쌓여 카드가 다섯 층이 된다.
+                if (onDetail != null) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(99.dp))
+                            .clickable(onClick = onDetail)
+                            .padding(start = 8.dp, top = 2.dp, bottom = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.parent_wallet_detail_link),
+                            color = colors.muted,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 12.sp,
+                        )
+                        Text(" ›", color = colors.muted, fontSize = 15.sp)
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            // 금액은 잉크색으로 적는다. 주황은 「누를 수 있는 것」에만 남긴다 — 잔액까지
+            // 브랜드색이면 화면에서 가장 큰 글씨가 버튼인 척한다.
+            AmountText(amount = wallet?.balance ?: 0, size = 28.sp)
 
-        if (showMonthly) {
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MonthlyStat(
-                    label = stringResource(R.string.parent_wallet_monthly_charge),
-                    amount = wallet?.monthlyChargeTotal ?: 0,
-                    tint = TintOrange,
-                    modifier = Modifier.weight(1f),
-                )
-                MonthlyStat(
-                    label = stringResource(R.string.parent_wallet_monthly_spend),
-                    amount = wallet?.monthlySpendTotal ?: 0,
-                    tint = TintBlue,
-                    modifier = Modifier.weight(1f),
-                )
+            if (showMonthly) {
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    MonthlyStat(
+                        label = stringResource(R.string.parent_wallet_monthly_charge),
+                        amount = wallet?.monthlyChargeTotal ?: 0,
+                        modifier = Modifier.weight(1f).padding(end = 14.dp),
+                    )
+                    Box(
+                        Modifier
+                            .height(28.dp)
+                            .width(1.dp)
+                            .background(colors.border.copy(alpha = 0.7f)),
+                    )
+                    MonthlyStat(
+                        label = stringResource(R.string.parent_wallet_monthly_spend),
+                        amount = wallet?.monthlySpendTotal ?: 0,
+                        modifier = Modifier.weight(1f).padding(start = 14.dp),
+                    )
+                }
             }
         }
 
-        Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            WalletActionButton(
+        // 채운 알약 두 개를 나란히 두는 대신, 카드 밑단을 반으로 갈라 누를 자리로 쓴다.
+        // 카드 폭을 다 쓰므로 과녁이 커지고, 주황 덩어리가 사라져 화면이 조용해진다.
+        HorizontalDivider(color = colors.border.copy(alpha = 0.6f))
+        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+            WalletAction(
                 label = stringResource(R.string.parent_wallet_action_charge),
-                primary = true,
+                accent = true,
                 modifier = Modifier.weight(1f),
                 onClick = onCharge,
             )
-            WalletActionButton(
+            Box(Modifier.fillMaxHeight().width(1.dp).background(colors.border.copy(alpha = 0.6f)))
+            WalletAction(
                 label = stringResource(R.string.parent_wallet_action_send),
-                primary = false,
+                accent = false,
                 modifier = Modifier.weight(1f),
                 enabled = sendEnabled,
                 onClick = onSend,
             )
         }
-
-        if (onDetail != null) {
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = colors.border.copy(alpha = 0.6f))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onDetail)
-                    .padding(top = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.parent_wallet_detail_link),
-                    modifier = Modifier.weight(1f),
-                    color = colors.muted,
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBold,
-                    fontSize = 12.5.sp,
-                )
-                Text("›", color = colors.muted, fontSize = 17.sp)
-            }
-        }
     }
 }
 
+/**
+ * 금액 한 줄.
+ *
+ * <p>「12,000원」으로 적는다. `₩ 12,000` 은 숫자 앞에 기호가 서서 눈이 금액에 닿기까지
+ * 한 글자를 더 지나야 하고, 한국 앱에서 읽는 순서와도 다르다.
+ */
 @Composable
-private fun MonthlyStat(label: String, amount: Int, tint: Color, modifier: Modifier = Modifier) {
+private fun AmountText(
+    amount: Int,
+    size: androidx.compose.ui.unit.TextUnit,
+    color: Color? = null,
+) {
     val colors = LocalKidhackColors.current
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(tint)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
-    ) {
-        Text(label, color = colors.muted, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 11.sp)
-        Spacer(Modifier.height(2.dp))
+    Row(verticalAlignment = Alignment.Bottom) {
         Text(
-            text = "₩ " + formatWon(amount),
-            color = colors.text,
+            text = formatWon(amount),
+            color = color ?: colors.text,
             fontFamily = KidhackFontFamily,
             fontWeight = FontBlack,
-            fontSize = 15.sp,
+            fontSize = size,
         )
+        Text(
+            text = stringResource(R.string.parent_wallet_won_suffix),
+            modifier = Modifier.padding(start = 2.dp, bottom = size.value.times(0.1f).dp),
+            color = color ?: colors.text,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = size.times(0.55f),
+        )
+    }
+}
+
+/** 이번 달 충전·사용. 파스텔 칸을 씌우지 않는다 — 색칸 두 개가 잔액보다 먼저 눈에 든다. */
+@Composable
+private fun MonthlyStat(label: String, amount: Int, modifier: Modifier = Modifier) {
+    val colors = LocalKidhackColors.current
+    Column(modifier = modifier) {
+        Text(label, color = colors.muted, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 11.5.sp)
+        Spacer(Modifier.height(3.dp))
+        AmountText(amount = amount, size = 15.sp)
     }
 }
 
@@ -889,7 +923,7 @@ private fun TransferSheetBody(state: WalletUiState, viewModel: WalletViewModel, 
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             state.children.forEach { child ->
                 WalletChip(
-                    label = child.name + " · ₩ " + formatWon(child.balance),
+                    label = child.name + " · " + formatWonText(child.balance),
                     selected = child.id == state.sheetChildId,
                 ) { viewModel.selectSheetChild(child.id) }
             }
@@ -989,6 +1023,8 @@ internal fun WalletBanner(error: String?, messageRes: Int?) {
 private fun WalletCard(
     modifier: Modifier = Modifier,
     padded: Boolean = true,
+    // 카드 폭을 끝까지 쓰는 구분선이 필요하면 여백을 0 으로 넘기고 안에서 직접 준다.
+    contentPadding: PaddingValues? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = LocalKidhackColors.current
@@ -999,7 +1035,12 @@ private fun WalletCard(
             .background(colors.card)
             .border(1.dp, colors.border.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
             // 목록 카드는 줄마다 위아래 여백을 스스로 갖고, 구분선은 카드 폭을 다 써야 한다.
-            .padding(horizontal = if (padded) 16.dp else 14.dp, vertical = if (padded) 16.dp else 0.dp),
+            .padding(
+                contentPadding ?: PaddingValues(
+                    horizontal = if (padded) 16.dp else 14.dp,
+                    vertical = if (padded) 16.dp else 0.dp,
+                ),
+            ),
         content = content,
     )
 }
@@ -1090,33 +1131,32 @@ private fun WalletChip(label: String, selected: Boolean, onClick: () -> Unit) {
 
 /** 잔액 칸·자녀 탭이 함께 쓰는 버튼. 채운 것과 테두리만 있는 것 두 가지. */
 @Composable
-private fun WalletActionButton(
+private fun WalletAction(
     label: String,
-    primary: Boolean,
+    accent: Boolean,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val colors = LocalKidhackColors.current
-    val tint = if (enabled) colors.brand else colors.border
-    Text(
-        text = label,
+    Box(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (primary && enabled) colors.brand else Color.Transparent)
-            .border(1.5.dp, tint, RoundedCornerShape(12.dp))
             .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(vertical = 11.dp),
-        color = when {
-            !enabled -> colors.muted
-            primary -> Color.White
-            else -> colors.brandDark
-        },
-        fontFamily = KidhackFontFamily,
-        fontWeight = FontBold,
-        fontSize = 13.5.sp,
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-    )
+            .padding(vertical = 15.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = when {
+                !enabled -> colors.muted.copy(alpha = 0.6f)
+                accent -> colors.brandDark
+                else -> colors.text
+            },
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 14.sp,
+        )
+    }
 }
 
 /** 자녀 한 명의 큰 칸. 고른 아이는 테두리와 바탕으로 구분한다. */
@@ -1162,7 +1202,7 @@ private fun ChildWalletCard(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "₩ " + formatWon(child.balance),
+            text = formatWonText(child.balance),
             fontFamily = KidhackFontFamily,
             fontWeight = FontBlack,
             fontSize = 16.sp,
@@ -1207,7 +1247,7 @@ private fun TransactionLine(tx: WalletTransaction) {
             Text(tx.createdAt, color = colors.muted, fontSize = 11.5.sp)
         }
         Text(
-            text = (if (outgoing) "−₩ " else "+₩ ") + formatWon(tx.amount),
+            text = (if (outgoing) "−" else "+") + formatWonText(tx.amount),
             fontFamily = KidhackFontFamily,
             fontWeight = FontBlack,
             fontSize = 13.5.sp,
@@ -1257,7 +1297,7 @@ private fun ChargeLine(item: ChargeHistoryItem, enabled: Boolean, onAction: (Wal
             )
         }
         Text(
-            text = "₩ " + formatWon(item.amount),
+            text = formatWonText(item.amount),
             fontFamily = KidhackFontFamily,
             fontWeight = FontBlack,
             fontSize = 13.5.sp,
@@ -1315,7 +1355,7 @@ private fun PaymentLine(item: QrPaymentHistoryItem, enabled: Boolean, onAction: 
             text = if (cancelled) {
                 stringResource(R.string.parent_wallet_payment_cancelled)
             } else {
-                "−₩ " + formatWon(item.amount)
+                "−" + formatWonText(item.amount)
             },
             fontFamily = KidhackFontFamily,
             fontWeight = FontBlack,
@@ -1426,8 +1466,6 @@ private fun AmountField(value: String, onChange: (String) -> Unit) {
             .padding(horizontal = 14.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("₩", color = colors.text, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 15.sp)
-        Spacer(Modifier.width(8.dp))
         Box(Modifier.weight(1f)) {
             if (value.isEmpty()) {
                 Text("0", color = colors.muted, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 15.sp)
@@ -1448,6 +1486,15 @@ private fun AmountField(value: String, onChange: (String) -> Unit) {
                 cursorBrush = SolidColor(colors.brand),
             )
         }
+        // 단위는 뒤에 붙인다. 앞에 세우면 커서가 늘 기호 뒤에서 시작하는 것처럼 보인다.
+        Spacer(Modifier.width(6.dp))
+        Text(
+            stringResource(R.string.parent_wallet_won_suffix),
+            color = colors.muted,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 15.sp,
+        )
     }
 }
 

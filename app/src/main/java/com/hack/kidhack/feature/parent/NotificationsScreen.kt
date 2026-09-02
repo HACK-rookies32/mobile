@@ -156,30 +156,6 @@ fun ParentNotificationsScreen(
     ) {
         ParentLoadingOrError(state.loading && state.notifications.isEmpty(), state.error, viewModel::load)
 
-        // 알림 설정 영역
-        KidCard {
-            Text(
-                stringResource(R.string.parent_notifications_section),
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 14.sp,
-                color = colors.text,
-            )
-            Spacer(Modifier.height(8.dp))
-            NotifRow(stringResource(R.string.parent_notif_location), stringResource(R.string.parent_notif_location_desc), s.location) { checked ->
-                viewModel.patch { it.copy(location = checked) }
-            }
-            NotifRow(stringResource(R.string.parent_notif_harmful), null, s.harmfulAccess) { checked ->
-                viewModel.patch { it.copy(harmfulAccess = checked) }
-            }
-            NotifRow(stringResource(R.string.parent_notif_app_usage), stringResource(R.string.parent_notif_app_usage_desc), s.appUsage) { checked ->
-                viewModel.patch { it.copy(appUsage = checked) }
-            }
-            NotifRow(stringResource(R.string.parent_notif_notice), null, s.notice, showDivider = false) { checked ->
-                viewModel.patch { it.copy(notice = checked) }
-            }
-        }
-
         // 개발 빌드에서만 보이는 알림 점검 도구. 릴리즈에는 들어가지 않는다.
         // 버튼을 누를수록 아래 목록이 길어지므로 목록 위에 둔다.
         if (BuildConfig.DEBUG) {

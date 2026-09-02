@@ -69,13 +69,13 @@ enum class TxFilter { ALL, OUT, IN, PAY }
 sealed interface PayAction {
     val label: String
     data class RefundCharge(val merchantUid: String, val amount: Int) : PayAction {
-        override val label get() = "₩ ${formatWon(amount)} 충전을 환불할까요? 지갑 잔액에서 차감돼요."
+        override val label get() = "${formatWonText(amount)} 충전을 환불할까요? 지갑 잔액에서 차감돼요."
     }
     data class CancelCharge(val merchantUid: String, val amount: Int) : PayAction {
-        override val label get() = "₩ ${formatWon(amount)} 충전 주문을 취소할까요?"
+        override val label get() = "${formatWonText(amount)} 충전 주문을 취소할까요?"
     }
     data class CancelPayment(val qrToken: String, val storeName: String, val amount: Int) : PayAction {
-        override val label get() = "$storeName 결제 ₩ ${formatWon(amount)} 를 취소할까요? 자녀 지갑으로 환급돼요."
+        override val label get() = "$storeName 결제 ${formatWonText(amount)} 를 취소할까요? 자녀 지갑으로 환급돼요."
     }
 }
 
@@ -323,7 +323,7 @@ fun ParentPayScreen(
                 Text("내 지갑 잔액", color = colors.muted, fontWeight = FontBold, fontSize = 12.sp)
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    "₩ ${formatWon(state.wallet?.balance ?: 0)}",
+                    formatWonText(state.wallet?.balance ?: 0),
                     color = colors.brand,
                     fontFamily = KidhackFontFamily,
                     fontWeight = FontBlack,
@@ -346,7 +346,7 @@ fun ParentPayScreen(
                             fontSize = 13.sp,
                         )
                         Text(
-                            "₩ ${formatWon(state.childWallet?.balance ?: 0)}",
+                            formatWonText(state.childWallet?.balance ?: 0),
                             color = colors.text,
                             fontFamily = KidhackFontFamily,
                             fontWeight = FontBold,
@@ -390,7 +390,7 @@ fun ParentPayScreen(
                 PayTab.RECLAIM -> {
                     KidCard {
                         val childBal = state.childWallet?.balance ?: 0
-                        Text("자녀 잔액: ₩ ${formatWon(childBal)}", color = colors.muted, fontSize = 12.sp)
+                        Text("자녀 잔액 " + formatWonText(childBal), color = colors.muted, fontSize = 12.sp)
                         Spacer(Modifier.height(8.dp))
                         KidTextField(state.amountInput, viewModel::onAmount, "회수할 금액", placeholder = "0", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                         Spacer(Modifier.height(16.dp))
@@ -547,7 +547,7 @@ private fun ChargeHistoryRow(
                 fontSize = 11.sp,
             )
         }
-        Text("₩ ${formatWon(item.amount)}", fontWeight = FontBlack, fontSize = 14.sp, color = colors.text)
+        Text(formatWonText(item.amount), fontWeight = FontBlack, fontSize = 14.sp, color = colors.text)
         val action = when (item.status) {
             "PAID" -> "환불" to PayAction.RefundCharge(item.merchantUid, item.amount)
             "READY" -> "취소" to PayAction.CancelCharge(item.merchantUid, item.amount)
@@ -583,7 +583,7 @@ private fun ChildPaymentRow(item: QrPaymentHistoryItem, onAction: (PayAction) ->
             Text(item.paidAtLabel, color = colors.muted, fontSize = 11.sp)
         }
         Text(
-            if (cancelled) "취소됨" else "-₩ ${formatWon(item.amount)}",
+            if (cancelled) "취소됨" else "-" + formatWonText(item.amount),
             fontWeight = FontBlack,
             fontSize = 14.sp,
             color = if (cancelled) colors.muted else colors.text,
@@ -630,7 +630,7 @@ private fun TransactionRow(tx: WalletTransaction) {
             Text(tx.createdAt, color = colors.muted, fontSize = 11.sp)
         }
         Text(
-            "${if (isOut) "-" else "+"}₩ ${formatWon(Math.abs(tx.amount))}",
+            (if (isOut) "-" else "+") + formatWonText(Math.abs(tx.amount)),
             fontWeight = FontBlack,
             fontSize = 14.sp,
             color = if (isOut) colors.text else colors.safe

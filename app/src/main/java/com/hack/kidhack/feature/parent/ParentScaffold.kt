@@ -141,10 +141,53 @@ internal fun formatDuration(sec: Int): String {
 internal fun formatWon(amount: Int): String =
     NumberFormat.getIntegerInstance(Locale.KOREA).format(kotlin.math.abs(amount))
 
+/**
+ * 「12,000원」.
+ *
+ * <p>`₩ 12,000` 은 기호가 숫자 앞에 서서, 눈이 금액에 닿기까지 한 글자를 더 지나야 한다.
+ * 한국에서 값을 읽는 순서와도 다르다. 지갑·페이의 모든 금액이 이 모양을 쓴다.
+ */
+internal fun formatWonText(amount: Int): String = formatWon(amount) + "원"
+
 internal fun formatMmSs(totalSec: Int): String {
     val m = (totalSec / 60).coerceAtLeast(0)
     val s = (totalSec % 60).coerceAtLeast(0)
     return "%d:%02d".format(m, s)
+}
+
+/**
+ * 말풍선 옆에 붙는 시각 — 「오후 2:32」.
+ *
+ * <p>대화는 날짜가 위 구분선으로 이미 갈려 있어, 풍선마다 날짜까지 적으면 같은 말이
+ * 열 번 반복된다.
+ */
+internal fun formatChatTimeOnly(raw: String): String {
+    if (raw.isBlank()) return ""
+    if (raw.matches(Regex("""^\d{1,2}:\d{2}$"""))) return raw
+    val dt = raw.toChatDateTime() ?: return raw
+    return dt.format(DateTimeFormatter.ofPattern("a h:mm", Locale.KOREA))
+}
+
+/**
+ * 날짜 구분에 쓸 하루 이름. 오늘·어제는 말로, 그 앞은 날짜로.
+ *
+ * <p>시각을 못 읽으면 null 을 준다 — 그때는 구분선을 그리지 않는다. 「방금」처럼 서버가
+ * 아닌 곳에서 만든 값이 섞이기 때문이다.
+ */
+internal fun String.toChatDay(): String? {
+    val dt = toChatDateTime() ?: return null
+    val today = LocalDate.now()
+    return when (dt.toLocalDate()) {
+        today -> "오늘"
+        today.minusDays(1) -> "어제"
+        else -> dt.format(DateTimeFormatter.ofPattern("yyyy년 M월 d일", Locale.KOREA))
+    }
+}
+
+private fun String.toChatDateTime(): LocalDateTime? {
+    if (isBlank()) return null
+    val normalized = replace(Regex("""\.\d+"""), "")
+    return runCatching { LocalDateTime.parse(normalized, DateTimeFormatter.ISO_LOCAL_DATE_TIME) }.getOrNull()
 }
 
 /** ISO/ STOMP sentAt → 채팅 말풍선용. 오늘이면 HH:mm, 아니면 yyyy.MM.dd HH:mm */

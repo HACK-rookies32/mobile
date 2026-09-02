@@ -114,6 +114,7 @@ import com.hack.kidhack.domain.model.QrPaymentHistoryItem
 import com.hack.kidhack.domain.model.StoreTerminalInfo
 import com.hack.kidhack.domain.model.ChildDashboard
 import com.hack.kidhack.domain.model.ChatMessage
+import com.hack.kidhack.domain.model.ChatMessagePage
 import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.ChildPhoto
 import com.hack.kidhack.domain.model.ChildProfile
@@ -805,19 +806,19 @@ class RealChatRepository(
     override suspend fun rooms(): List<ChatRoom> =
         api.rooms().unwrap().map { it.toDomain() }
 
-    override suspend fun messages(roomId: String, before: String?, size: Int): List<ChatMessage> {
+    override suspend fun messages(roomId: String, before: String?, size: Int): ChatMessagePage {
         val session = sessionRepository.current()
         val myId = session?.user?.id?.toLongOrNull()
         val myRole = session?.user?.role ?: Role.PARENT
-        // 커서 페이징이라 응답이 { messages, hasMore, oldestSentAt } 다.
-        // 다음 페이지는 호출자가 oldestSentAt 을 before 로 넘긴다.
-        //
+        val page = api.messages(roomId, before, size).unwrap()
         // 서버는 **최신 → 과거** 순으로 주는데 화면은 LazyColumn 에 순서대로 그리고 마지막
         // 항목으로 스크롤한다(= 아래가 최신). 그대로 쓰면 대화가 거꾸로 쌓이고, 새로 보낸
         // 메시지만 아래에 붙어 순서가 뒤섞인다. 여기서 뒤집어 「오래된 → 최신」으로 통일한다.
-        return api.messages(roomId, before, size).unwrap().messages
-            .asReversed()
-            .map { it.toDomain(myUserId = myId, myRole = myRole) }
+        return ChatMessagePage(
+            messages = page.messages.asReversed().map { it.toDomain(myUserId = myId, myRole = myRole) },
+            hasMore = page.hasMore,
+            oldestSentAt = page.oldestSentAt,
+        )
     }
 
     override fun observeMessages(roomId: String): Flow<ChatMessage> =

@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -17,15 +18,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -38,6 +50,7 @@ import com.hack.kidhack.core.common.RemoteUrl
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
+import com.hack.kidhack.core.designsystem.component.KidSearchBar
 import com.hack.kidhack.core.designsystem.component.KidTextField
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
@@ -174,25 +187,12 @@ fun ColumnScope.NoticeBody(
         return
     }
 
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        KidTextField(
-            value = state.keyword,
-            onValueChange = onKeyword,
-            label = stringResource(R.string.notice_search_label),
-            placeholder = stringResource(R.string.notice_search_hint),
-            modifier = Modifier.weight(1f),
-        )
-        KidButton(
-            text = stringResource(R.string.notice_search_action),
-            onClick = onSearch,
-            variant = KidButtonVariant.Secondary,
-        )
-    }
-    Spacer(Modifier.height(4.dp))
+    KidSearchBar(
+        value = state.keyword,
+        onValueChange = onKeyword,
+        onSearch = onSearch,
+        hint = stringResource(R.string.notice_search_hint),
+    )
 
     if (state.error != null) {
         KidCard {
@@ -207,31 +207,49 @@ fun ColumnScope.NoticeBody(
         }
     }
 
-    state.items.forEach { notice ->
-        KidCard(Modifier.clickable { onOpen(notice) }) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+    // 공지 하나하나를 카드로 감싸면 제목 한 줄짜리 상자가 줄줄이 늘어선다. 게시판 탭과
+    // 같은 구분선 목록으로 둔다. 바깥 Column 의 줄 간격이 사이에 끼지 않도록 한 겹 묶는다.
+    Column(Modifier.fillMaxWidth()) {
+        state.items.forEachIndexed { index, notice ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpen(notice) }
+                    .padding(vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         notice.title,
                         fontFamily = KidhackFontFamily,
                         fontWeight = FontBold,
-                        fontSize = 14.sp,
+                        fontSize = 14.5.sp,
+                        lineHeight = 20.sp,
+                        letterSpacing = (-0.3).sp,
                         color = colors.text,
                     )
+                    Spacer(Modifier.height(5.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(notice.createdAt.toDisplayDate(), color = colors.muted, fontSize = 12.sp)
+                        Text(notice.createdAt.toDisplayDate(), color = colors.subtle, fontSize = 11.5.sp)
                         // 첨부·링크는 목록에 개수만 온다. 실물은 상세에서 받는다.
-                        if (notice.attachmentCount > 0) {
-                            Spacer(Modifier.width(8.dp))
-                            Text("📎 " + notice.attachmentCount, color = colors.muted, fontSize = 12.sp)
+                        val extras = buildList {
+                            if (notice.attachmentCount > 0) {
+                                add(stringResource(R.string.notice_attachment_count, notice.attachmentCount))
+                            }
+                            if (notice.linkCount > 0) {
+                                add(stringResource(R.string.notice_link_count, notice.linkCount))
+                            }
                         }
-                        if (notice.linkCount > 0) {
-                            Spacer(Modifier.width(8.dp))
-                            Text("🔗 " + notice.linkCount, color = colors.muted, fontSize = 12.sp)
+                        extras.forEach { label ->
+                            Text(" · ", color = colors.subtle, fontSize = 11.5.sp)
+                            Text(label, color = colors.subtle, fontSize = 11.5.sp)
                         }
                     }
                 }
-                Text("›", color = colors.border, fontSize = 16.sp)
+                Text("›", color = colors.border, fontSize = 17.sp)
+            }
+            if (index != state.items.lastIndex) {
+                HorizontalDivider(color = colors.line)
             }
         }
     }
