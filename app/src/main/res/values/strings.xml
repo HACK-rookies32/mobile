@@ -19,9 +19,10 @@
     <string name="terms_effective">이 약관은 2026년 8월 28일부터 적용됩니다.</string>
 
     <!-- 공지 목록. 부모·자녀 화면이 같은 본문을 쓴다. -->
-    <string name="notice_search_label">공지 검색</string>
-    <string name="notice_search_hint">제목으로 검색</string>
-    <string name="notice_search_action">검색</string>
+    <string name="notice_search_hint">공지 제목 검색</string>
+    <string name="search_clear">검색어 지우기</string>
+    <string name="notice_attachment_count">첨부 %1$d</string>
+    <string name="notice_link_count">링크 %1$d</string>
     <string name="notice_retry">다시 시도</string>
     <string name="notice_empty">등록된 공지가 없어요.</string>
     <string name="notice_loading">불러오는 중…</string>

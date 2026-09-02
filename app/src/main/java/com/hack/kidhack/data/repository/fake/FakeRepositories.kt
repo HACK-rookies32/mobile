@@ -510,8 +510,15 @@ class FakeCommunityRepository : CommunityRepository {
 
     override fun pagedPosts(keyword: String?): Flow<PagingData<Post>> = Pager(PagingConfig(20)) {
         PageResponsePagingSource { page, size ->
-            val all = if (keyword.isNullOrBlank()) items.toList()
-                else items.filter { it.title.contains(keyword, ignoreCase = true) || it.author.contains(keyword, ignoreCase = true) }
+            // 서버와 같이 최신순으로 내린다. 정렬하지 않으면 목 빌드에서만 순서가 뒤죽박죽이라,
+            // 실기기로 옮기기 전까지 정렬 문제를 알아채지 못한다.
+            val all = (
+                if (keyword.isNullOrBlank()) items.toList()
+                else items.filter {
+                    it.title.contains(keyword, ignoreCase = true) ||
+                        it.author.contains(keyword, ignoreCase = true)
+                }
+                ).sortedWith(compareByDescending<Post> { it.createdAtLabel }.thenByDescending { it.id })
             val totalPages = kotlin.math.ceil(all.size / size.toDouble()).toInt().coerceAtLeast(1)
             val slice = all.drop(page * size).take(size)
             PageResponse(slice, page, size, all.size.toLong(), totalPages)

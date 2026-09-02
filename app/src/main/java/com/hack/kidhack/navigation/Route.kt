@@ -1,5 +1,8 @@
 package com.hack.kidhack.navigation
 
+import androidx.annotation.DrawableRes
+import com.hack.kidhack.R
+
 sealed class Route(val path: String) {
     data object Splash : Route("splash")
     data object Login : Route("login")
@@ -14,8 +17,9 @@ sealed class Route(val path: String) {
     data object ParentChat : Route("parent/chat")
     data object ParentNotifications : Route("parent/notifications")
     data object ParentMypage : Route("parent/mypage")
+    data object ParentAccountSettings : Route("parent/account")
+    data object ParentNotificationSettings : Route("parent/account/notifications")
     data object ParentEditProfile : Route("parent/editprofile")
-    data object ParentActivities : Route("parent/activities")
     data object ParentChildAccount : Route("parent/childaccount")
     data object ParentWithdraw : Route("parent/withdraw")
     data object ParentAppControl : Route("parent/appcontrol")
@@ -87,21 +91,28 @@ sealed class Route(val path: String) {
 data class TabItem(
     val route: Route,
     val label: String,
-    val emoji: String,
+    /** 탭 아이콘. 이모지는 기기마다 모양·크기가 달라 탭 줄이 흔들린다. */
+    @DrawableRes val icon: Int,
 )
 
+/**
+ * 부모 하단 탭.
+ *
+ * <p>「알림」 자리를 커뮤니티가 대신한다. 알림은 자녀관리 헤더의 종으로 옮겼다 — 탭 다섯
+ * 자리는 매일 오가는 곳에 주는 것이 맞고, 알림은 일이 생겼을 때만 들여다본다.
+ */
 val ParentTabs = listOf(
-    TabItem(Route.ParentChildren, "자녀관리", "👪"),
-    TabItem(Route.ParentLocation, "위치", "📍"),
-    TabItem(Route.ParentChat, "채팅", "💬"),
-    TabItem(Route.ParentNotifications, "알림", "🔔"),
-    TabItem(Route.ParentMypage, "마이", "👤"),
+    TabItem(Route.ParentChildren, "자녀관리", R.drawable.ic_child),
+    TabItem(Route.ParentLocation, "위치", R.drawable.ic_place),
+    TabItem(Route.ParentChat, "채팅", R.drawable.ic_chat),
+    TabItem(Route.ParentCommunity, "커뮤니티", R.drawable.ic_people),
+    TabItem(Route.ParentMypage, "마이", R.drawable.ic_person),
 )
 
 val ChildTabs = listOf(
-    TabItem(Route.ChildHome, "홈", "🏠"),
-    TabItem(Route.ChildChat, "채팅", "💬"),
-    TabItem(Route.ChildServices, "서비스", "🛡️"),
-    TabItem(Route.ChildCamera, "카메라", "📷"),
-    TabItem(Route.ChildMypage, "마이", "👤"),
+    TabItem(Route.ChildHome, "홈", R.drawable.ic_home),
+    TabItem(Route.ChildChat, "채팅", R.drawable.ic_chat),
+    TabItem(Route.ChildServices, "서비스", R.drawable.ic_shield),
+    TabItem(Route.ChildCamera, "카메라", R.drawable.ic_camera),
+    TabItem(Route.ChildMypage, "마이", R.drawable.ic_person),
 )

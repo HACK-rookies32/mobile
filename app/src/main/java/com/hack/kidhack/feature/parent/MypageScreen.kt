@@ -1,6 +1,7 @@
 package com.hack.kidhack.feature.parent
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -12,13 +13,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -232,16 +237,8 @@ class MypageViewModel(
  */
 @Composable
 fun ParentMypageScreen(
-    onOpenEditProfile: () -> Unit = {},
-    onOpenNotifications: () -> Unit = {},
-    onOpenActivities: () -> Unit = {},
-    onOpenChildAccount: () -> Unit = {},
-    onOpenWithdraw: () -> Unit = {},
-    onOpenCamera: () -> Unit = {},
-    onOpenProfile: () -> Unit = {},
+    onOpenAccountSettings: () -> Unit = {},
     onOpenPairing: () -> Unit = {},
-    onOpenCommunity: () -> Unit = {},
-    onOpenNotice: () -> Unit = {},
     onOpenContact: () -> Unit = {},
     onOpenWallet: () -> Unit = {},
     onOpenCards: () -> Unit = {},
@@ -255,6 +252,7 @@ fun ParentMypageScreen(
     val walletState by walletViewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
     val user = state.user
+    val childCount = state.children.size.takeIf { it > 0 }?.let { "${'$'}it명" }.orEmpty()
 
     // 지갑 화면에서 충전·송금하고 돌아오면 잔액이 달라져 있다.
     LifecycleResumeRefresh { walletViewModel.load() }
@@ -263,46 +261,189 @@ fun ParentMypageScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.card)
-            .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .statusBarsPadding(),
     ) {
+        // 화면 이름을 먼저 둔다. 자녀관리·사용 리포트·커뮤니티가 모두 이 자리에 제목을
+        // 갖고 있어서, 마이페이지만 없으면 탭을 옮길 때 한 칸이 비어 보인다. 이름표가
+        // 위를 받쳐 주면 프로필도 상태바에 붙지 않는다.
+        // 제목 줄 높이를 40dp 로 맞춘다. 자녀관리는 제목 옆에 40dp 종 버튼이 있어 줄이
+        // 그만큼 높고, 21sp 글씨가 그 안에서 가운데로 내려앉는다. 버튼이 없는 화면은 줄이
+        // 글씨 높이만큼만이라 제목이 상태바에 바짝 붙어 보였다 — 같은 높이를 직접 준다.
         Row(
-            modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)
+                .heightIn(min = 40.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier.size(52.dp).clip(RoundedCornerShape(99.dp)).background(colors.card),
-                contentAlignment = Alignment.Center,
-            ) { Text("👩", fontSize = 26.sp) }
-            Spacer(Modifier.size(14.dp))
-            Column {
-                Text(
-                    stringResource(R.string.parent_mypage_greeting, user?.name ?: ""),
-                    color = colors.text,
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBlack,
-                    fontSize = 20.sp,
-                )
-                Text(
-                    user?.email ?: user?.loginId.orEmpty(),
-                    color = colors.muted,
-                    fontSize = 12.sp,
-                )
-            }
+            Text(
+                text = stringResource(R.string.parent_mypage_title),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBlack,
+                fontSize = 21.sp,
+                color = colors.text,
+            )
         }
 
-        WalletBalanceCard(
-            wallet = walletState.wallet,
-            onCharge = { walletViewModel.openSheet(WalletSheet.Charge) },
-            onSend = { walletViewModel.openSheet(WalletSheet.Send) },
-            sendEnabled = walletState.children.isNotEmpty(),
-            onDetail = onOpenWallet,
-        )
-        WalletBanner(error = walletState.error, messageRes = walletState.messageRes)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+        ) {
+            // 프로필 줄 전체가 계정 설정으로 가는 문이다. 톱니만 눌리게 두면 손가락이
+            // 19dp 짜리 과녁을 맞혀야 한다 — 톱니는 「여기를 누르면 설정」이라는 표시로만 둔다.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(onClick = onOpenAccountSettings)
+                    .padding(start = 4.dp, end = 6.dp, top = 10.dp, bottom = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(52.dp).clip(CircleShape).background(colors.brandLight),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_person),
+                        contentDescription = null,
+                        modifier = Modifier.size(26.dp),
+                        tint = colors.brandDark,
+                    )
+                }
+                Spacer(Modifier.size(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.parent_mypage_greeting, user?.name ?: ""),
+                        color = colors.text,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBlack,
+                        fontSize = 19.sp,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        user?.email ?: user?.loginId.orEmpty(),
+                        color = colors.muted,
+                        fontSize = 12.5.sp,
+                    )
+                }
+                Icon(
+                    painter = painterResource(R.drawable.ic_gear),
+                    contentDescription = stringResource(R.string.parent_account_settings),
+                    modifier = Modifier.size(19.dp),
+                    tint = colors.muted,
+                )
+            }
 
-        ParentLoadingOrError(state.loading && user == null, state.error, viewModel::load)
+            WalletBalanceCard(
+                wallet = walletState.wallet,
+                onCharge = { walletViewModel.openSheet(WalletSheet.Charge) },
+                onSend = { walletViewModel.openSheet(WalletSheet.Send) },
+                sendEnabled = walletState.children.isNotEmpty(),
+                onDetail = onOpenWallet,
+            )
+            WalletBanner(error = walletState.error, messageRes = walletState.messageRes)
+
+            ParentLoadingOrError(state.loading && user == null, state.error, viewModel::load)
+
+            // 묶음 이름은 카드 밖 작은 회색 글씨로. 계정 설정·알림 설정·자녀관리가 모두
+            // 이 모양이라, 카드 안에 이름이 들어가 있던 여기만 층이 하나 더 깊어 보였다.
+            // 줄마다 아이콘은 달지 않는다 — 이름만으로 뜻이 분명해 눈만 피로해진다.
+            GroupLabel(stringResource(R.string.parent_mypage_service))
+            OutlinedGroup {
+                ListRow(stringResource(R.string.parent_mypage_pairing), trailing = childCount, onClick = onOpenPairing)
+                ListRow(stringResource(R.string.parent_mypage_cards), onClick = onOpenCards, showDivider = false)
+            }
+            // 커뮤니티·공지사항·활동 내역은 하단 탭 「커뮤니티」로 옮겼다. 여기 목록에 두면
+            // 글 하나 읽는 데 마이페이지를 거쳐야 한다.
+            GroupLabel(stringResource(R.string.parent_mypage_other))
+            OutlinedGroup {
+                ListRow(stringResource(R.string.parent_mypage_contact), onClick = onOpenContact)
+                ListRow(stringResource(R.string.parent_mypage_terms), onClick = onOpenTerms)
+                ListRow(stringResource(R.string.parent_mypage_version), trailing = "", onClick = null, showDivider = false)
+            }
+            Spacer(Modifier.height(28.dp))
+        }
+    }
+
+    // 충전·송금 미니 시트. 지갑 화면과 같은 것을 쓴다.
+    WalletSheetHost(state = walletState, viewModel = walletViewModel, onRegisterCard = onOpenCards)
+}
+
+@Composable
+private fun FormHeader(title: String, onClose: () -> Unit) {
+    val colors = LocalKidhackColors.current
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            modifier = Modifier.weight(1f),
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 14.sp,
+            color = colors.text,
+        )
+        Text(
+            "✕",
+            modifier = Modifier
+                .clip(RoundedCornerShape(99.dp))
+                .clickable(onClick = onClose)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            color = colors.muted,
+            fontSize = 16.sp,
+            fontWeight = FontBold,
+        )
+    }
+    Spacer(Modifier.height(8.dp))
+}
+
+/** 묶음 위의 작은 회색 이름. 계정 설정·알림 설정과 같은 모양이다. */
+@Composable
+private fun GroupLabel(title: String) {
+    val colors = LocalKidhackColors.current
+    Text(
+        text = title,
+        modifier = Modifier.padding(start = 8.dp, top = 18.dp, bottom = 8.dp),
+        color = colors.muted,
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBold,
+        fontSize = 12.sp,
+    )
+}
+
+/** 테두리만 두른 흰 카드. 안쪽 줄이 제 여백을 갖고 구분선은 카드 폭을 다 쓴다. */
+@Composable
+private fun OutlinedGroup(content: @Composable ColumnScope.() -> Unit) {
+    val colors = LocalKidhackColors.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, colors.border.copy(alpha = 0.9f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp),
+        content = content,
+    )
+}
+
+/**
+ * 비밀번호 변경 폼.
+ *
+ * <p>서버에 「현재 비밀번호로 바꾸기」 API 가 없어 가입 이메일 인증코드를 받아 재설정하는
+ * 2단계(`/auth/reset-password/send-code` → `/auth/reset-password`)를 그대로 쓴다.
+ *
+ * <p>계정 설정 화면이 부른다. 마이페이지에 있던 것을 옮겼다 — 비밀번호는 내 계정을
+ * 손보는 일이라 서비스 목록과 같은 자리에 있을 이유가 없다.
+ */
+@Composable
+internal fun ColumnScope.PasswordChangeSection(
+    state: MypageUiState,
+    viewModel: MypageViewModel,
+) {
+    val colors = LocalKidhackColors.current
+    val user = state.user
         if (state.changingPassword) {
             KidCard {
                 FormHeader(stringResource(R.string.parent_mypage_change_password), viewModel::togglePasswordChange)
@@ -382,122 +523,4 @@ fun ParentMypageScreen(
                 },
             )
         }
-        GroupCard(stringResource(R.string.parent_mypage_account)) {
-            ListRow(stringResource(R.string.parent_mypage_edit_profile), onClick = onOpenEditProfile)
-            ListRow(stringResource(R.string.parent_mypage_change_password), subtitle = stringResource(R.string.parent_mypage_password_stub), onClick = viewModel::togglePasswordChange)
-            ListRow(stringResource(R.string.parent_mypage_notif_settings), onClick = onOpenNotifications)
-            ListRow(stringResource(R.string.parent_mypage_activities), onClick = onOpenActivities, showDivider = false)
-        }
-
-        GroupCard(stringResource(R.string.parent_mypage_child_manage)) {
-            // 자녀 선택기 추가
-            if (state.children.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    state.children.forEach { child ->
-                        val selected = child.id == state.selectedChildId
-                        Text(
-                            text = child.name,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(99.dp))
-                                .background(if (selected) colors.brand else colors.surface)
-                                .clickable { viewModel.selectChild(child.id) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            color = if (selected) Color.White else colors.text,
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontBold,
-                            fontSize = 12.sp,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = colors.border.copy(alpha = 0.5f))
-                Spacer(Modifier.height(8.dp))
-            }
-
-            // 카메라 촬영은 일단 빼기로 한 기능이라 입구만 감춘다. 화면·라우트(ParentCameraRequest)는
-            // 그대로 두어 되돌리기 쉽게 한다. (mobile#51 — 자녀관리로 옮길지 여부는 별도 결정)
-            // ListRow(stringResource(R.string.parent_mypage_camera), leading = "📷", onClick = onOpenCamera)
-            ListRow(stringResource(R.string.parent_mypage_child_profile), leading = "👦", onClick = onOpenProfile)
-            // 루키즈 페이는 위 잔액 칸이 대신한다. 지갑으로 들어가는 문이 두 개면 어느 쪽이
-            // 무엇인지 설명할 수 없다.
-            ListRow(stringResource(R.string.parent_mypage_child_account), leading = "🔓", onClick = onOpenChildAccount, showDivider = false)
-        }
-
-        GroupCard(stringResource(R.string.parent_mypage_community_group)) {
-            ListRow(stringResource(R.string.parent_mypage_community), leading = "👨‍👩‍👧", onClick = onOpenCommunity)
-            ListRow(stringResource(R.string.parent_mypage_notice), leading = "📢", onClick = onOpenNotice)
-            ListRow(stringResource(R.string.parent_mypage_contact), leading = "📮", onClick = onOpenContact, showDivider = false)
-        }
-
-        GroupCard(stringResource(R.string.parent_mypage_service)) {
-            ListRow(stringResource(R.string.parent_mypage_pairing), leading = "🔗", onClick = onOpenPairing)
-            ListRow(stringResource(R.string.parent_mypage_cards), leading = "🪪", onClick = onOpenCards, showDivider = false)
-        }
-        GroupCard(stringResource(R.string.parent_mypage_other)) {
-            ListRow(stringResource(R.string.parent_mypage_terms), onClick = onOpenTerms)
-            ListRow(stringResource(R.string.parent_mypage_version), trailing = "", onClick = null)
-            ListRow(stringResource(R.string.parent_mypage_withdraw), onClick = onOpenWithdraw, showDivider = false)
-        }
-        KidButton(
-            stringResource(R.string.parent_mypage_logout),
-            viewModel::logout,
-            Modifier.fillMaxWidth(),
-            KidButtonVariant.Danger,
-        )
-        Spacer(Modifier.height(8.dp))
-    }
-
-    // 충전·송금 미니 시트. 지갑 화면과 같은 것을 쓴다.
-    WalletSheetHost(state = walletState, viewModel = walletViewModel, onRegisterCard = onOpenCards)
-}
-
-@Composable
-private fun FormHeader(title: String, onClose: () -> Unit) {
-    val colors = LocalKidhackColors.current
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            title,
-            modifier = Modifier.weight(1f),
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 14.sp,
-            color = colors.text,
-        )
-        Text(
-            "✕",
-            modifier = Modifier
-                .clip(RoundedCornerShape(99.dp))
-                .clickable(onClick = onClose)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            color = colors.muted,
-            fontSize = 16.sp,
-            fontWeight = FontBold,
-        )
-    }
-    Spacer(Modifier.height(8.dp))
-}
-
-@Composable
-private fun GroupCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    val colors = LocalKidhackColors.current
-    KidCard {
-        Text(
-            title.uppercase(),
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 12.sp,
-            color = colors.muted,
-        )
-        Spacer(Modifier.height(4.dp))
-        content()
-    }
 }

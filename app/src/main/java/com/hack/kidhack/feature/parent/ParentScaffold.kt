@@ -141,6 +141,14 @@ internal fun formatDuration(sec: Int): String {
 internal fun formatWon(amount: Int): String =
     NumberFormat.getIntegerInstance(Locale.KOREA).format(kotlin.math.abs(amount))
 
+/**
+ * 「12,000원」.
+ *
+ * <p>`₩ 12,000` 은 기호가 숫자 앞에 서서, 눈이 금액에 닿기까지 한 글자를 더 지나야 한다.
+ * 한국에서 값을 읽는 순서와도 다르다. 지갑·페이의 모든 금액이 이 모양을 쓴다.
+ */
+internal fun formatWonText(amount: Int): String = formatWon(amount) + "원"
+
 internal fun formatMmSs(totalSec: Int): String {
     val m = (totalSec / 60).coerceAtLeast(0)
     val s = (totalSec % 60).coerceAtLeast(0)

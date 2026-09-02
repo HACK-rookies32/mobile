@@ -168,6 +168,10 @@ data class Post(
     val title: String,
     val author: String,
     val content: String = "",
+    /** 목록에서 한 줄로 보여 줄 본문 앞부분. 상세에서는 비어 있다. */
+    val preview: String = "",
+    /** 목록 오른쪽에 붙는 첫 사진. 사진이 없으면 null. */
+    val thumbnail: String? = null,
     val likeCount: Int = 0,
     val createdAtLabel: String = "",
     val liked: Boolean = false,

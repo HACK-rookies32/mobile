@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.annotation.DrawableRes
@@ -98,6 +99,8 @@ data class ChildCareUiState(
      */
     val setup: ChildSetup = ChildSetup(),
     val selectedChildId: String? = null,
+    /** 안 읽은 알림이 있는지. 헤더의 종에 점을 붙일지 정한다. */
+    val hasUnread: Boolean = false,
 ) {
     /** 화면 제목에 쓸 이름. 아직 못 불러왔으면 빈 값. */
     val selectedChildName: String
@@ -145,7 +148,15 @@ class ChildCareViewModel(
     private val _state = MutableStateFlow(ChildCareUiState())
     val state: StateFlow<ChildCareUiState> = _state.asStateFlow()
 
-    init { load() }
+    init {
+        load()
+        // 보관함을 구독해 안 읽은 알림이 있는지만 본다. 목록은 알림 화면이 그린다.
+        viewModelScope.launch {
+            alertSync.alerts.collect { alerts ->
+                _state.update { it.copy(hasUnread = alerts.any { alert -> !alert.read }) }
+            }
+        }
+    }
 
     fun load() {
         viewModelScope.launch {
@@ -259,6 +270,7 @@ class ChildCareViewModel(
 fun ParentChildrenScreen(
     onOpenChild: () -> Unit = {},
     onAddChild: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {},
     viewModel: ChildCareViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -284,14 +296,47 @@ fun ParentChildrenScreen(
             .background(colors.card)
             .statusBarsPadding(),
     ) {
-        Text(
-            text = stringResource(R.string.parent_childcare_title),
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 4.dp),
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBlack,
-            fontSize = 21.sp,
-            color = colors.text,
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.parent_childcare_title),
+                modifier = Modifier.weight(1f),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBlack,
+                fontSize = 21.sp,
+                color = colors.text,
+            )
+            // 알림이 하단 탭에서 빠지면서 이 종이 유일한 입구가 됐다. 안 읽은 것이 있으면
+            // 점으로 알린다 — 개수까지 적으면 「몇 건인지」가 「무슨 일인지」보다 앞선다.
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onOpenNotifications),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_bell),
+                    contentDescription = stringResource(R.string.parent_notifications_title),
+                    modifier = Modifier.size(21.dp),
+                    tint = colors.text,
+                )
+                if (state.hasUnread) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 9.dp, end = 9.dp)
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(colors.danger),
+                    )
+                }
+            }
+        }
         Text(
             text = stringResource(R.string.parent_childcare_pick_child),
             modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
@@ -643,6 +688,8 @@ fun ParentChildCareScreen(
     onOpenScreenshot: () -> Unit = {},
     onOpenHarmful: () -> Unit = {},
     onOpenGeofence: () -> Unit = {},
+    onOpenChildProfile: () -> Unit = {},
+    onOpenChildAccount: () -> Unit = {},
     viewModel: ChildCareViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -699,6 +746,23 @@ fun ParentChildCareScreen(
                     state.setup.places,
                     onOpenGeofence,
                 )),
+        ),
+        // 마이페이지에 있던 자녀 항목을 여기로 옮겼다. 자녀 한 명에 매인 설정이라 자녀를
+        // 고른 뒤에 보는 것이 맞다 — 마이페이지에 두면 어느 아이 것인지 알 수 없었다.
+        CareGroup(
+            R.string.parent_childcare_group_account,
+            listOf(
+                CareItem(
+                    R.drawable.ic_person,
+                    R.string.parent_mypage_child_profile,
+                    onClick = onOpenChildProfile,
+                ),
+                CareItem(
+                    R.drawable.ic_key,
+                    R.string.parent_mypage_child_account,
+                    onClick = onOpenChildAccount,
+                ),
+            ),
         ),
     )
 

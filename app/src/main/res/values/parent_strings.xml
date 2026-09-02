@@ -64,8 +64,21 @@
     <string name="parent_notif_app_usage_desc">금지 앱 실행, 사용량 한도</string>
     <string name="parent_notif_notice">공지 알림</string>
 
+    <string name="parent_mypage_title">마이페이지</string>
     <string name="parent_mypage_greeting">%1$s 님</string>
     <string name="parent_mypage_account">계정 설정</string>
+    <!-- 계정 설정 — 마이페이지 이름 옆 톱니로 들어간다 -->
+    <string name="parent_account_settings">계정 설정</string>
+    <string name="parent_account_manage">계정 관리</string>
+    <string name="parent_account_change_photo">프로필 사진 바꾸기</string>
+    <string name="parent_account_profile_hint">닉네임 · 연락처</string>
+    <string name="parent_account_role_parent">보호자</string>
+    <!-- 알림 설정 — 계정 설정 안. 받은 알림 목록과 다른 화면이다 -->
+    <string name="parent_notif_settings_title">알림 설정</string>
+    <string name="parent_notif_settings_lead">받고 싶은 알림만 켜 두세요.</string>
+    <string name="parent_notif_group_safety">안전</string>
+    <string name="parent_notif_group_usage">사용</string>
+    <string name="parent_notif_group_etc">기타</string>
     <string name="parent_mypage_edit_profile">내 정보 수정</string>
     <string name="parent_mypage_notif_settings">알림 설정</string>
     <string name="parent_mypage_change_password">비밀번호 변경</string>
@@ -82,8 +95,6 @@
     <string name="parent_mypage_password_confirm_ok">변경하기</string>
     <string name="parent_mypage_password_confirm_cancel">취소</string>
     <string name="parent_mypage_password_changed">비밀번호를 변경했어요</string>
-    <string name="parent_mypage_activities">활동 내역</string>
-    <string name="parent_activity_title">활동 내역</string>
     <string name="parent_activity_type_unknown">활동</string>
     <string name="parent_activity_filter_post">작성한 글</string>
     <string name="parent_activity_filter_comment">댓글</string>
@@ -97,9 +108,6 @@
     <string name="parent_mypage_child_profile">자녀 프로필</string>
     <string name="parent_mypage_harmful">유해사이트 관리</string>
     <string name="parent_mypage_pairing">자녀 페어링</string>
-    <string name="parent_mypage_community_group">커뮤니티</string>
-    <string name="parent_mypage_community">부모 커뮤니티</string>
-    <string name="parent_mypage_notice">공지사항</string>
     <string name="parent_mypage_contact">관리자 문의</string>
     <string name="parent_mypage_service">서비스</string>
     <string name="parent_mypage_pay">루키즈 페이</string>
@@ -264,17 +272,32 @@
     <string name="parent_pairing_not_connected">아직 연결된 자녀가 없어요. 자녀 기기에서 코드를 입력했는지 확인해 주세요.</string>
     <string name="parent_pairing_to_dashboard">대시보드로 이동</string>
 
-    <string name="parent_community_title">부모 커뮤니티</string>
+    <string name="parent_community_hub_title">커뮤니티</string>
+    <string name="parent_community_tab_board">게시판</string>
+    <string name="parent_community_tab_notice">공지사항</string>
+    <string name="parent_community_tab_activity">내 활동</string>
+    <string name="parent_back">뒤로 가기</string>
+    <string name="parent_community_like_count">좋아요 %1$d</string>
+    <string name="parent_community_comment_head">댓글 %1$d</string>
+    <string name="parent_community_search_hint">제목 · 작성자 검색</string>
+    <string name="parent_community_search_empty">「%1$s」에 맞는 글이 없어요</string>
+    <string name="parent_community_empty">아직 올라온 글이 없어요</string>
+    <string name="parent_community_load_more_failed">더 불러오지 못했어요</string>
+    <string name="parent_community_more">더 보기</string>
+    <string name="parent_community_attach_photo">사진</string>
+    <string name="parent_community_attach_link">링크</string>
+    <string name="parent_community_attach_remove">첨부 지우기</string>
+    <string name="parent_community_link_title">링크 추가</string>
+    <string name="parent_community_link_lead">글 아래에 붙습니다. 누르면 브라우저가 열려요.</string>
+    <string name="parent_community_link_label">주소</string>
+    <string name="parent_community_link_add">추가</string>
+    <string name="parent_community_attach_count">사진 %1$d · 링크 %2$d</string>
     <string name="parent_community_write">글 작성</string>
     <string name="parent_community_write_title">제목</string>
     <string name="parent_community_write_body">내용</string>
     <string name="parent_community_write_submit">등록</string>
-    <string name="parent_community_comments">💬 %1$d</string>
-    <string name="parent_community_likes">❤️ %1$d</string>
-    <string name="parent_community_like">좋아요</string>
     <string name="parent_community_comment_hint">댓글을 입력하세요</string>
     <string name="parent_community_comment_send">등록</string>
-    <string name="parent_community_detail">게시글</string>
     <string name="parent_community_delete">삭제</string>
     <string name="parent_community_edit">수정</string>
     <string name="parent_community_edit_submit">수정 저장하기</string>
@@ -330,6 +353,7 @@
     <string name="parent_childcare_group_screen">화면 확인</string>
     <string name="parent_childcare_group_online">온라인 안전</string>
     <string name="parent_childcare_group_place">이동 안전</string>
+    <string name="parent_childcare_group_account">자녀 계정</string>
     <string name="parent_childcare_report">사용 리포트</string>
     <string name="parent_childcare_report_desc">오늘 사용 시간과 최근 알림을 봅니다.</string>
     <string name="parent_childcare_usage_detail">앱 사용 상세</string>
@@ -393,6 +417,7 @@
     <string name="parent_wallet_title">루키즈 페이</string>
     <string name="parent_wallet_tab_mine">내 지갑</string>
     <string name="parent_wallet_tab_child">자녀 지갑</string>
+    <string name="parent_wallet_won_suffix">원</string>
     <string name="parent_wallet_my_balance">내 지갑 잔액</string>
     <string name="parent_wallet_detail_link">지갑 상세 · 자녀별 잔액</string>
     <string name="parent_wallet_monthly_charge">이번 달 충전</string>

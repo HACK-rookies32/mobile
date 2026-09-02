@@ -169,6 +169,7 @@ object FakeData {
             title = "유튜브 시청 시간 제한, 어떻게 하시나요?",
             author = "행복한엄마",
             content = "하루 한 시간으로 정해 두었는데 다들 어떻게 하시는지 궁금해요.",
+            preview = "하루 한 시간으로 정해 두었는데 다들 어떻게 하시는지 궁금해요.",
             likeCount = 24,
             createdAtLabel = "2026-08-28T14:02:00",
             comments = listOf(
@@ -176,8 +177,24 @@ object FakeData {
                 Comment("2", "103", "민준아빠", "약속을 정하는 게 가장 중요한 것 같아요.", "2026-08-28T15:40:00"),
             ),
         ),
-        Post(id = "2", authorId = "104", title = "스마트폰 처음 사준 시기가 언제예요?", author = "두아이아빠", likeCount = 37, createdAtLabel = "2026-08-28T09:00:00"),
-        Post(id = "3", authorId = "105", title = "루키즈 앱 쓰고 마음이 편해졌어요 후기", author = "워킹맘", likeCount = 18, createdAtLabel = "2026-08-27T20:00:00"),
+        Post(
+            id = "2",
+            authorId = "104",
+            title = "스마트폰 처음 사준 시기가 언제예요?",
+            author = "두아이아빠",
+            preview = "초등 5학년인데 주변에서 다 갖고 다닌다고 사 달라고 조르네요.",
+            likeCount = 37,
+            createdAtLabel = "2026-08-28T09:00:00",
+        ),
+        Post(
+            id = "3",
+            authorId = "105",
+            title = "루키즈 앱 쓰고 마음이 편해졌어요 후기",
+            author = "워킹맘",
+            preview = "퇴근이 늦어 늘 불안했는데 위치 알림 하나로 마음이 놓입니다.",
+            likeCount = 18,
+            createdAtLabel = "2026-08-27T20:00:00",
+        ),
     ) + (4..48).map { i ->
         // pageSize(20)보다 확실히 많게 하려고 기존 더미 패턴을 순환 생성한다.
         val titles = listOf(
@@ -189,11 +206,23 @@ object FakeData {
             "우리 아이 스마트폰 첫 개통 후기",
         )
         val authors = listOf("행복한엄마", "두아이아빠", "워킹맘", "도전맘", "민준아빠", "하늘맘")
+        // 목록 한 줄에 본문 앞부분이 붙는 안(B)이라, 더미도 미리보기를 갖고 있어야
+        // 실제 화면과 같은 높이로 그려진다. 일부는 일부러 비워 둔다 — 예전 글에는
+        // 서버가 미리보기를 주지 않아, 그 줄이 어떻게 보이는지도 확인해야 한다.
+        val previews = listOf(
+            "주중에는 한 시간, 주말에는 두 시간으로 정해 두고 있어요.",
+            "학원 앞 지정 장소를 걸어 두니 도착 알림이 바로 옵니다.",
+            "차단 목록 정리해서 올려 둡니다. 필요하신 분 가져가세요.",
+            "",
+            "아이가 먼저 위치 공유를 켜 두더라고요. 고마웠습니다.",
+            "개통하면서 같이 설정한 것들 순서대로 적어 봤어요.",
+        )
         Post(
             id = i.toString(),
             authorId = (100 + i).toString(),
             title = titles[i % titles.size],
             author = authors[i % authors.size],
+            preview = previews[i % previews.size],
             likeCount = (i * 3) % 60,
             createdAtLabel = "2026-08-2" + (i % 8) + "T12:00:00",
         )
