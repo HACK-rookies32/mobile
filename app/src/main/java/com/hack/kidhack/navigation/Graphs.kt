@@ -73,6 +73,8 @@ import com.hack.kidhack.feature.parent.ParentNotificationsScreen
 import com.hack.kidhack.feature.parent.ParentPairingScreen
 import com.hack.kidhack.feature.parent.ParentPayScreen
 import com.hack.kidhack.feature.parent.ParentWalletScreen
+import com.hack.kidhack.feature.efin.AccountPasswordScreen
+import com.hack.kidhack.feature.efin.IdentityVerifyScreen
 import com.hack.kidhack.feature.terminal.StoreTerminalScreen
 import com.hack.kidhack.feature.parent.ParentCameraRequestScreen
 import com.hack.kidhack.feature.parent.ParentScreenshotScreen
@@ -154,8 +156,16 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                     onOpenEditProfile = { navController.navigate(Route.ParentEditProfile.path) },
                     onOpenNotificationSettings = { navController.navigate(Route.ParentNotificationSettings.path) },
                     onWithdraw = { navController.navigate(Route.ParentWithdraw.path) },
+                    onOpenAccountPassword = { navController.navigate(Route.ParentAccountPassword.path) },
+                    onOpenIdentityVerify = { navController.navigate(Route.ParentIdentityVerify.path) },
                 )
             }
+        }
+        composable(Route.ParentAccountPassword.path) {
+            ParentShell(navController) { AccountPasswordScreen(onBack = { navController.popBackStack() }) }
+        }
+        composable(Route.ParentIdentityVerify.path) {
+            ParentShell(navController) { IdentityVerifyScreen(onBack = { navController.popBackStack() }) }
         }
         composable(Route.ParentNotificationSettings.path) {
             ParentShell(navController) {

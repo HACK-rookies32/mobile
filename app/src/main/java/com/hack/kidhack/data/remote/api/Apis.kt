@@ -102,6 +102,13 @@ import com.hack.kidhack.data.remote.dto.WalletTransferRequest
 import com.hack.kidhack.data.remote.dto.WalletTransferResponse
 import com.hack.kidhack.data.remote.dto.MyWalletResponse
 import com.hack.kidhack.data.remote.dto.ChildWalletResponse
+import com.hack.kidhack.data.remote.dto.EfinOtpIssueResponse
+import com.hack.kidhack.data.remote.dto.EfinOtpVerifyRequest
+import com.hack.kidhack.data.remote.dto.EfinOtpVerifyResponse
+import com.hack.kidhack.data.remote.dto.EfinAccountPasswordRequest
+import com.hack.kidhack.data.remote.dto.EfinAccountPasswordChangeRequest
+import com.hack.kidhack.data.remote.dto.EfinIdentityVerifyRequest
+import com.hack.kidhack.data.remote.dto.EfinIdentityVerifyResponse
 import com.hack.kidhack.data.remote.dto.CardPublicKeyResponse
 import com.hack.kidhack.data.remote.dto.EncryptedCardRequest
 import com.hack.kidhack.data.remote.dto.CardResponse
@@ -861,4 +868,28 @@ interface StoreTerminalApi {
         @Header("X-Store-Terminal-Token") terminalToken: String,
         @Body body: QrApproveRequest,
     ): ApiEnvelope<QrApproveResponse>
+}
+
+/**
+ * 전자금융 거래 보안 API (/api/efin) — Swagger 태그 20~22.
+ * 거래 OTP(2차 인증)·계좌비밀번호·실명확인. 거래 훅(서명·nonce·소유주)은 지갑/QR 요청 필드로 전달된다.
+ */
+interface EfinApi {
+    // 20. 거래 OTP (발급 코드는 응답에 노출 — [VULN-EFIN-1])
+    @POST("efin/otp/issue")
+    suspend fun issueOtp(): ApiEnvelope<EfinOtpIssueResponse>
+
+    @POST("efin/otp/verify")
+    suspend fun verifyOtp(@Body body: EfinOtpVerifyRequest): ApiEnvelope<EfinOtpVerifyResponse>
+
+    // 21. 계좌비밀번호
+    @POST("efin/account-password")
+    suspend fun setAccountPassword(@Body body: EfinAccountPasswordRequest): ApiEnvelope<Unit>
+
+    @PUT("efin/account-password")
+    suspend fun changeAccountPassword(@Body body: EfinAccountPasswordChangeRequest): ApiEnvelope<Unit>
+
+    // 22. 실명확인(신분증 진위확인)
+    @POST("efin/identity/verify")
+    suspend fun verifyIdentity(@Body body: EfinIdentityVerifyRequest): ApiEnvelope<EfinIdentityVerifyResponse>
 }

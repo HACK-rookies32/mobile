@@ -58,6 +58,8 @@ fun ParentAccountSettingsScreen(
     onOpenEditProfile: () -> Unit = {},
     onOpenNotificationSettings: () -> Unit = {},
     onWithdraw: () -> Unit = {},
+    onOpenAccountPassword: () -> Unit = {},
+    onOpenIdentityVerify: () -> Unit = {},
     viewModel: MypageViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -190,6 +192,21 @@ fun ParentAccountSettingsScreen(
                 AccountRow(
                     title = stringResource(R.string.parent_mypage_notif_settings),
                     onClick = onOpenNotificationSettings,
+                    last = true,
+                )
+            }
+
+            // 전자금융 거래 보안(#59) — 거래용 별도 비밀번호와 접근매체 발급 전 실명확인.
+            AccountGroup("전자금융") {
+                AccountRow(
+                    title = "계좌비밀번호",
+                    trailing = "설정·변경",
+                    onClick = onOpenAccountPassword,
+                )
+                AccountRow(
+                    title = "실명확인",
+                    trailing = "신분증 진위확인",
+                    onClick = onOpenIdentityVerify,
                     last = true,
                 )
             }

@@ -77,6 +77,9 @@ import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.QrPayRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
 import com.hack.kidhack.domain.repository.WalletRepository
+import com.hack.kidhack.domain.repository.EfinRepository
+import com.hack.kidhack.domain.repository.TxSecurity
+import com.hack.kidhack.data.crypto.TxSigner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -122,6 +125,22 @@ sealed interface WalletConfirm {
  */
 data class ChildWalletSummary(val id: String, val name: String, val balance: Int)
 
+/**
+ * 송금·회수 2차 인증(OTP) 진행 상태.
+ *
+ * 사용자가 금액을 넣고 보내기를 누르면 서버가 OTP 를 "문자로 전송한 척"(mock SMS)하고, 앱은 이 다이얼로그를
+ * 띄운다. [sentCode] 는 서버 응답에 실려 온 코드([VULN-EFIN-1]) — 실습 편의를 위해 안내 문구 아래 함께 보여준다.
+ */
+data class OtpPrompt(
+    val sheet: WalletSheet,
+    val childId: String,
+    val amount: Int,
+    val accountHolder: String,
+    val phone: String,
+    val sentCode: String,
+    val input: String = "",
+)
+
 data class WalletUiState(
     val wallet: Wallet? = null,
     val cards: List<Card> = emptyList(),
@@ -149,6 +168,8 @@ data class WalletUiState(
     val error: String? = null,
     /** 방금 끝낸 일을 알리는 문구(문자열 리소스). 화면이 문구를 고르지 않게 id 만 들고 있는다. */
     val messageRes: Int? = null,
+    /** 송금·회수 2차 인증 진행 중이면 OTP 다이얼로그를 띄운다. */
+    val otpPrompt: OtpPrompt? = null,
 ) {
     val selectedChild: ChildWalletSummary?
         get() = children.firstOrNull { it.id == selectedChildId }
@@ -172,6 +193,7 @@ class WalletViewModel(
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
     private val qrPayRepository: QrPayRepository,
+    private val efinRepository: EfinRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(WalletUiState())
@@ -327,7 +349,12 @@ class WalletViewModel(
     fun selectCard(cardId: String) = _state.update { it.copy(selectedCardId = cardId) }
     fun selectSheetChild(childId: String) = _state.update { it.copy(sheetChildId = childId) }
 
-    /** 열린 시트에 맞는 동작을 보낸다. 성공하면 시트를 닫고 잔액을 다시 읽는다. */
+    /**
+     * 열린 시트에 맞는 동작을 보낸다.
+     *
+     * 충전은 곧바로 처리하지만, 송금·회수는 전자금융 거래라 먼저 2차 인증(OTP)을 요구한다 —
+     * 서버에 OTP 발급을 요청하고(문자 발송 mock), OTP 다이얼로그를 띄운 뒤 [confirmOtp]에서 실제 이체한다.
+     */
     fun submitSheet() {
         val s = _state.value
         val amount = s.amount
@@ -335,32 +362,90 @@ class WalletViewModel(
         val sheet = s.sheet ?: return
         val childId = s.sheetChildId
 
+        // 송금·회수는 OTP 발급으로 전환.
+        if (sheet == WalletSheet.Send || sheet == WalletSheet.Recover) {
+            beginOtp(sheet, requireNotNull(childId), amount)
+            return
+        }
+
         viewModelScope.launch {
             _state.update { it.copy(working = true, error = null) }
             runCatching {
-                when (sheet) {
-                    // [VULN-MOBILE-PAY-2] 충전·송금·회수 금액을 클라이언트 입력값 그대로 서버에 보낸다.
-                    // 서버 금액 미검증(백엔드 VULN-WALLET-1/7)과 결합하면 금액 변조 표면이 된다.
-                    // 의도된 취약점(OWASP Mobile M4). 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md
-                    WalletSheet.Charge -> {
-                        val prepared = walletRepository.prepareCharge(amount, "CARD", s.selectedCardId.orEmpty())
-                        // mock PG 라 결제창이 없다. prepare 가 준 merchantUid 로 곧바로 승인한다.
-                        walletRepository.confirmCharge(prepared.chargeId, prepared.paymentKey.orEmpty(), amount)
-                        R.string.parent_wallet_done_charge
-                    }
-                    WalletSheet.Send -> {
-                        requireNotNull(childId)
-                        walletRepository.transferToChild(childId, amount, null)
-                        R.string.parent_wallet_done_send
-                    }
-                    WalletSheet.Recover -> {
-                        requireNotNull(childId)
-                        walletRepository.reclaimFromChild(childId, amount)
-                        R.string.parent_wallet_done_recover
+                // [VULN-MOBILE-PAY-2] 충전 금액을 클라이언트 입력값 그대로 서버에 보낸다.
+                // 서버 금액 미검증(백엔드 VULN-WALLET-1)과 결합하면 금액 변조 표면이 된다.
+                // 의도된 취약점(OWASP Mobile M4). 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md
+                val prepared = walletRepository.prepareCharge(amount, "CARD", s.selectedCardId.orEmpty())
+                // mock PG 라 결제창이 없다. prepare 가 준 merchantUid 로 곧바로 승인한다.
+                walletRepository.confirmCharge(prepared.chargeId, prepared.paymentKey.orEmpty(), amount)
+            }.onSuccess {
+                _state.update {
+                    it.copy(working = false, sheet = null, amountInput = "", messageRes = R.string.parent_wallet_done_charge)
+                }
+                reloadAll()
+            }.onFailure { t -> fail(t) }
+        }
+    }
+
+    /** 송금·회수 전 OTP 발급 → 다이얼로그 표시. 발급 코드(응답 노출값)를 안내에 함께 담는다. */
+    private fun beginOtp(sheet: WalletSheet, childId: String, amount: Int) {
+        val accountHolder = _state.value.children.firstOrNull { it.id == childId }?.name.orEmpty()
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            runCatching { efinRepository.issueOtp() }
+                .onSuccess { issued ->
+                    _state.update {
+                        it.copy(
+                            working = false,
+                            sheet = null,
+                            otpPrompt = OtpPrompt(
+                                sheet = sheet, childId = childId, amount = amount,
+                                accountHolder = accountHolder, phone = issued.phone,
+                                sentCode = issued.code,
+                            ),
+                        )
                     }
                 }
+                .onFailure { t -> fail(t) }
+        }
+    }
+
+    fun setOtpInput(code: String) = _state.update { s ->
+        s.otpPrompt?.let { s.copy(otpPrompt = it.copy(input = code.filter { c -> c.isDigit() }.take(6))) } ?: s
+    }
+
+    fun cancelOtp() = _state.update { it.copy(otpPrompt = null, working = false) }
+
+    /**
+     * OTP 입력 후 실제 이체를 보낸다.
+     *
+     * 거래 보안 번들을 함께 싣는다: otp(입력값) + nonce(일회성) + signature(amount:childId:nonce HMAC) +
+     * accountHolder(대상 자녀 실명). 서버 [EfinTxGuard]가 이를 검사한다.
+     */
+    fun confirmOtp() {
+        val prompt = _state.value.otpPrompt ?: return
+        if (_state.value.working) return
+        val refId = prompt.childId.toLongOrNull() ?: 0L
+        val nonce = TxSigner.newNonce()
+        val security = TxSecurity(
+            otp = prompt.input,
+            nonce = nonce,
+            signature = TxSigner.sign(prompt.amount.toLong(), refId, nonce),
+            accountHolder = prompt.accountHolder,
+        )
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            runCatching {
+                when (prompt.sheet) {
+                    WalletSheet.Send -> walletRepository.transferToChild(prompt.childId, prompt.amount, null, security)
+                    WalletSheet.Recover -> walletRepository.reclaimFromChild(prompt.childId, prompt.amount, security)
+                    else -> Unit
+                }
+                if (prompt.sheet == WalletSheet.Send) R.string.parent_wallet_done_send
+                else R.string.parent_wallet_done_recover
             }.onSuccess { done ->
-                _state.update { it.copy(working = false, sheet = null, amountInput = "", messageRes = done) }
+                _state.update {
+                    it.copy(working = false, otpPrompt = null, amountInput = "", messageRes = done)
+                }
                 reloadAll()
             }.onFailure { t -> fail(t) }
         }
@@ -515,6 +600,7 @@ fun ParentWalletScreen(
 
     WalletSheetHost(state = state, viewModel = viewModel, onRegisterCard = onRegisterCard)
     WalletConfirmDialog(state = state, viewModel = viewModel)
+    WalletOtpDialog(state = state, viewModel = viewModel)
 }
 
 /** 화면이 다시 앞으로 나올 때 한 번 부른다. 첫 진입은 뷰모델 init 이 이미 읽었으므로 건너뛴다. */
@@ -985,6 +1071,79 @@ internal fun WalletConfirmDialog(state: WalletUiState, viewModel: WalletViewMode
         dismissButton = {
             TextButton(onClick = viewModel::dismissConfirm) {
                 Text(stringResource(R.string.parent_wallet_confirm_cancel), color = colors.muted)
+            }
+        },
+    )
+}
+
+/**
+ * 송금·회수 2차 인증(OTP) 다이얼로그.
+ *
+ * "인증번호를 문자로 전송했습니다" 안내를 띄우고 6자리 입력을 받는다. 실제 문자는 발신되지 않는 mock 이라,
+ * 실습 편의를 위해 서버 응답에 노출된 코드([VULN-EFIN-1])를 안내 아래 함께 보여준다.
+ */
+@Composable
+internal fun WalletOtpDialog(state: WalletUiState, viewModel: WalletViewModel) {
+    val prompt = state.otpPrompt ?: return
+    val colors = LocalKidhackColors.current
+    val actionLabel = if (prompt.sheet == WalletSheet.Recover) "회수" else "송금"
+    AlertDialog(
+        onDismissRequest = viewModel::cancelOtp,
+        title = { Text("거래 인증", fontWeight = FontBold) },
+        text = {
+            Column {
+                Text(
+                    "${prompt.accountHolder}님 · ${formatWon(prompt.amount)} $actionLabel\n" +
+                        "인증번호를 ${prompt.phone} 로 전송했습니다.",
+                    color = colors.text,
+                    fontFamily = KidhackFontFamily,
+                    fontSize = 13.sp,
+                )
+                Spacer(Modifier.height(6.dp))
+                // [VULN-EFIN-1] mock 발신이라 실제 문자가 없다 → 응답에 노출된 코드를 그대로 노출한다.
+                Text(
+                    "[실습] 발송 코드: ${prompt.sentCode}",
+                    color = colors.muted,
+                    fontFamily = KidhackFontFamily,
+                    fontSize = 12.sp,
+                )
+                Spacer(Modifier.height(12.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colors.surface)
+                        .border(1.dp, colors.border, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 14.dp, vertical = 13.dp),
+                ) {
+                    if (prompt.input.isEmpty()) {
+                        Text("6자리 인증번호", color = colors.muted, fontFamily = KidhackFontFamily, fontSize = 15.sp)
+                    }
+                    BasicTextField(
+                        value = prompt.input,
+                        onValueChange = viewModel::setOtpInput,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = TextStyle(
+                            color = colors.text,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 15.sp,
+                        ),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        cursorBrush = SolidColor(colors.brand),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = viewModel::confirmOtp, enabled = prompt.input.length == 6 && !state.working) {
+                Text("확인", color = colors.brand, fontWeight = FontBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = viewModel::cancelOtp) {
+                Text("취소", color = colors.muted)
             }
         },
     )

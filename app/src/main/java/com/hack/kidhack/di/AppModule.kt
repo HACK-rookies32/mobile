@@ -49,6 +49,10 @@ import com.hack.kidhack.data.remote.api.UserApi
 import com.hack.kidhack.data.remote.api.WalletApi
 import com.hack.kidhack.data.remote.api.QrPayApi
 import com.hack.kidhack.data.remote.api.StoreTerminalApi
+import com.hack.kidhack.data.remote.api.EfinApi
+import com.hack.kidhack.domain.repository.EfinRepository
+import com.hack.kidhack.data.repository.real.RealEfinRepository
+import com.hack.kidhack.data.repository.fake.FakeEfinRepository
 import com.hack.kidhack.data.remote.interceptor.AuthInterceptor
 import com.hack.kidhack.data.remote.interceptor.TokenAuthenticator
 import com.hack.kidhack.data.repository.CachedChatRepository
@@ -171,6 +175,8 @@ import com.hack.kidhack.feature.parent.PairingViewModel
 import com.hack.kidhack.feature.parent.ParentChatViewModel
 import com.hack.kidhack.feature.parent.PayViewModel
 import com.hack.kidhack.feature.parent.WalletViewModel
+import com.hack.kidhack.feature.efin.AccountPasswordViewModel
+import com.hack.kidhack.feature.efin.IdentityVerifyViewModel
 import com.hack.kidhack.feature.terminal.StoreTerminalViewModel
 import com.hack.kidhack.feature.parent.CameraRequestViewModel
 import com.hack.kidhack.feature.parent.ScreenTimeViewModel
@@ -287,6 +293,7 @@ val appModule = module {
     single { get<Retrofit>().create(CardApi::class.java) }
     single { get<Retrofit>().create(QrPayApi::class.java) }
     single { get<Retrofit>().create(StoreTerminalApi::class.java) }
+    single { get<Retrofit>().create(EfinApi::class.java) }
 
     single<AuthRepository> {
         if (useMock) {
@@ -354,6 +361,10 @@ val appModule = module {
     single<StoreTerminalRepository> {
         if (useMock) FakeStoreTerminalRepository() else RealStoreTerminalRepository(get())
     }
+    // 전자금융 거래 보안 (거래 OTP · 계좌비밀번호 · 실명확인)
+    single<EfinRepository> {
+        if (useMock) FakeEfinRepository() else RealEfinRepository(get())
+    }
 
     // FCM 대체 푸시 채널 (WebSocket + 폴링 백업)
     single { ChildCommandSocket(get(), get(), BuildConfig.BASE_URL) }
@@ -396,7 +407,9 @@ val appModule = module {
     viewModel { NoticeViewModel(get()) }
     viewModel { ContactViewModel(get<InquiryRepository>()) }
     viewModel { PayViewModel(get(), get(), get(), get()) }
-    viewModel { WalletViewModel(get(), get(), get(), get(), get()) }
+    viewModel { WalletViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { AccountPasswordViewModel(get()) }
+    viewModel { IdentityVerifyViewModel(get()) }
     viewModel { CardViewModel(get()) }
     // 매장 단말 테스트 화면 (숨은 라우트, 디버그/시연용)
     viewModel { StoreTerminalViewModel(get()) }

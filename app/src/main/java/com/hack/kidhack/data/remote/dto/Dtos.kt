@@ -984,8 +984,59 @@ data class ChargeHistoryResponseDto(
 
 // --- 12. 이체 ---
 
+/**
+ * 이체/회수 요청. childId·amount 는 필수, 전자금융 보안 필드는 nullable(서버 EfinTxGuard 가 검사).
+ *
+ * otp: 거래 2차 인증번호 / signature: amount:childId:nonce HMAC / nonce: 재사용 방지 일회성 값 /
+ * accountHolder: 대상 계좌 소유주명. null 로 보내면 서버가 해당 검증을 건너뛰는 결함이 있다([VULN-EFIN-2] 등).
+ */
 @Serializable
-data class WalletTransferRequest(val childId: Long, val amount: Long)
+data class WalletTransferRequest(
+    val childId: Long,
+    val amount: Long,
+    val otp: String? = null,
+    val signature: String? = null,
+    val nonce: String? = null,
+    val accountHolder: String? = null,
+)
+
+// --- 20~22. 전자금융 거래 보안 (efin) ---
+
+@Serializable
+data class EfinOtpIssueResponse(
+    val phone: String = "",
+    /** [VULN-EFIN-1] 서버가 발급 코드를 응답에 그대로 실어 준다. */
+    val code: String = "",
+    val expiresIn: Long = 180,
+)
+
+@Serializable
+data class EfinOtpVerifyRequest(val code: String)
+
+@Serializable
+data class EfinOtpVerifyResponse(val valid: Boolean = false)
+
+@Serializable
+data class EfinAccountPasswordRequest(val password: String)
+
+@Serializable
+data class EfinAccountPasswordChangeRequest(val currentPassword: String, val newPassword: String)
+
+@Serializable
+data class EfinIdentityVerifyRequest(
+    val name: String,
+    val birthDate: String,
+    val idType: String,
+    val idNumber: String,
+    val issuedDate: String,
+)
+
+@Serializable
+data class EfinIdentityVerifyResponse(
+    val verified: Boolean = false,
+    val name: String = "",
+    val verifiedAt: String? = null,
+)
 
 @Serializable
 data class WalletTransferResponse(

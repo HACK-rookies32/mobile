@@ -361,11 +361,24 @@ interface NoticeRepository {
     suspend fun get(id: String): NoticeDetail
 }
 
+/**
+ * 거래 전 과정 보안 번들 — 송금/회수 요청에 함께 실린다(전자금융 거래 보안, #59).
+ *
+ * otp: 발급받은 거래 2차 인증번호 / signature: amount:childId:nonce HMAC / nonce: 일회성 값 /
+ * accountHolder: 대상 계좌 소유주명. null 이면 서버가 해당 검증을 건너뛴다(의도된 결함).
+ */
+data class TxSecurity(
+    val otp: String? = null,
+    val signature: String? = null,
+    val nonce: String? = null,
+    val accountHolder: String? = null,
+)
+
 interface WalletRepository {
     suspend fun getMyWallet(): Wallet
     suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction>
-    suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult
-    suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult
+    suspend fun transferToChild(childId: String, amount: Int, memo: String?, security: TxSecurity? = null): TransferResult
+    suspend fun reclaimFromChild(childId: String, amount: Int, security: TxSecurity? = null): TransferResult
     suspend fun getChildWallet(childId: String): Wallet
     suspend fun prepareCharge(amount: Int, method: String, cardId: String): Charge
     suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet
@@ -580,3 +593,31 @@ suspend fun SessionRepository.childId(): String = current()?.user?.id.orEmpty()
  * **조립을 여기 한 곳에만 두어** 그때 이 함수만 고치면 되게 한다.
  */
 suspend fun SessionRepository.notificationRecipientId(): String = current()?.user?.id.orEmpty()
+
+/* ---------------------------------------------------- 전자금융 (efin) ---- */
+
+/** 거래 OTP 발급 결과. code 는 서버가 응답에 노출한 값([VULN-EFIN-1]). */
+data class OtpIssue(val phone: String, val code: String, val expiresIn: Long)
+
+/** 실명확인 결과. */
+data class IdentityResult(val verified: Boolean, val name: String, val verifiedAt: String?)
+
+/**
+ * 전자금융 거래 보안 — 거래 OTP·계좌비밀번호·실명확인(#59).
+ *
+ * 거래 훅(서명·nonce·소유주 검증)은 별도 API 가 아니라 송금/QR 요청 필드로 전달되므로 여기 없다.
+ */
+interface EfinRepository {
+    /** 거래 OTP 발급 → mock SMS 발신. 반환 code 는 응답 노출값. */
+    suspend fun issueOtp(): OtpIssue
+    suspend fun verifyOtp(code: String): Boolean
+    suspend fun setAccountPassword(password: String)
+    suspend fun changeAccountPassword(currentPassword: String, newPassword: String)
+    suspend fun verifyIdentity(
+        name: String,
+        birthDate: String,
+        idType: String,
+        idNumber: String,
+        issuedDate: String,
+    ): IdentityResult
+}

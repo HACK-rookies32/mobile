@@ -64,6 +64,10 @@ import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AllowanceRepository
 import com.hack.kidhack.domain.repository.QrPayRepository
 import com.hack.kidhack.domain.repository.StoreTerminalRepository
+import com.hack.kidhack.domain.repository.EfinRepository
+import com.hack.kidhack.domain.repository.IdentityResult
+import com.hack.kidhack.domain.repository.OtpIssue
+import com.hack.kidhack.domain.repository.TxSecurity
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
 import com.hack.kidhack.domain.repository.AppControlRepository
@@ -712,11 +716,11 @@ class FakeWalletRepository : WalletRepository {
         WalletTransaction("tx1", "CHARGE", 50000, 50000, null, "08.15"),
         WalletTransaction("tx2", "TRANSFER_OUT", -5000, 45000, "101", "08.20")
     )
-    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult {
+    override suspend fun transferToChild(childId: String, amount: Int, memo: String?, security: TxSecurity?): TransferResult {
         balance -= amount
         return TransferResult(balance, 10000 + amount, "tx-${System.currentTimeMillis()}")
     }
-    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult {
+    override suspend fun reclaimFromChild(childId: String, amount: Int, security: TxSecurity?): TransferResult {
         balance += amount
         return TransferResult(balance, 10000 - amount, "tx-${System.currentTimeMillis()}")
     }
@@ -1169,4 +1173,19 @@ class FakeStoreTerminalRepository : StoreTerminalRepository {
             item
         }
     }
+}
+
+/** 목 전자금융 — OTP 는 고정 코드, 계좌비번/실명확인은 성공 처리. */
+class FakeEfinRepository : EfinRepository {
+    override suspend fun issueOtp(): OtpIssue = OtpIssue(phone = "010-****-5678", code = "428193", expiresIn = 180)
+    override suspend fun verifyOtp(code: String): Boolean = code == "428193"
+    override suspend fun setAccountPassword(password: String) {}
+    override suspend fun changeAccountPassword(currentPassword: String, newPassword: String) {}
+    override suspend fun verifyIdentity(
+        name: String,
+        birthDate: String,
+        idType: String,
+        idNumber: String,
+        issuedDate: String,
+    ): IdentityResult = IdentityResult(verified = name.isNotBlank(), name = name, verifiedAt = "방금")
 }
