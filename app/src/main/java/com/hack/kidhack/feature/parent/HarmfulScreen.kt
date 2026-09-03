@@ -1,6 +1,18 @@
 package com.hack.kidhack.feature.parent
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,7 +35,6 @@ import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
 import com.hack.kidhack.core.common.HarmfulCategories
 import com.hack.kidhack.core.designsystem.component.KidButton
-import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.KidSwitch
 import com.hack.kidhack.core.designsystem.component.KidTextField
 import com.hack.kidhack.core.designsystem.theme.FontBold
@@ -303,22 +314,78 @@ fun ParentHarmfulScreen(
     val colors = LocalKidhackColors.current
     val custom = state.customKeywords
 
-    ParentScreenScaffold(
-        header = { ParentHeaderBar(stringResource(R.string.parent_harmful_title), onBack) },
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.card)
+            .statusBarsPadding(),
     ) {
-        ParentLoadingOrError(state.loading && state.items.isEmpty(), state.error, viewModel::load)
-        KidCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("🚫", fontSize = 18.sp)
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    stringResource(R.string.parent_harmful_auto_title),
-                    modifier = Modifier.weight(1f),
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBold,
-                    fontSize = 14.sp,
-                    color = colors.danger,
-                )
+        // 헤더
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("\u2039", color = colors.text, fontSize = 26.sp)
+            }
+            Text(
+                stringResource(R.string.parent_harmful_title),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 16.sp,
+                color = colors.text,
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding(),
+        ) {
+            if ((state.loading && state.items.isEmpty()) || state.error != null) {
+                Box(Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
+                    ParentLoadingOrError(state.loading && state.items.isEmpty(), state.error, viewModel::load)
+                }
+            }
+
+            // 자동 차단 마스터 — 방패 아이콘이 앵커. 스위치만 위험색.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(colors.surface),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_shield),
+                        contentDescription = null,
+                        modifier = Modifier.size(19.dp),
+                        tint = colors.muted,
+                    )
+                }
+                Spacer(Modifier.width(13.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.parent_harmful_auto_title),
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 14.5.sp,
+                        color = colors.text,
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        stringResource(R.string.parent_harmful_auto_desc),
+                        color = colors.subtle,
+                        fontSize = 11.5.sp,
+                        lineHeight = 17.sp,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
                 KidSwitch(
                     state.autoOn,
                     viewModel::onAuto,
@@ -326,93 +393,187 @@ fun ParentHarmfulScreen(
                     trackColor = colors.danger,
                 )
             }
-            Text(stringResource(R.string.parent_harmful_auto_desc), color = colors.danger, fontSize = 12.sp)
-        }
-        KidCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 22.dp), color = colors.line)
+
+            // ── 차단 카테고리 ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     stringResource(R.string.parent_harmful_categories),
                     modifier = Modifier.weight(1f),
+                    color = colors.subtle,
                     fontFamily = KidhackFontFamily,
                     fontWeight = FontBold,
-                    fontSize = 14.sp,
-                    color = colors.text,
+                    fontSize = 12.sp,
                 )
-                // 저장은 키워드 단위 API 호출이라 즉시 끝나지 않는다. 진행 중임을 알려 준다.
                 if (state.saving) {
-                    Text(stringResource(R.string.parent_harmful_saving), fontSize = 12.sp, color = colors.muted)
+                    Text(stringResource(R.string.parent_harmful_saving), fontSize = 11.5.sp, color = colors.subtle)
                 }
             }
-            Spacer(Modifier.height(8.dp))
             HarmfulBundles.forEachIndexed { i, cat ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            stringResource(cat.labelRes),
-                            fontFamily = KidhackFontFamily,
-                            fontWeight = FontBold,
-                            fontSize = 14.sp,
-                            color = if (state.autoOn) colors.text else colors.muted,
-                        )
-                        Text(
-                            stringResource(
-                                R.string.parent_harmful_category_count,
-                                HarmfulCategories.keywords(cat.id).size,
-                            ),
-                            fontSize = 11.sp,
-                            color = colors.muted,
-                        )
-                    }
-                    KidSwitch(
-                        state.categoryOn(cat.id),
-                        { viewModel.toggleCategory(cat.id, it) },
-                        // 마스터가 꺼져 있으면 카테고리 키워드가 이미 내려간 상태다.
-                        enabled = state.autoOn && !state.saving,
-                        trackColor = colors.danger,
+                CategoryRow(
+                    icon = categoryIcon(cat.id),
+                    name = stringResource(cat.labelRes),
+                    count = HarmfulCategories.keywords(cat.id).size,
+                    checked = state.categoryOn(cat.id),
+                    enabled = state.autoOn && !state.saving,
+                    dimmed = !state.autoOn,
+                    onChange = { viewModel.toggleCategory(cat.id, it) },
+                    last = i == HarmfulBundles.lastIndex,
+                )
+            }
+
+            // ── 직접 추가한 키워드 ──
+            Text(
+                stringResource(R.string.parent_harmful_keyword),
+                modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 8.dp),
+                color = colors.subtle,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 12.sp,
+            )
+            Column(Modifier.padding(horizontal = 22.dp)) {
+                KidTextField(
+                    state.keyword,
+                    viewModel::onKeyword,
+                    stringResource(R.string.parent_harmful_keyword_hint),
+                )
+                Spacer(Modifier.height(10.dp))
+                KidButton(
+                    stringResource(R.string.parent_harmful_keyword_add),
+                    viewModel::addKeyword,
+                    Modifier.fillMaxWidth(),
+                    enabled = !state.saving,
+                )
+                state.notice?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, fontSize = 11.5.sp, color = colors.subtle, lineHeight = 17.sp)
+                }
+            }
+
+            if (custom.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.parent_harmful_keywords),
+                    modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 4.dp),
+                    color = colors.subtle,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 12.sp,
+                )
+                custom.forEachIndexed { i, item ->
+                    KeywordRow(
+                        pattern = item.pattern,
+                        enabled = !state.saving,
+                        onRemove = { viewModel.removeKeyword(item) },
+                        last = i == custom.lastIndex,
                     )
                 }
-                if (i < HarmfulBundles.lastIndex) HorizontalDivider(color = colors.border)
             }
+
+            Spacer(Modifier.height(24.dp))
         }
-        KidCard {
-            Text(stringResource(R.string.parent_harmful_keyword), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
-            Spacer(Modifier.height(8.dp))
-            KidTextField(state.keyword, viewModel::onKeyword, stringResource(R.string.parent_harmful_keyword_hint))
-            KidButton(
-                stringResource(R.string.parent_harmful_keyword_add),
-                viewModel::addKeyword,
-                Modifier.fillMaxWidth(),
-                enabled = !state.saving,
+    }
+}
+
+/** 카테고리 id → 라인 아이콘. */
+private fun categoryIcon(id: String): Int = when (id) {
+    HarmfulCategories.ADULT -> R.drawable.ic_cat_adult
+    HarmfulCategories.GAMBLING -> R.drawable.ic_cat_gambling
+    HarmfulCategories.VIOLENCE -> R.drawable.ic_cat_violence
+    HarmfulCategories.DRUGS -> R.drawable.ic_cat_drugs
+    else -> R.drawable.ic_warning
+}
+
+/** 차단 카테고리 한 줄 — 아이콘 · 이름 · 키워드 수 · 스위치. */
+@Composable
+private fun CategoryRow(
+    icon: Int,
+    name: String,
+    count: Int,
+    checked: Boolean,
+    enabled: Boolean,
+    dimmed: Boolean,
+    onChange: (Boolean) -> Unit,
+    last: Boolean,
+) {
+    val colors = LocalKidhackColors.current
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(colors.surface),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(icon),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = if (dimmed) colors.border else colors.muted,
+                )
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    name,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 14.5.sp,
+                    letterSpacing = (-0.2).sp,
+                    color = if (dimmed) colors.subtle else colors.text,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    stringResource(R.string.parent_harmful_category_count, count),
+                    fontSize = 11.5.sp,
+                    color = colors.subtle,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            KidSwitch(checked, onChange, enabled = enabled, trackColor = colors.danger)
+        }
+        if (!last) HorizontalDivider(modifier = Modifier.padding(horizontal = 22.dp), color = colors.line)
+    }
+}
+
+/** 직접 추가한 키워드 한 줄 — 점 · 단어 · 삭제. */
+@Composable
+private fun KeywordRow(pattern: String, enabled: Boolean, onRemove: () -> Unit, last: Boolean) {
+    val colors = LocalKidhackColors.current
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("\u2022", color = colors.subtle, fontSize = 14.sp)
+            Spacer(Modifier.width(10.dp))
+            Text(
+                pattern,
+                modifier = Modifier.weight(1f),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 14.sp,
+                color = colors.text,
             )
-            state.notice?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, fontSize = 12.sp, color = colors.muted)
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(colors.danger.copy(alpha = 0.08f))
+                    .clickable(enabled = enabled, onClick = onRemove),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_close),
+                    contentDescription = stringResource(R.string.parent_harmful_keyword_remove),
+                    modifier = Modifier.size(13.dp),
+                    tint = colors.danger,
+                )
             }
         }
-        if (custom.isNotEmpty()) {
-            KidCard {
-                Text(stringResource(R.string.parent_harmful_keywords), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
-                custom.forEach { item ->
-                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "• ${item.pattern}",
-                            modifier = Modifier.weight(1f),
-                            fontSize = 13.sp,
-                            color = colors.text,
-                        )
-                        Text(
-                            stringResource(R.string.parent_harmful_keyword_remove),
-                            modifier = Modifier
-                                .clickable(enabled = !state.saving) { viewModel.removeKeyword(item) }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            fontSize = 12.sp,
-                            fontWeight = FontBold,
-                            color = colors.danger,
-                        )
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
+        if (!last) HorizontalDivider(modifier = Modifier.padding(horizontal = 22.dp), color = colors.line)
     }
 }
