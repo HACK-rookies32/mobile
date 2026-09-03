@@ -290,11 +290,7 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
         }
         childTab(Route.ChildHome.path, navController) {
             ChildHomeScreen(
-                onChat = { navController.navigateChildTab(Route.ChildChat.path) },
-                onServices = { navController.navigateChildTab(Route.ChildServices.path) },
-                onMypage = { navController.navigateChildTab(Route.ChildMypage.path) },
                 onScreenshot = { navController.navigate(Route.ChildScreenshot.path) },
-                onCamera = { navController.navigateChildTab(Route.ChildCamera.path) },
             )
         }
         childTab(Route.ChildChat.path, navController) { ChildChatScreen() }
@@ -322,11 +318,7 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
         }
         childTab(Route.ChildMypage.path, navController) {
             ChildMypageScreen(
-                onServices = { navController.navigateChildTab(Route.ChildServices.path) },
                 onLinkParent = { navController.navigate(Route.ChildPairing.path) },
-                onScreenshot = { navController.navigate(Route.ChildScreenshot.path) },
-                onCamera = { navController.navigateChildGallery() },
-                onPay = { navController.navigate(Route.ChildPay.path) },
                 onEditProfile = { navController.navigate(Route.ChildProfileEdit.path) },
                 onTerms = { navController.navigate(Route.ChildTerms.path) },
                 onNotice = { navController.navigate(Route.ChildNotice.path) },
@@ -342,10 +334,9 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
                 ChildPairingScreen(onBack = { navController.popBackStack() })
             }
         }
-        composable(Route.ChildPay.path) {
-            ChildShell(navController) {
-                ChildPayScreen(onBack = { navController.popBackStack() })
-            }
+        // 페이는 이제 하단 탭이다. 탭이라 별도 뒤로가기 대신 홈 탭으로 돌린다(추후 페이 화면 재설계 시 헤더 정리).
+        childTab(Route.ChildPay.path, navController) {
+            ChildPayScreen(onBack = { navController.navigateChildTab(Route.ChildHome.path) })
         }
         composable(Route.ChildProfileEdit.path) {
             ChildShell(navController) {

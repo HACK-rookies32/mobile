@@ -49,12 +49,19 @@ data class ChildHomeUiState(
     val name: String = "",
     val alias: String = "",
     val usedMinutes: Int = 0,
+    /** 부모가 서버에 정한 하루 총 사용 한도(분). 없으면 null 이라 「남은 시간」을 적지 않는다. */
+    val limitMinutes: Int? = null,
+    /** 오늘 앱별 사용 — 자녀가 「내가 뭘 얼마나 썼는지」 직접 본다. 많이 쓴 순. */
+    val usages: List<com.hack.kidhack.domain.model.AppUsage> = emptyList(),
     val protectedNow: Boolean = false,
     val services: List<HomeServiceRow> = emptyList(),
     val alerts: List<HomeAlertRow> = emptyList(),
     val error: String? = null,
 ) {
     val usedLabel: String get() = formatDurationMin(usedMinutes)
+
+    /** 한도까지 남은 분. 한도가 없거나 이미 넘겼으면 null / 0. */
+    val remainingMinutes: Int? get() = limitMinutes?.let { (it - usedMinutes).coerceAtLeast(0) }
 
     /**
      * 꺼져 있는데 자녀가 켤 수 있는 보호 기능들.
@@ -102,6 +109,9 @@ class ChildHomeViewModel(
             val device = deviceStatus.snapshot()
             val usedMinutes = usage.totalMinutes
 
+            // 하루 총 한도(부모가 서버에 설정)를 한 번 읽어 화면에 남은 시간을 보여 준다.
+            val limitMinutes = runCatching { screenTimeWatcher.refreshLimit() }.getOrNull()
+
             // 한도 도달을 여기서도 확인한다(시간당 워커만 믿으면 최대 1시간 늦게 뜬다).
             screenTimeWatcher.check(usedMinutes)
 
@@ -118,6 +128,8 @@ class ChildHomeViewModel(
                     name = user?.name.orEmpty(),
                     alias = user?.name?.aliasOrSelf().orEmpty(),
                     usedMinutes = usedMinutes,
+                    limitMinutes = limitMinutes,
+                    usages = usage.usages,
                     protectedNow = locationOn || harmfulOn,
                     services = listOf(
                         HomeServiceRow(

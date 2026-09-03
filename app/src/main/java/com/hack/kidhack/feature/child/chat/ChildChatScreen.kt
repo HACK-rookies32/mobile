@@ -10,7 +10,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -35,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -43,7 +50,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.R
-import com.hack.kidhack.core.designsystem.component.BrandGradientHeader
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
@@ -83,48 +90,66 @@ fun ChildChatScreen(
         }
     }
 
+    // 키보드가 열리면 마지막 메시지가 입력창 위로 보이도록 스크롤을 내린다.
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    LaunchedEffect(imeVisible) {
+        if (imeVisible && state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.surface)
-            .imePadding(),
+            .background(colors.card)
+            .statusBarsPadding(),
     ) {
-        // 채팅은 메시지 세로 공간이 중요하다 — 히어로 헤더의 40dp 아래 여백을 슬림하게 줄인다.
-        BrandGradientHeader(
-            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
+        // 부모 채팅방과 같은 흰 헤더 — 상대(엄마) 아바타 + 이름. 주황 히어로를 걷어냈다.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(colors.brandLight),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    stringResource(R.string.child_chat_mom).trim().take(1).ifBlank { "?" },
+                    color = colors.brandDark,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 13.sp,
+                )
+            }
+            Spacer(Modifier.size(9.dp))
+            Text(
+                text = stringResource(R.string.child_chat_mom),
+                color = colors.text,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 16.sp,
+            )
+            // 서버가 주는 값은 안 읽음 수뿐이라, 있으면 브랜드색 알약으로 붙인다.
+            val unread = state.room?.unreadCount ?: 0
+            if (unread > 0) {
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    text = "$unread",
                     modifier = Modifier
-                        .size(40.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("👩", fontSize = 20.sp)
-                }
-                Spacer(Modifier.size(12.dp))
-                Column {
-                    Text(
-                        text = stringResource(R.string.child_chat_mom),
-                        color = Color.White,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBold,
-                        fontSize = 16.sp,
-                    )
-                    // 서버 ChatRoomSummaryResponse 에 접속 여부가 없어 온라인 표시를 걷어냈다.
-                    // 실제로 주는 값은 안 읽음 수라 그것을 보여 준다.
-                    val unread = state.room?.unreadCount ?: 0
-                    if (unread > 0) {
-                        Text(
-                            text = stringResource(R.string.child_chat_unread, unread),
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 12.sp,
-                        )
-                    }
-                }
+                        .background(colors.brand)
+                        .padding(horizontal = 7.dp, vertical = 1.dp),
+                    color = Color.White,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 11.sp,
+                )
             }
         }
+        KidHeaderDivider()
         if (!state.loading && state.room == null) {
             Box(
                 modifier = Modifier
@@ -188,6 +213,9 @@ fun ChildChatScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(colors.card)
+                // 콘텐츠에 이미 네비바 인셋이 들어가 있어, ime 에서 네비바만큼을 빼야 입력창이
+                // 키보드보다 그만큼 더 뜨지 않고 키보드 바로 위에 딱 붙는다.
+                .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars))
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -259,7 +287,13 @@ private fun ChatBubble(message: ChatMessage) {
                     .background(colors.brandLight),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("👩", fontSize = 14.sp)
+                Text(
+                    stringResource(R.string.child_chat_mom).trim().take(1).ifBlank { "?" },
+                    color = colors.brandDark,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 11.sp,
+                )
             }
             Spacer(Modifier.size(8.dp))
         }

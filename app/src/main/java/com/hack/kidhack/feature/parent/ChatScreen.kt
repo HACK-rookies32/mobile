@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -544,6 +545,12 @@ private fun ColumnScope.RoomDetail(
 ) {
     val colors = LocalKidhackColors.current
     val listState = rememberLazyListState()
+
+    // 키보드가 열리면 마지막 메시지가 입력창 위로 보이도록 스크롤을 내린다.
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    LaunchedEffect(imeVisible) {
+        if (imeVisible && state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
+    }
 
     // 새 메시지가 붙으면 아래로. 지난 장을 앞에 붙일 때는 움직이지 않는다 — 읽던 자리가
     // 튀면 「더 보기」를 누른 사람이 어디를 보고 있었는지 잃는다.

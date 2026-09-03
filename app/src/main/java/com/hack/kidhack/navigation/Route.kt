@@ -109,10 +109,11 @@ val ParentTabs = listOf(
     TabItem(Route.ParentMypage, "마이", R.drawable.ic_person),
 )
 
+// 서비스 탭은 홈과 중복이라 접고(위치·보호상태는 홈으로 흡수), 카메라는 뺀 기능이라 내렸다.
+// 대신 아이가 실제로 쓰는 「페이」를 탭으로 올린다.
 val ChildTabs = listOf(
     TabItem(Route.ChildHome, "홈", R.drawable.ic_home),
     TabItem(Route.ChildChat, "채팅", R.drawable.ic_chat),
-    TabItem(Route.ChildServices, "서비스", R.drawable.ic_shield),
-    TabItem(Route.ChildCamera, "카메라", R.drawable.ic_camera),
+    TabItem(Route.ChildPay, "페이", R.drawable.ic_card),
     TabItem(Route.ChildMypage, "마이", R.drawable.ic_person),
 )
