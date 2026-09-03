@@ -120,11 +120,14 @@ fun ParentCommunityHubScreen(
             1 -> {
                 val state by noticeViewModel.state.collectAsStateWithLifecycle()
                 // 공지 본문은 스캐폴드가 대 주던 여백·스크롤을 그대로 기대한다(자녀 화면과 공유).
+                // 검색바 위치를 게시판 탭과 똑같이 맞춘다 — 게시판은 검색바에 가로 20·위 12 를
+                // 주는데, 공지 탭은 여기 Column 패딩에 기대므로 그 값을 그대로 맞춰 준다.
                 Column(
                     modifier = Modifier
                         .weight(1f)
+                        .background(colors.surface)
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
+                        .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     NoticeBody(

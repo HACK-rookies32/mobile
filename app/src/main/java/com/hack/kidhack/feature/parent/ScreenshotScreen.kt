@@ -52,6 +52,7 @@ import com.hack.kidhack.R
 import com.hack.kidhack.core.common.RemoteUrl
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
+import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
@@ -172,7 +173,7 @@ fun ParentScreenshotScreen(
             .statusBarsPadding(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -185,7 +186,7 @@ fun ParentScreenshotScreen(
                 stringResource(R.string.parent_screenshot_title),
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 color = colors.text,
             )
         }

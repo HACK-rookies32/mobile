@@ -266,7 +266,7 @@ fun ParentGeofenceScreen(
             .statusBarsPadding(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -279,7 +279,7 @@ fun ParentGeofenceScreen(
                 stringResource(R.string.parent_geofence_title),
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 color = colors.text,
             )
         }

@@ -243,7 +243,7 @@
     <!-- 하루 사용시간 약속 (별도 화면). 앱별 한도와 달리 하루 전체 사용 시간이다. -->
     <string name="parent_screentime_title">하루 사용시간 약속</string>
     <string name="parent_screentime_for_child">%1$s 의 약속이에요</string>
-    <string name="parent_screentime_toggle">하루 사용시간 약속 사용</string>
+    <string name="parent_screentime_toggle">약속 사용하기</string>
     <string name="parent_screentime_how_long">얼마나 사용할까요?</string>
     <string name="parent_screentime_unit_hour">시간</string>
     <string name="parent_screentime_unit_minute">분</string>
@@ -268,7 +268,7 @@
     <string name="parent_filter_all">전체</string>
     <string name="parent_filter_blocked">차단</string>
     <string name="parent_filter_limited">제한</string>
-    <string name="parent_appcontrol_add">+ 앱 추가</string>
+    <string name="parent_appcontrol_add">앱 추가</string>
     <string name="parent_appcontrol_add_hint">앱 이름</string>
     <string name="parent_appcontrol_add_confirm">추가</string>
     <string name="parent_appcontrol_unlimited">무제한</string>
@@ -365,6 +365,7 @@
     <string name="parent_community_empty">아직 올라온 글이 없어요</string>
     <string name="parent_community_load_more_failed">더 불러오지 못했어요</string>
     <string name="parent_community_more">더 보기</string>
+    <string name="parent_community_post_title">게시글</string>
     <string name="parent_community_attach_photo">사진</string>
     <string name="parent_community_attach_link">링크</string>
     <string name="parent_community_attach_remove">첨부 지우기</string>
@@ -401,6 +402,8 @@
     <string name="parent_contact_field_content_hint">겪으신 일을 자세히 적어 주시면 빠르게 도와드릴 수 있어요.</string>
     <string name="parent_contact_field_photo">사진</string>
     <string name="parent_contact_field_link">링크 (선택)</string>
+    <string name="parent_contact_field_link_hint">링크 추가 (선택)</string>
+    <string name="parent_contact_photo_count">사진 %1$d장</string>
     <string name="parent_contact_answer_from">루키즈 고객센터</string>
     <string name="parent_contact_received">%1$s 접수</string>
     <string name="parent_contact_title">관리자 문의</string>

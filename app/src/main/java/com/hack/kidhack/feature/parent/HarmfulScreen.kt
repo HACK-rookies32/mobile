@@ -37,6 +37,7 @@ import com.hack.kidhack.core.common.HarmfulCategories
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidSwitch
 import com.hack.kidhack.core.designsystem.component.KidTextField
+import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
@@ -322,7 +323,7 @@ fun ParentHarmfulScreen(
     ) {
         // 헤더
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -335,7 +336,7 @@ fun ParentHarmfulScreen(
                 stringResource(R.string.parent_harmful_title),
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 color = colors.text,
             )
         }

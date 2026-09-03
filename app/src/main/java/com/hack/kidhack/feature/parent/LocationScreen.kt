@@ -60,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
 import com.hack.kidhack.core.designsystem.component.KidSwitch
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
@@ -319,9 +320,10 @@ fun ParentLocationScreen(
             .background(colors.card)
             .statusBarsPadding(),
     ) {
-        // \ud5e4\ub354 \u2014 \uc81c\ubaa9 + \uc0c8\ub85c\uace0\uce68
+        // \ud5e4\ub354 \u2014 \uc81c\ubaa9 + \uc0c8\ub85c\uace0\uce68. \ub9c8\uc774\ud398\uc774\uc9c0\u00b7\ucc44\ud305\u00b7\uc790\ub140\uad00\ub9ac\uc640 \uac19\uc740 \uaddc\uaca9(\uc81c\ubaa9 21 Black,
+        // \uc704 12\u00b7\uc544\ub798 4, \uc544\ub798 KidHeaderDivider)\uc73c\ub85c \ub9de\ucd98\ub2e4.
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -344,6 +346,7 @@ fun ParentLocationScreen(
                 )
             }
         }
+        KidHeaderDivider()
 
         Column(
             modifier = Modifier

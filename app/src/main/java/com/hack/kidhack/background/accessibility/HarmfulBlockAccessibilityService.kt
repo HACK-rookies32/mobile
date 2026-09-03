@@ -1,6 +1,7 @@
 package com.hack.kidhack.background.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.provider.Settings
@@ -171,30 +172,41 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
     private fun isExempt(packageName: String): Boolean =
         packageName == applicationContext.packageName ||
             packageName in EXEMPT_PACKAGES ||
-            packageName in essentialPackages()
+            packageName in deviceExemptPackages()
 
-    private var essentialCache: Set<String> = emptySet()
-    private var essentialCachedAt = 0L
+    private var deviceExemptCache: Set<String> = emptySet()
+    private var deviceExemptCachedAt = 0L
 
     /**
-     * 전화·문자 기본 앱은 스크린타임/개별 차단에서 늘 예외다 — 한도를 다 써도 아이가
-     * 연락은 할 수 있어야 한다. 기기마다 패키지가 달라(삼성 `com.samsung.android.dialer`,
-     * 구글 등) 고정 목록 대신 「기본 전화/문자 앱」이 무엇인지 물어 캐시한다.
+     * 기기마다 패키지가 다른 「항상 예외」 앱들 — 고정 목록 대신 시스템에 물어 캐시한다.
+     *
+     * <p>① 홈 런처: 삼성은 `com.sec.android.app.launcher`, 픽셀은 `nexuslauncher` 처럼 제조사마다
+     * 다르다. 런처가 예외가 아니면 한도 초과 시 홈 화면에서 계속 HOME 이 발동하고, 그 여파로
+     * 앱을 여는 전환까지 끊겨 우리 앱(예외)마저 열리다 튕긴다.
+     * ② 기본 전화·문자 앱: 한도를 다 써도 아이가 연락은 할 수 있어야 한다.
      */
-    private fun essentialPackages(): Set<String> {
+    private fun deviceExemptPackages(): Set<String> {
         val now = System.currentTimeMillis()
-        if (now - essentialCachedAt < ESSENTIAL_TTL_MS && essentialCache.isNotEmpty()) return essentialCache
+        if (now - deviceExemptCachedAt < ESSENTIAL_TTL_MS && deviceExemptCache.isNotEmpty()) return deviceExemptCache
         val set = buildSet {
+            // 홈 런처(들). AppUsageCollector 가 사용량 집계에서 빼는 것과 같은 방식.
+            runCatching {
+                val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                packageManager.queryIntentActivities(home, 0)
+                    .forEach { it.activityInfo?.packageName?.takeIf { p -> p.isNotBlank() }?.let(::add) }
+            }
+            // 기본 전화 앱.
             runCatching { getSystemService(TelecomManager::class.java)?.defaultDialerPackage }
                 .getOrNull()?.takeIf { it.isNotBlank() }?.let { add(it) }
+            // 기본 문자 앱.
             runCatching { Telephony.Sms.getDefaultSmsPackage(this@HarmfulBlockAccessibilityService) }
                 .getOrNull()?.takeIf { it.isNotBlank() }?.let { add(it) }
         }
         if (set.isNotEmpty()) {
-            essentialCache = set
-            essentialCachedAt = now
+            deviceExemptCache = set
+            deviceExemptCachedAt = now
         }
-        return set.ifEmpty { essentialCache }
+        return set.ifEmpty { deviceExemptCache }
     }
 
     override fun onInterrupt() = Unit

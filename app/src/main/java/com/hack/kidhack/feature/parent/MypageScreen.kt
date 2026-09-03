@@ -49,6 +49,8 @@ import com.hack.kidhack.core.common.formatPhoneNumber
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
+import com.hack.kidhack.core.designsystem.component.KidSectionCard
 import com.hack.kidhack.core.designsystem.component.ListRow
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
@@ -268,9 +270,10 @@ fun ParentMypageScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.card)
+            .background(colors.surface)
             .statusBarsPadding(),
     ) {
+      Column(Modifier.fillMaxWidth().background(colors.card)) {
         // 화면 이름을 먼저 둔다. 자녀관리·사용 리포트·커뮤니티가 모두 이 자리에 제목을
         // 갖고 있어서, 마이페이지만 없으면 탭을 옮길 때 한 칸이 비어 보인다. 이름표가
         // 위를 받쳐 주면 프로필도 상태바에 붙지 않는다.
@@ -292,6 +295,8 @@ fun ParentMypageScreen(
                 color = colors.text,
             )
         }
+        KidHeaderDivider()
+      }
 
         Column(
             modifier = Modifier
@@ -299,16 +304,17 @@ fun ParentMypageScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
         ) {
+            Spacer(Modifier.height(12.dp))
             // 프로필 줄 전체가 계정 설정으로 가는 문이다. 톱니만 눌리게 두면 손가락이
             // 19dp 짜리 과녁을 맞혀야 한다 — 톱니는 「여기를 누르면 설정」이라는 표시로만 둔다.
-            Row(
+            KidSectionCard {
+              Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
                     .clickable(onClick = onOpenAccountSettings)
-                    .padding(start = 4.dp, end = 6.dp, top = 10.dp, bottom = 14.dp),
+                    .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-            ) {
+              ) {
                 Box(
                     Modifier.size(52.dp).clip(CircleShape).background(colors.brandLight),
                     contentAlignment = Alignment.Center,
@@ -337,8 +343,8 @@ fun ParentMypageScreen(
                         stringResource(R.string.parent_mypage_greeting, user?.name ?: ""),
                         color = colors.text,
                         fontFamily = KidhackFontFamily,
-                        fontWeight = FontBlack,
-                        fontSize = 19.sp,
+                        fontWeight = FontBold,
+                        fontSize = 16.sp,
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
@@ -353,7 +359,9 @@ fun ParentMypageScreen(
                     modifier = Modifier.size(19.dp),
                     tint = colors.muted,
                 )
+              }
             }
+            Spacer(Modifier.height(12.dp))
 
             WalletBalanceCard(
                 wallet = walletState.wallet,
@@ -370,14 +378,14 @@ fun ParentMypageScreen(
             // 이 모양이라, 카드 안에 이름이 들어가 있던 여기만 층이 하나 더 깊어 보였다.
             // 줄마다 아이콘은 달지 않는다 — 이름만으로 뜻이 분명해 눈만 피로해진다.
             GroupLabel(stringResource(R.string.parent_mypage_service))
-            OutlinedGroup {
+            KidSectionCard {
                 ListRow(stringResource(R.string.parent_mypage_pairing), trailing = childCount, onClick = onOpenPairing)
                 ListRow(stringResource(R.string.parent_mypage_cards), onClick = onOpenCards, showDivider = false)
             }
             // 커뮤니티·공지사항·활동 내역은 하단 탭 「커뮤니티」로 옮겼다. 여기 목록에 두면
             // 글 하나 읽는 데 마이페이지를 거쳐야 한다.
             GroupLabel(stringResource(R.string.parent_mypage_other))
-            OutlinedGroup {
+            KidSectionCard {
                 ListRow(stringResource(R.string.parent_mypage_contact), onClick = onOpenContact)
                 ListRow(stringResource(R.string.parent_mypage_terms), onClick = onOpenTerms)
                 ListRow(stringResource(R.string.parent_mypage_version), trailing = "", onClick = null, showDivider = false)

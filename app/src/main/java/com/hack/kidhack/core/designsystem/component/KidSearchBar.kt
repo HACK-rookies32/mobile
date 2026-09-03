@@ -1,6 +1,7 @@
 package com.hack.kidhack.core.designsystem.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -56,11 +57,14 @@ fun KidSearchBar(
 ) {
     val colors = LocalKidhackColors.current
     val keyboard = LocalSoftwareKeyboardController.current
+    // 캔버스가 회색(surface)이라 검색바도 회색이면 묻힌다 — 흰 알약에 얇은 테두리를 둘러
+    // 캔버스 위로 또렷하게 띄운다. 돋보기만 브랜드색으로 「여기가 검색」임을 알린다.
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(21.dp))
-            .background(colors.surface)
+            .background(colors.card)
+            .border(1.dp, colors.border, RoundedCornerShape(21.dp))
             .padding(start = 13.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -68,7 +72,7 @@ fun KidSearchBar(
             painter = painterResource(R.drawable.ic_search),
             contentDescription = null,
             modifier = Modifier.size(16.dp),
-            tint = colors.subtle,
+            tint = colors.brand,
         )
         Spacer(Modifier.width(9.dp))
         BasicTextField(

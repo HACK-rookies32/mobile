@@ -11,16 +11,20 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -33,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,6 +67,8 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.hack.kidhack.R
 import com.hack.kidhack.core.common.RemoteUrl
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
+import com.hack.kidhack.navigation.ImmersiveContent
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
@@ -353,6 +360,13 @@ fun ParentChatScreen(viewModel: ParentChatViewModel = koinViewModel()) {
     // 대화에서 뒤로 가면 목록으로. 여기서 막지 않으면 탭이 통째로 빠진다.
     BackHandler(enabled = selectedRoom != null) { viewModel.selectRoom(null) }
 
+    // 방에 들어가면 하단 탭 바를 접어 풀스크린 대화로 만든다 — 입력창이 탭 바 위에
+    // 떠 있지 않고 화면 맨 아래에 앉는다. 화면을 떠나거나 목록으로 돌아오면 되돌린다.
+    DisposableEffect(selectedRoom != null) {
+        ImmersiveContent.active = selectedRoom != null
+        onDispose { ImmersiveContent.active = false }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -398,6 +412,8 @@ private fun ColumnScope.RoomList(
             color = colors.text,
         )
     }
+    // 마이페이지·자녀관리와 같은 헤더 구분선 — 제목과 방 목록 사이를 다른 탭과 똑같이 가른다.
+    KidHeaderDivider()
 
     when {
         state.loading && state.rooms.isEmpty() ->
@@ -539,7 +555,7 @@ private fun ColumnScope.RoomDetail(
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp, bottom = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -680,7 +696,10 @@ private fun ChatComposer(draft: String, onDraft: (String) -> Unit, onSend: () ->
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .imePadding()
+                // 콘텐츠에는 이미 네비바 인셋이 들어가 있다. 여기서 imePadding 을 그대로 쓰면
+                // 키보드 높이가 네비바 위에 또 더해져 입력창이 키보드보다 그만큼 더 떠올랐다.
+                // ime 에서 네비바를 빼 「추가로 더 올릴 만큼」만 남겨 키보드 바로 위에 앉힌다.
+                .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars))
                 .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

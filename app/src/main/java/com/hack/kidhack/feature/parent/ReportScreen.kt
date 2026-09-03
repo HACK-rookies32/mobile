@@ -675,27 +675,28 @@ private fun PromiseBar(usedSeconds: Int, limitMinutes: Int?) {
 }
 
 /** 화면 맨 위 제목 줄. */
+/** 카드관리 등 다른 서브 페이지와 같은 헤더 규격 — 40dp ‹ 상자 + 좌측 제목 18 Bold, 위 12·아래 4. */
 @Composable
 internal fun ReportTitleBar(title: String, onBack: () -> Unit) {
     val colors = LocalKidhackColors.current
     Row(
-        modifier = Modifier.padding(start = 8.dp, end = 20.dp, top = 8.dp, bottom = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "‹",
+        Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(99.dp))
-                .clickable(onClick = onBack)
-                .padding(horizontal = 14.dp, vertical = 2.dp),
-            color = colors.text,
-            fontSize = 26.sp,
-        )
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("‹", color = colors.text, fontSize = 26.sp)
+        }
         Text(
             text = title,
             fontFamily = KidhackFontFamily,
-            fontWeight = FontBlack,
-            fontSize = 21.sp,
+            fontWeight = FontBold,
+            fontSize = 18.sp,
             color = colors.text,
         )
     }

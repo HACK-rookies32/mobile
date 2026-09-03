@@ -40,6 +40,7 @@ import com.hack.kidhack.R
 import com.hack.kidhack.background.alert.ServerAlertSync
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
+import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
@@ -165,7 +166,7 @@ fun ParentNotificationsScreen(
     ) {
         // 헤더 — ‹ 알림
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp, bottom = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (onBack != null) {
@@ -180,7 +181,7 @@ fun ParentNotificationsScreen(
                 stringResource(R.string.parent_notif_list_title),
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 color = colors.text,
             )
         }

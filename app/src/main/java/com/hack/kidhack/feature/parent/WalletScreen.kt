@@ -31,6 +31,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -65,6 +66,7 @@ import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.data.remote.userMessage
 import com.hack.kidhack.domain.model.Card
@@ -456,26 +458,30 @@ fun ParentWalletScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.card)
+            .background(colors.surface)
             .statusBarsPadding(),
     ) {
-        ReportTitleBar(title = stringResource(R.string.parent_wallet_title), onBack = onBack)
+        Column(Modifier.fillMaxWidth().background(colors.card)) {
+            ReportTitleBar(title = stringResource(R.string.parent_wallet_title), onBack = onBack)
 
-        WalletTabs(
-            titles = listOf(
-                stringResource(R.string.parent_wallet_tab_mine),
-                stringResource(R.string.parent_wallet_tab_child),
-            ),
-            selected = state.tab.ordinal,
-            onSelect = { viewModel.selectTab(WalletTab.entries[it]) },
-        )
+            WalletTabs(
+                titles = listOf(
+                    stringResource(R.string.parent_wallet_tab_mine),
+                    stringResource(R.string.parent_wallet_tab_child),
+                ),
+                selected = state.tab.ordinal,
+                onSelect = { viewModel.selectTab(WalletTab.entries[it]) },
+            )
+            KidHeaderDivider()
+        }
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
         ) {
+            Spacer(Modifier.height(8.dp))
             WalletBanner(error = state.error, messageRes = state.messageRes)
 
             // 첫 조회 전에는 목록을 그리지 않는다. 빈 목록을 먼저 보여 주면 "거래가 없다"로
@@ -1028,21 +1034,26 @@ private fun WalletCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = LocalKidhackColors.current
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(colors.card)
-            .border(1.dp, colors.border.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
-            // 목록 카드는 줄마다 위아래 여백을 스스로 갖고, 구분선은 카드 폭을 다 써야 한다.
-            .padding(
-                contentPadding ?: PaddingValues(
-                    horizontal = if (padded) 16.dp else 14.dp,
-                    vertical = if (padded) 16.dp else 0.dp,
+    // 테두리 대신 은은한 그림자로 띄워, 마이페이지의 KidSectionCard 와 같은 결을 낸다.
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = colors.card,
+        shadowElevation = 1.5.dp,
+        tonalElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier
+                // 목록 카드는 줄마다 위아래 여백을 스스로 갖고, 구분선은 카드 폭을 다 써야 한다.
+                .padding(
+                    contentPadding ?: PaddingValues(
+                        horizontal = if (padded) 16.dp else 14.dp,
+                        vertical = if (padded) 16.dp else 0.dp,
+                    ),
                 ),
-            ),
-        content = content,
-    )
+            content = content,
+        )
+    }
 }
 
 /** 묶음 위의 작은 회색 이름. */

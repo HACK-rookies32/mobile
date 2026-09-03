@@ -768,7 +768,8 @@ class RealCardRepository(private val api: CardApi) : CardRepository {
     }
 
     override suspend fun list(): List<Card> = api.list().unwrap().map { it.toDomain() }
-    override suspend fun delete(cardId: String) { api.delete(cardId.toServerId()).unwrapOrNull() }
+    // unwrap() 으로 서버 실패를 던진다 — 예전엔 unwrapOrNull 로 삼켜서, 삭제가 안 돼도 성공처럼 조용히 넘어갔다.
+    override suspend fun delete(cardId: String) { api.delete(cardId.toServerId()).unwrap() }
 }
 
 /** QR 결제 리포지토리(서버 v0.2, 태그 15·18·19). */

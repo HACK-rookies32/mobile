@@ -48,6 +48,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.hack.kidhack.R
 import com.hack.kidhack.core.common.RemoteUrl
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
@@ -207,7 +208,7 @@ fun ParentChildProfileScreen(
             .statusBarsPadding(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 10.dp, top = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 10.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -223,7 +224,7 @@ fun ParentChildProfileScreen(
                 stringResource(R.string.parent_profile_title),
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 color = colors.text,
             )
             Spacer(Modifier.weight(1f))
@@ -241,6 +242,7 @@ fun ParentChildProfileScreen(
                 fontSize = 14.sp,
             )
         }
+        KidHeaderDivider()
 
         Column(
             modifier = Modifier

@@ -36,6 +36,7 @@ import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.feature.common.TermsArticleTitles
 import com.hack.kidhack.feature.common.TermsBody
@@ -65,7 +66,8 @@ fun ParentTermsScreen(onBack: () -> Unit = {}) {
             .statusBarsPadding(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp),
+            // \uce74\ub4dc\uad00\ub9ac \ub4f1 \ub2e4\ub978 \uc11c\ube0c \ud398\uc774\uc9c0\uc640 \uac19\uc740 \ud5e4\ub354 \uaddc\uaca9(\uc704 12\u00b7\uc544\ub798 4).
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -81,10 +83,11 @@ fun ParentTermsScreen(onBack: () -> Unit = {}) {
                 stringResource(R.string.parent_terms_title),
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 color = colors.text,
             )
         }
+        KidHeaderDivider()
 
         // 법무 문서에서 가장 먼저 확인하는 값이라 맨 위에 한 줄로 둔다.
         Text(

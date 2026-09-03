@@ -192,7 +192,7 @@ fun ParentEditProfileScreen(
     ) {
         // 헤더 — ‹ 내 정보 수정
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -203,7 +203,7 @@ fun ParentEditProfileScreen(
                 stringResource(R.string.parent_editprofile_title),
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 color = colors.text,
             )
         }
