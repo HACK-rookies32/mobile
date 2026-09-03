@@ -381,7 +381,7 @@ val appModule = module {
     viewModel { MypageViewModel(get(), get(), get(), get()) }
     viewModel { EditProfileViewModel(get()) }
     viewModel { ActivityViewModel(get()) }
-    viewModel { ChildAccountViewModel(get()) }
+    viewModel { ChildAccountViewModel(get(), get()) }
     viewModel { WithdrawViewModel(get(), get()) }
     viewModel { AppControlViewModel(get(), get(), get()) }
     viewModel { ScreenshotViewModel(get(), get(), get()) }

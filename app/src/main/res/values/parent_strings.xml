@@ -56,6 +56,13 @@
     <string name="parent_geofence_events">최근 출입 기록</string>
     <string name="parent_geofence_manage">지정 장소 관리</string>
 
+    <string name="parent_geofence_type_label">종류</string>
+    <string name="parent_geofence_type_geo">안전 구역</string>
+    <string name="parent_geofence_type_geo_desc">들어오고 나갈 때 알림</string>
+    <string name="parent_geofence_type_dest">목적지</string>
+    <string name="parent_geofence_type_dest_desc">도착했을 때 알림</string>
+    <string name="parent_geofence_radius_custom">직접</string>
+    <string name="parent_geofence_radius_hint">반경을 미터로 입력</string>
     <string name="parent_geofence_title">지정 장소 관리</string>
     <string name="parent_geofence_empty">등록된 지정 장소가 없어요</string>
     <string name="parent_geofence_add">장소 추가</string>
@@ -141,16 +148,26 @@
     <string name="parent_mypage_child_account">자녀 계정 관리</string>
     <string name="parent_mypage_withdraw">회원 탈퇴</string>
 
+    <string name="parent_child_account_paired">연결됨</string>
+    <string name="parent_child_account_info">계정 정보</string>
+    <string name="parent_child_account_login_id">로그인 ID</string>
+    <string name="parent_child_account_alias">별명</string>
+    <string name="parent_child_account_phone">연락처</string>
+    <string name="parent_child_account_email">이메일</string>
+    <string name="parent_child_account_address">주소</string>
+    <string name="parent_child_account_unset">등록되지 않음</string>
+    <string name="parent_child_account_actions">계정 조치</string>
+    <string name="parent_child_account_force_logout_desc">이 기기의 세션을 끊어요. 자녀가 다시 로그인해야 해요.</string>
+    <string name="parent_child_account_unpair_desc">자녀 계정이 삭제돼요. 되돌릴 수 없어요.</string>
     <string name="parent_child_account_title">자녀 계정 관리</string>
-    <string name="parent_child_account_empty">연결된 자녀가 없어요</string>
     <string name="parent_child_account_force_logout">강제 로그아웃</string>
     <string name="parent_child_account_unpair">연결 해제·탈퇴</string>
-    <string name="parent_child_account_notice">강제 로그아웃은 자녀 기기의 로그인만 풀립니다. 연결 해제는 자녀 계정까지 삭제되며 되돌릴 수 없습니다.</string>
     <string name="parent_child_account_logout_confirm_title">%1$s 기기를 로그아웃시킬까요?</string>
-    <string name="parent_child_account_logout_confirm_message">자녀 기기에서 로그아웃되고 다시 로그인해야 합니다. 계정은 그대로 유지돼요.</string>
+    <string name="parent_child_account_logout_confirm_message">자녀는 알림 없이 로그아웃돼요. 다시 로그인하기 전까지 위치·사용 기록이 올라오지 않아요.</string>
     <string name="parent_child_account_unpair_confirm_title">%1$s 연결을 해제할까요?</string>
-    <string name="parent_child_account_unpair_confirm_message">연결이 끊기고 자녀 계정이 삭제됩니다. 되돌릴 수 없어요.</string>
-    <string name="parent_child_account_confirm_ok">진행하기</string>
+    <string name="parent_child_account_unpair_confirm_message">· 자녀 계정이 삭제돼요
+· 사용 기록·지정 장소도 함께 사라져요
+· 되돌릴 수 없어요</string>
     <string name="parent_child_account_confirm_cancel">취소</string>
 
     <string name="parent_withdraw_title">회원 탈퇴</string>
