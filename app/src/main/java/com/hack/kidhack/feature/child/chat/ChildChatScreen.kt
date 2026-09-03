@@ -89,7 +89,10 @@ fun ChildChatScreen(
             .background(colors.surface)
             .imePadding(),
     ) {
-        BrandGradientHeader {
+        // 채팅은 메시지 세로 공간이 중요하다 — 히어로 헤더의 40dp 아래 여백을 슬림하게 줄인다.
+        BrandGradientHeader(
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier

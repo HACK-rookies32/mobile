@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -25,6 +26,9 @@ import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 @Composable
 fun BrandGradientHeader(
     modifier: Modifier = Modifier,
+    // 히어로 헤더는 아래 여백을 넉넉히(40dp) 두지만, 채팅처럼 본문 세로 공간이 중요한
+    // 화면은 슬림하게 줄여 쓸 수 있게 열어 둔다. 기본값은 기존 동작 그대로.
+    contentPadding: PaddingValues = PaddingValues(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 40.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = LocalKidhackColors.current
@@ -33,7 +37,7 @@ fun BrandGradientHeader(
             .fillMaxWidth()
             .background(Brush.linearGradient(listOf(colors.brand, colors.brandDark)))
             .statusBarsPadding()
-            .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 40.dp),
+            .padding(contentPadding),
         content = content,
     )
 }
