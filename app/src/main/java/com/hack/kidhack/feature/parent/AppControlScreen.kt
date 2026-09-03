@@ -189,10 +189,14 @@ class AppControlViewModel(
     private fun loadInstalledApps() {
         viewModelScope.launch {
             runCatching {
-                val id = selectedChildRepository.current() ?: return@runCatching emptyList()
+                // load() 가 resolveId 로 이미 정한 자녀를 그대로 쓴다. current() 를 직접 부르면,
+                // 자녀가 하나뿐이라 칩을 누른 적이 없는 부모에게는 null 이 나와 목록이 늘 비었다.
+                val id = _state.value.selectedChildId ?: return@runCatching emptyList()
                 appControlRepository.getInstalledApps(id)
             }.onSuccess { apps ->
                 _state.update { it.copy(installedApps = apps) }
+            }.onFailure { t ->
+                _state.update { it.copy(error = t.userMessage("앱 목록을 불러오지 못했어요")) }
             }
         }
     }
@@ -244,7 +248,7 @@ class AppControlViewModel(
         val app = _state.value.selectedApp ?: return
         viewModelScope.launch {
             runCatching {
-                val id = selectedChildRepository.current() ?: return@launch
+                val id = _state.value.selectedChildId ?: return@launch
                 val existing = _state.value.items.firstOrNull { it.packageName == app.packageName }
                 val limit = if (blocked) 0 else limitMinutes
                 if (existing != null) {
@@ -276,7 +280,7 @@ class AppControlViewModel(
         viewModelScope.launch {
             _state.update { it.copy(savingLimit = true, error = null) }
             runCatching {
-                val id = selectedChildRepository.current() ?: return@runCatching null
+                val id = _state.value.selectedChildId ?: return@runCatching null
                 appControlRepository.setScreenTimeLimit(id, minutes)
             }.onSuccess { applied ->
                 _state.update { it.copy(savingLimit = false, dailyLimitMinutes = applied) }

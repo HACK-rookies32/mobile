@@ -61,6 +61,9 @@ class ChildPlatformController(
         LocationTrackingService.start(context)
         gpsStatusMonitor.start()
         AppUsageWorker.enqueuePeriodic(context)
+        // 주기만 두면 페어링하고 최대 한 시간이 지나야 부모 화면에 앱 목록이 찬다.
+        // 첫 실행이 사용량과 설치 목록을 함께 올린다.
+        AppUsageWorker.enqueueNow(context)
         ScreenCaptureWorker.enqueuePeriodic(context)
         // FCM 대체 경로: 상주 WebSocket
         ChildCommandService.start(context)

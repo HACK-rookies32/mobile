@@ -12,6 +12,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.hack.kidhack.data.local.AppUsageReportStore
 import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.model.InstalledApp
+import com.hack.kidhack.domain.repository.AppControlRepository
 import com.hack.kidhack.domain.repository.AppUsageRepository
 import com.hack.kidhack.domain.repository.SessionRepository
 import org.koin.core.component.KoinComponent
@@ -29,6 +31,7 @@ class AppUsageWorker(
     private val usageCollector: AppUsageCollector by inject()
     private val screenTimeWatcher: ScreenTimeWatcher by inject()
     private val reportStore: AppUsageReportStore by inject()
+    private val appControlRepository: AppControlRepository by inject()
 
     /**
      * 서버는 보고를 행으로 쌓고 조회 시 합산한다. 그래서 **증가분만** 보내야 한다.
@@ -40,6 +43,14 @@ class AppUsageWorker(
      */
     override suspend fun doWork(): Result {
         val childId = sessionRepository.current()?.user?.id ?: return Result.success()
+
+        // 부모가 통제할 앱을 고르려면 자녀 기기에 무엇이 깔려 있는지 서버가 알아야 한다.
+        // 서버·부모 앱·데이터 계층은 다 있었는데 자녀 기기가 이 호출을 한 번도 하지 않아,
+        // 부모 화면의 앱 고르기 목록이 늘 비어 있었다.
+        //
+        // 사용량 보고와 같은 주기라 새 스케줄이 필요 없다. 실패해도 사용량 보고는 계속한다 —
+        // 목록이 하루 늦게 차는 것보다 사용량이 빠지는 쪽이 더 아프다.
+        runCatching { syncInstalledApps(childId) }
 
         // 자녀가 앱을 열지 않아도 한도 도달은 기록돼야 한다.
         // 바로 아래에서 사용량을 보고하므로 여기서는 즉시 보고를 다시 예약하지 않는다.
@@ -74,6 +85,35 @@ class AppUsageWorker(
             },
             onFailure = { if (runAttemptCount < 3) Result.retry() else Result.success() },
         )
+    }
+
+    /**
+     * 자녀 기기에 깔린 앱을 서버에 올린다.
+     *
+     * <p>런처에서 열 수 있는 앱만 보낸다. 시스템 서비스·오버레이 패키지까지 보내면 부모가
+     * 고를 목록이 수백 줄이 되고, 그중 손댈 수 있는 것은 몇 개 없다.
+     *
+     * <p>서버가 <b>전량 삭제 후 재삽입</b>하므로 늘 전체를 보낸다. 증분으로 보내면 지운 앱이
+     * 목록에 영원히 남는다.
+     */
+    private suspend fun syncInstalledApps(childId: String) {
+        val packageManager = applicationContext.packageManager
+        val launchable = packageManager.getInstalledApplications(0)
+            .asSequence()
+            .filter { packageManager.getLaunchIntentForPackage(it.packageName) != null }
+            .filter { it.packageName != applicationContext.packageName }
+            .map {
+                InstalledApp(
+                    packageName = it.packageName,
+                    appName = packageManager.getApplicationLabel(it).toString(),
+                )
+            }
+            .sortedBy { it.appName }
+            .toList()
+
+        // 서버가 apps 를 1건 이상으로 요구한다(@NotEmpty). 빈 목록을 보내면 400 이다.
+        if (launchable.isEmpty()) return
+        appControlRepository.syncInstalledApps(childId, launchable)
     }
 
     companion object {
