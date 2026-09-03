@@ -687,6 +687,7 @@ data class AllowancePaymentDto(
 )
 
 /** 자녀 기기에 설치된 앱 (서버 `AppResponse`). 서버에 category 는 없다. */
+@Serializable
 data class InstalledAppDto(
     @Serializable(with = FlexibleStringSerializer::class)
     val id: String = "",

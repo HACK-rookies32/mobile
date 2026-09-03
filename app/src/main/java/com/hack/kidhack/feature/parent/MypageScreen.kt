@@ -66,6 +66,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import com.hack.kidhack.core.common.RemoteUrl
 
 enum class PasswordError { EMPTY, MISMATCH, NO_CODE }
 
@@ -256,6 +262,8 @@ fun ParentMypageScreen(
 
     // 지갑 화면에서 충전·송금하고 돌아오면 잔액이 달라져 있다.
     LifecycleResumeRefresh { walletViewModel.load() }
+    // 내 정보 수정에서 사진·닉네임을 바꾸고 돌아오면 즉시 반영되도록 프로필도 다시 읽는다.
+    LifecycleResumeRefresh { viewModel.load() }
 
     Column(
         modifier = Modifier
@@ -305,12 +313,23 @@ fun ParentMypageScreen(
                     Modifier.size(52.dp).clip(CircleShape).background(colors.brandLight),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_person),
-                        contentDescription = null,
-                        modifier = Modifier.size(26.dp),
-                        tint = colors.brandDark,
-                    )
+                    val photo = user?.profileImageUrl
+                    if (photo.isNullOrBlank()) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_person),
+                            contentDescription = null,
+                            modifier = Modifier.size(26.dp),
+                            tint = colors.brandDark,
+                        )
+                    } else {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(RemoteUrl.absolute(photo)).crossfade(true).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
                 Spacer(Modifier.size(14.dp))
                 Column(Modifier.weight(1f)) {

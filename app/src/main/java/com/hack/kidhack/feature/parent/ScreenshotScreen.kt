@@ -49,6 +49,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.hack.kidhack.R
+import com.hack.kidhack.core.common.RemoteUrl
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.theme.FontBold
@@ -291,7 +292,7 @@ fun ParentScreenshotScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(shot.imageUrl.takeIf { !it.isNullOrBlank() } ?: R.drawable.ic_launcher_foreground)
+                            .data(RemoteUrl.absolute(shot.imageUrl.orEmpty()).takeIf { it.isNotBlank() } ?: R.drawable.ic_launcher_foreground)
                             .build(),
                         contentDescription = null,
                         modifier = Modifier
@@ -371,7 +372,7 @@ private fun ScreenshotTile(shot: Screenshot, modifier: Modifier = Modifier, onVi
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(shot.imageUrl.takeIf { !it.isNullOrBlank() } ?: R.drawable.ic_launcher_foreground)
+                .data(RemoteUrl.absolute(shot.imageUrl.orEmpty()).takeIf { it.isNotBlank() } ?: R.drawable.ic_launcher_foreground)
                 .crossfade(true)
                 .build(),
             contentDescription = null,

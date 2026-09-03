@@ -144,6 +144,9 @@ class ChildCareViewModel(
     private val _state = MutableStateFlow(ChildCareUiState())
     val state: StateFlow<ChildCareUiState> = _state.asStateFlow()
 
+    /** 마지막으로 load() 한 시각. 화면 재진입 시 잦은 재조회를 막는 데 쓴다. */
+    private var lastLoadedAt = 0L
+
     init {
         load()
         // 보관함을 구독해 안 읽은 알림이 있는지만 본다. 목록은 알림 화면이 그린다.
@@ -154,7 +157,17 @@ class ChildCareViewModel(
         }
     }
 
+    /**
+     * 화면 재진입용. 사용 리포트에 갔다 돌아오면 뷰모델이 유지돼 init 의 조회가 다시 돌지
+     * 않아 「오늘 사용」이 그대로였다. 최근 [CARE_REFRESH_MIN_MS] 안에 읽었으면 건너뛴다.
+     */
+    fun refreshIfStale() {
+        if (System.currentTimeMillis() - lastLoadedAt < CARE_REFRESH_MIN_MS) return
+        load()
+    }
+
     fun load() {
+        lastLoadedAt = System.currentTimeMillis()
         viewModelScope.launch {
             val loaded = runCatching {
                 val children = childRepository.children()
@@ -569,6 +582,9 @@ private fun usageLabel(totalSeconds: Int): String {
     }
 }
 
+/** 대시보드 재진입 시 이 간격 안에 이미 읽었으면 다시 읽지 않는다. */
+private const val CARE_REFRESH_MIN_MS = 5_000L
+
 private const val SECONDS_PER_MINUTE = 60
 
 /**
@@ -692,6 +708,9 @@ fun ParentChildCareScreen(
     val colors = LocalKidhackColors.current
     val childId = state.selectedChildId
     val child = state.children.firstOrNull { it.id == childId }
+
+    // 사용 리포트 등에서 돌아올 때 「오늘 사용」을 다시 읽는다(뷰모델이 유지돼 init 이 다시 안 돎).
+    LaunchedEffect(Unit) { viewModel.refreshIfStale() }
 
     // 탭을 두지 않고 이름표로만 가른다. 대시보드와 탭이 한 화면에 있으면 스크롤이 서로
     // 다툰다 — 요약을 보려고 올리고 목록을 보려고 내리는데, 탭을 누르면 또 위로 튄다.

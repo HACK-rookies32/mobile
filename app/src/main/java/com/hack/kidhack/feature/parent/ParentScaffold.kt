@@ -232,6 +232,7 @@ internal fun ChildProfile.avatarEmoji(): String = "👦"
 fun MapChipButton(
     label: String,
     modifier: Modifier = Modifier,
+    active: Boolean = false,
     onClick: () -> Unit,
 ) {
     val colors = LocalKidhackColors.current
@@ -239,11 +240,11 @@ fun MapChipButton(
         label,
         modifier = modifier
             .padding(8.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(colors.card)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (active) colors.brand else colors.card)
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        color = colors.text,
+            .padding(horizontal = 11.dp, vertical = 7.dp),
+        color = if (active) Color.White else colors.text,
         fontFamily = KidhackFontFamily,
         fontWeight = FontBold,
         fontSize = 12.sp,

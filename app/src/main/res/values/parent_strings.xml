@@ -46,6 +46,14 @@
     <string name="parent_location_route_show">오늘 이동 경로 확인</string>
     <string name="parent_location_route_hide">이동 경로 숨기기</string>
     <string name="parent_location_route">오늘 이동 경로</string>
+    <string name="parent_location_header">위치</string>
+    <string name="parent_location_current_named">%1$s님 현재 위치</string>
+    <string name="parent_location_realtime_named">%1$s님 위치를 실시간으로 받아옵니다</string>
+    <string name="parent_geofence_events_named">최근 출입 기록 · %1$s</string>
+    <string name="parent_location_realtime_desc">자녀 위치를 계속 받아옵니다</string>
+    <string name="parent_location_route_desc">지도에 오늘 동선을 선으로 표시</string>
+    <string name="parent_location_updated">%1$s 업데이트</string>
+    <string name="parent_geofence_manage_desc">집·학교 등 안전 구역과 목적지</string>
     <string name="parent_location_empty_history">아직 기록된 이동 경로가 없어요</string>
     <string name="parent_geofence_type_geofence">위험구역</string>
     <string name="parent_geofence_type_destination">목적지</string>
@@ -84,6 +92,9 @@
     <string name="parent_chat_send_error">메시지 전송에 실패했어요</string>
 
     <string name="parent_notifications_title">알림 수신</string>
+    <string name="parent_notif_list_title">알림</string>
+    <string name="parent_notif_group_today">오늘</string>
+    <string name="parent_notif_group_older">이전</string>
     <string name="parent_notifications_section">알림 설정</string>
     <string name="parent_notif_location">GPS·위치 알림</string>
     <string name="parent_notif_location_desc">GPS 꺼짐, 안전구역 이탈</string>
@@ -190,6 +201,9 @@
     <string name="parent_editprofile_change_photo">프로필 사진 변경</string>
     <string name="parent_editprofile_pick_gallery">갤러리에서 선택</string>
     <string name="parent_editprofile_basic">기본 정보</string>
+    <string name="parent_editprofile_editable">바꿀 수 있어요</string>
+    <string name="parent_editprofile_signup">가입 정보</string>
+    <string name="parent_editprofile_loginid">아이디</string>
     <string name="parent_editprofile_nickname">닉네임</string>
     <string name="parent_editprofile_nickname_placeholder">커뮤니티에서 사용할 닉네임</string>
     <string name="parent_editprofile_nickname_hint">커뮤니티에 표시되는 이름이에요</string>

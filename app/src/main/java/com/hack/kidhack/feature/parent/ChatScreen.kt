@@ -176,12 +176,19 @@ class ParentChatViewModel(
                 if (children.isEmpty()) {
                     emptyList()
                 } else {
+                    // 최근 메시지·안읽음이 든 요약 목록. 방 생성 API(POST)는 이 값을 주지 않아
+                    // 예전엔 목록 미리보기가 늘 비어 있었다. 요약(GET rooms)에서 자녀별로 가져온다.
+                    val summaryByChildId = runCatching { chatRepository.rooms() }
+                        .getOrDefault(emptyList())
+                        .mapNotNull { r -> r.childId?.let { it.toString() to r } }
+                        .toMap()
                     children.map { child ->
                         val childId = child.id.toLongOrNull()
                             ?: error("자녀 회원 번호가 올바르지 않아요")
-                        val cached = roomByChildId[child.id]
-                        val room = cached ?: chatRepository.getOrCreateRoom(parentId, childId)
-                            .also { roomByChildId[child.id] = it }
+                        // 방이 이미 있으면 요약(미리보기 포함)을, 없으면 생성해 목록에 띄운다.
+                        val room = summaryByChildId[child.id]
+                            ?: chatRepository.getOrCreateRoom(parentId, childId)
+                        roomByChildId[child.id] = room
                         // 서버가 자녀 접속 여부를 주지 않는다(ChildSummaryResponse 에 없음).
                         // 방 자체의 상태를 그대로 쓰고 자녀 정보로는 이름만 덮는다.
                         room.copy(title = child.name)

@@ -379,7 +379,7 @@ val appModule = module {
     viewModel { ParentChatViewModel(get(), get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get(), get(), get()) }
     viewModel { MypageViewModel(get(), get(), get(), get()) }
-    viewModel { EditProfileViewModel(get()) }
+    viewModel { EditProfileViewModel(get(), get()) }
     viewModel { ActivityViewModel(get()) }
     viewModel { ChildAccountViewModel(get(), get()) }
     viewModel { WithdrawViewModel(get(), get()) }

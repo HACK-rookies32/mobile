@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.hack.kidhack.core.common.RemoteUrl
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
@@ -118,7 +119,7 @@ fun ParentAccountSettingsScreen(
                         )
                     } else {
                         AsyncImage(
-                            model = photo,
+                            model = RemoteUrl.absolute(photo),
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,

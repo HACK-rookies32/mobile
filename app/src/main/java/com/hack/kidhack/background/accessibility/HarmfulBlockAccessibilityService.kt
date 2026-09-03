@@ -4,6 +4,8 @@ import android.accessibilityservice.AccessibilityService
 import android.graphics.PixelFormat
 import android.os.Build
 import android.provider.Settings
+import android.provider.Telephony
+import android.telecom.TelecomManager
 import android.view.Gravity
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -167,7 +169,33 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
      * 정작 막아야 할 웹/앱 콘텐츠와 무관하다.
      */
     private fun isExempt(packageName: String): Boolean =
-        packageName == applicationContext.packageName || packageName in EXEMPT_PACKAGES
+        packageName == applicationContext.packageName ||
+            packageName in EXEMPT_PACKAGES ||
+            packageName in essentialPackages()
+
+    private var essentialCache: Set<String> = emptySet()
+    private var essentialCachedAt = 0L
+
+    /**
+     * 전화·문자 기본 앱은 스크린타임/개별 차단에서 늘 예외다 — 한도를 다 써도 아이가
+     * 연락은 할 수 있어야 한다. 기기마다 패키지가 달라(삼성 `com.samsung.android.dialer`,
+     * 구글 등) 고정 목록 대신 「기본 전화/문자 앱」이 무엇인지 물어 캐시한다.
+     */
+    private fun essentialPackages(): Set<String> {
+        val now = System.currentTimeMillis()
+        if (now - essentialCachedAt < ESSENTIAL_TTL_MS && essentialCache.isNotEmpty()) return essentialCache
+        val set = buildSet {
+            runCatching { getSystemService(TelecomManager::class.java)?.defaultDialerPackage }
+                .getOrNull()?.takeIf { it.isNotBlank() }?.let { add(it) }
+            runCatching { Telephony.Sms.getDefaultSmsPackage(this@HarmfulBlockAccessibilityService) }
+                .getOrNull()?.takeIf { it.isNotBlank() }?.let { add(it) }
+        }
+        if (set.isNotEmpty()) {
+            essentialCache = set
+            essentialCachedAt = now
+        }
+        return set.ifEmpty { essentialCache }
+    }
 
     override fun onInterrupt() = Unit
 
@@ -325,6 +353,8 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
             "com.google.android.inputmethod.latin",
             "com.android.permissioncontroller",
         )
+        /** 기본 전화/문자 앱 조회 캐시 수명. 기본 앱은 자주 바뀌지 않는다. */
+        private const val ESSENTIAL_TTL_MS = 10 * 60 * 1000L
         private const val BLOCKLIST_TTL_MS = 5 * 60 * 1000L
         private const val OVERLAY_MS = 2_500L
         private const val MAX_NODE_DEPTH = 12
