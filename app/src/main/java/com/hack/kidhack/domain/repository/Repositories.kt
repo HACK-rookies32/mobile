@@ -372,6 +372,8 @@ data class TxSecurity(
     val signature: String? = null,
     val nonce: String? = null,
     val accountHolder: String? = null,
+    /** 거래 비밀번호(계좌비밀번호 6자리). 서버 관문이 필수로 검증. */
+    val accountPassword: String? = null,
 )
 
 interface WalletRepository {
@@ -380,7 +382,7 @@ interface WalletRepository {
     suspend fun transferToChild(childId: String, amount: Int, memo: String?, security: TxSecurity? = null): TransferResult
     suspend fun reclaimFromChild(childId: String, amount: Int, security: TxSecurity? = null): TransferResult
     suspend fun getChildWallet(childId: String): Wallet
-    suspend fun prepareCharge(amount: Int, method: String, cardId: String): Charge
+    suspend fun prepareCharge(amount: Int, method: String, cardId: String, security: TxSecurity? = null): Charge
     suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet
 
     /** 이 부모↔자녀 사이 이체/회수 원장(최신순 페이징). */
@@ -611,8 +613,10 @@ interface EfinRepository {
     /** 거래 OTP 발급 → mock SMS 발신. 반환 code 는 응답 노출값. */
     suspend fun issueOtp(): OtpIssue
     suspend fun verifyOtp(code: String): Boolean
-    suspend fun setAccountPassword(password: String)
-    suspend fun changeAccountPassword(currentPassword: String, newPassword: String)
+    /** 계좌비밀번호가 맞는지 사전 확인(거래 전 UI 점검). 최종 검증은 서버 관문. */
+    suspend fun verifyAccountPassword(password: String): Boolean
+    suspend fun setAccountPassword(password: String, loginPassword: String)
+    suspend fun changeAccountPassword(currentPassword: String, newPassword: String, loginPassword: String)
     suspend fun verifyIdentity(
         name: String,
         birthDate: String,

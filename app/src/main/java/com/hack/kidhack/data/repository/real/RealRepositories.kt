@@ -55,6 +55,7 @@ import com.hack.kidhack.data.remote.dto.EfinAccountPasswordRequest
 import com.hack.kidhack.data.remote.dto.EfinAccountPasswordChangeRequest
 import com.hack.kidhack.data.remote.dto.EfinIdentityVerifyRequest
 import com.hack.kidhack.data.remote.dto.EfinOtpVerifyRequest
+import com.hack.kidhack.data.remote.dto.EfinAccountPasswordVerifyRequest
 import com.hack.kidhack.domain.repository.EfinRepository
 import com.hack.kidhack.domain.repository.IdentityResult
 import com.hack.kidhack.domain.repository.OtpIssue
@@ -697,8 +698,10 @@ class RealWalletRepository(
     override suspend fun getChildWallet(childId: String): Wallet =
         walletApi.childWallet(childId.toServerId()).unwrap().toWallet()
 
-    override suspend fun prepareCharge(amount: Int, method: String, cardId: String): com.hack.kidhack.domain.model.Charge =
-        walletApi.chargePrepare(WalletChargePrepareRequest(amount.toLong())).unwrap().toCharge()
+    override suspend fun prepareCharge(amount: Int, method: String, cardId: String, security: TxSecurity?): com.hack.kidhack.domain.model.Charge =
+        walletApi.chargePrepare(WalletChargePrepareRequest(
+            amount = amount.toLong(), otp = security?.otp, accountPassword = security?.accountPassword,
+            signature = security?.signature, nonce = security?.nonce)).unwrap().toCharge()
 
     override suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet {
         // chargeId = prepare 가 발급한 merchantUid. paymentKey 는 토스 결제위젯 성공 콜백의 paymentKey —
@@ -1090,12 +1093,16 @@ class RealEfinRepository(
     override suspend fun verifyOtp(code: String): Boolean =
         efinApi.verifyOtp(EfinOtpVerifyRequest(code)).unwrap().valid
 
-    override suspend fun setAccountPassword(password: String) {
-        efinApi.setAccountPassword(EfinAccountPasswordRequest(password)).unwrap()
+    override suspend fun verifyAccountPassword(password: String): Boolean =
+        efinApi.verifyAccountPassword(EfinAccountPasswordVerifyRequest(password)).unwrap().valid
+
+    override suspend fun setAccountPassword(password: String, loginPassword: String) {
+        efinApi.setAccountPassword(EfinAccountPasswordRequest(password, loginPassword)).unwrap()
     }
 
-    override suspend fun changeAccountPassword(currentPassword: String, newPassword: String) {
-        efinApi.changeAccountPassword(EfinAccountPasswordChangeRequest(currentPassword, newPassword)).unwrap()
+    override suspend fun changeAccountPassword(currentPassword: String, newPassword: String, loginPassword: String) {
+        efinApi.changeAccountPassword(
+            EfinAccountPasswordChangeRequest(currentPassword, newPassword, loginPassword)).unwrap()
     }
 
     override suspend fun verifyIdentity(

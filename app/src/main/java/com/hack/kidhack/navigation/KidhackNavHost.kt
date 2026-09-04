@@ -22,6 +22,8 @@ import com.hack.kidhack.domain.model.Session
 import com.hack.kidhack.domain.repository.SessionEvents
 import com.hack.kidhack.domain.repository.SessionRepository
 import org.koin.core.context.GlobalContext
+import com.hack.kidhack.feature.efin.TxAuthCoordinator
+import com.hack.kidhack.feature.efin.TxAuthHost
 
 @Composable
 fun KidhackNavHost() {
@@ -141,6 +143,10 @@ fun KidhackNavHost() {
         parentGraph(navController)
         childGraph(navController)
     }
+
+    // 거래 승인 다이얼로그를 앱 루트에 딱 하나만 띄운다 — 송금·회수·충전이 공유(화면마다 붙이지 않음).
+    // AlertDialog 는 자체 윈도우라 트리 위치와 무관하게 화면 중앙에 뜬다.
+    TxAuthHost(koin.get<TxAuthCoordinator>())
 }
 
 /**

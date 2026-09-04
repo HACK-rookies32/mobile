@@ -178,6 +178,7 @@ import com.hack.kidhack.feature.parent.WalletViewModel
 import com.hack.kidhack.feature.efin.AccountPasswordViewModel
 import com.hack.kidhack.feature.efin.IdentityVerifyViewModel
 import com.hack.kidhack.feature.efin.OtpNotifier
+import com.hack.kidhack.feature.efin.TxAuthCoordinator
 import com.hack.kidhack.feature.terminal.StoreTerminalViewModel
 import com.hack.kidhack.feature.parent.CameraRequestViewModel
 import com.hack.kidhack.feature.parent.ScreenTimeViewModel
@@ -367,6 +368,8 @@ val appModule = module {
         if (useMock) FakeEfinRepository() else RealEfinRepository(get())
     }
     single { OtpNotifier(androidContext()) }
+    // 거래 승인 공용 코디네이터 — 송금·회수·충전이 하나의 승인 다이얼로그를 공유한다.
+    single { TxAuthCoordinator(get(), get()) }
 
     // FCM 대체 푸시 채널 (WebSocket + 폴링 백업)
     single { ChildCommandSocket(get(), get(), BuildConfig.BASE_URL) }
@@ -408,8 +411,8 @@ val appModule = module {
     viewModel { ScreenTimeViewModel(get(), get(), get()) }
     viewModel { NoticeViewModel(get()) }
     viewModel { ContactViewModel(get<InquiryRepository>()) }
-    viewModel { PayViewModel(get(), get(), get(), get()) }
-    viewModel { WalletViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { PayViewModel(get(), get(), get(), get(), get()) }
+    viewModel { WalletViewModel(get(), get(), get(), get(), get(), get()) }
     viewModel { AccountPasswordViewModel(get()) }
     viewModel { IdentityVerifyViewModel(get()) }
     viewModel { CardViewModel(get()) }

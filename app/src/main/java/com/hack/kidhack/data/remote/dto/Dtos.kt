@@ -927,7 +927,13 @@ data class TxResponseDto(
 // --- 11. 충전/환불 ---
 
 @Serializable
-data class WalletChargePrepareRequest(val amount: Long)
+data class WalletChargePrepareRequest(
+    val amount: Long,
+    val otp: String? = null,
+    val accountPassword: String? = null,
+    val signature: String? = null,
+    val nonce: String? = null,
+)
 
 @Serializable
 data class WalletChargePrepareResponse(
@@ -998,6 +1004,7 @@ data class WalletTransferRequest(
     val signature: String? = null,
     val nonce: String? = null,
     val accountHolder: String? = null,
+    val accountPassword: String? = null,
 )
 
 // --- 20~22. 전자금융 거래 보안 (efin) ---
@@ -1017,10 +1024,20 @@ data class EfinOtpVerifyRequest(val code: String)
 data class EfinOtpVerifyResponse(val valid: Boolean = false)
 
 @Serializable
-data class EfinAccountPasswordRequest(val password: String)
+data class EfinAccountPasswordRequest(val password: String, val loginPassword: String)
 
 @Serializable
-data class EfinAccountPasswordChangeRequest(val currentPassword: String, val newPassword: String)
+data class EfinAccountPasswordChangeRequest(
+    val currentPassword: String,
+    val newPassword: String,
+    val loginPassword: String,
+)
+
+@Serializable
+data class EfinAccountPasswordVerifyRequest(val password: String)
+
+@Serializable
+data class EfinAccountPasswordVerifyResponse(val valid: Boolean = false)
 
 @Serializable
 data class EfinIdentityVerifyRequest(

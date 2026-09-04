@@ -59,6 +59,8 @@ data class AccountPwUiState(
     val password: String = "",
     val current: String = "",
     val newPassword: String = "",
+    /** 본인확인용 앱 로그인 비밀번호. */
+    val loginPassword: String = "",
     val working: Boolean = false,
     val error: String? = null,
     val done: String? = null,
@@ -77,6 +79,7 @@ class AccountPasswordViewModel(
     fun onPassword(v: String) = _state.update { it.copy(password = digits(v)) }
     fun onCurrent(v: String) = _state.update { it.copy(current = digits(v)) }
     fun onNew(v: String) = _state.update { it.copy(newPassword = digits(v)) }
+    fun onLoginPassword(v: String) = _state.update { it.copy(loginPassword = v) }
 
     fun submit() {
         val s = _state.value
@@ -85,13 +88,13 @@ class AccountPasswordViewModel(
             _state.update { it.copy(working = true, error = null, done = null) }
             runCatching {
                 when (s.mode) {
-                    AccountPwMode.SET -> efinRepository.setAccountPassword(s.password)
-                    AccountPwMode.CHANGE -> efinRepository.changeAccountPassword(s.current, s.newPassword)
+                    AccountPwMode.SET -> efinRepository.setAccountPassword(s.password, s.loginPassword)
+                    AccountPwMode.CHANGE -> efinRepository.changeAccountPassword(s.current, s.newPassword, s.loginPassword)
                 }
             }.onSuccess {
                 _state.update {
                     it.copy(
-                        working = false, password = "", current = "", newPassword = "",
+                        working = false, password = "", current = "", newPassword = "", loginPassword = "",
                         done = if (s.mode == AccountPwMode.SET) "계좌비밀번호를 설정했습니다." else "계좌비밀번호를 변경했습니다.",
                     )
                 }
@@ -153,6 +156,10 @@ fun AccountPasswordScreen(
                 }
             }
 
+            Spacer(Modifier.height(2.dp))
+            FieldLabel("본인확인 · 앱 로그인 비밀번호")
+            LoginPwField(state.loginPassword, viewModel::onLoginPassword)
+
             EfinPrimaryButton(
                 text = if (state.mode == AccountPwMode.SET) "설정" else "변경",
                 enabled = !state.working && isReady(state),
@@ -164,7 +171,7 @@ fun AccountPasswordScreen(
     }
 }
 
-private fun isReady(s: AccountPwUiState): Boolean = when (s.mode) {
+private fun isReady(s: AccountPwUiState): Boolean = s.loginPassword.isNotBlank() && when (s.mode) {
     AccountPwMode.SET -> s.password.length == 6
     AccountPwMode.CHANGE -> s.current.length == 6 && s.newPassword.length == 6
 }
@@ -187,6 +194,34 @@ private fun ModeChip(label: String, selected: Boolean, modifier: Modifier, onCli
             fontFamily = KidhackFontFamily,
             fontWeight = FontBold,
             fontSize = 14.sp,
+        )
+    }
+}
+
+/** 앱 로그인 비밀번호 입력(마스킹, 길이 제한 없음). */
+@Composable
+private fun LoginPwField(value: String, onChange: (String) -> Unit) {
+    val colors = LocalKidhackColors.current
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.surface)
+            .border(1.dp, colors.border, RoundedCornerShape(12.dp))
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+    ) {
+        if (value.isEmpty()) {
+            Text("로그인 비밀번호", color = colors.muted, fontFamily = KidhackFontFamily, fontSize = 15.sp)
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = TextStyle(color = colors.text, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 15.sp),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
+            cursorBrush = SolidColor(colors.brand),
         )
     }
 }

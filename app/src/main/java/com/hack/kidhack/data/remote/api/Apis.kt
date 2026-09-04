@@ -107,6 +107,8 @@ import com.hack.kidhack.data.remote.dto.EfinOtpVerifyRequest
 import com.hack.kidhack.data.remote.dto.EfinOtpVerifyResponse
 import com.hack.kidhack.data.remote.dto.EfinAccountPasswordRequest
 import com.hack.kidhack.data.remote.dto.EfinAccountPasswordChangeRequest
+import com.hack.kidhack.data.remote.dto.EfinAccountPasswordVerifyRequest
+import com.hack.kidhack.data.remote.dto.EfinAccountPasswordVerifyResponse
 import com.hack.kidhack.data.remote.dto.EfinIdentityVerifyRequest
 import com.hack.kidhack.data.remote.dto.EfinIdentityVerifyResponse
 import com.hack.kidhack.data.remote.dto.CardPublicKeyResponse
@@ -888,6 +890,9 @@ interface EfinApi {
 
     @PUT("efin/account-password")
     suspend fun changeAccountPassword(@Body body: EfinAccountPasswordChangeRequest): ApiEnvelope<Unit>
+
+    @POST("efin/account-password/verify")
+    suspend fun verifyAccountPassword(@Body body: EfinAccountPasswordVerifyRequest): ApiEnvelope<EfinAccountPasswordVerifyResponse>
 
     // 22. 실명확인(신분증 진위확인)
     @POST("efin/identity/verify")

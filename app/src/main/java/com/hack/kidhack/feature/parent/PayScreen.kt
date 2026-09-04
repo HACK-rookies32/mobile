@@ -108,6 +108,7 @@ class PayViewModel(
     private val cardRepository: CardRepository,
     private val selectedChildRepository: SelectedChildRepository,
     private val qrPayRepository: QrPayRepository,
+    private val txAuth: com.hack.kidhack.feature.efin.TxAuthCoordinator,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(PayUiState())
@@ -247,7 +248,9 @@ class PayViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true) }
             runCatching {
-                val prep = walletRepository.prepareCharge(amount, "CARD", cardId)
+                // 공용 승인(계좌비번+OTP) — 취소하면 중단.
+                val auth = txAuth.authorize(amount, null, 0L) ?: return@launch stopLoading()
+                val prep = walletRepository.prepareCharge(amount, "CARD", cardId, auth)
                 walletRepository.confirmCharge(prep.chargeId, prep.paymentKey ?: "", amount)
             }.onSuccess {
                 _state.update { it.copy(successMessage = "충전이 완료되었습니다.", amountInput = "") }
@@ -263,7 +266,8 @@ class PayViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true) }
             runCatching {
-                walletRepository.transferToChild(childId, amount, _state.value.memoInput.ifBlank { null })
+                val auth = txAuth.authorize(amount, null, childId.toLongOrNull() ?: 0L) ?: return@launch stopLoading()
+                walletRepository.transferToChild(childId, amount, _state.value.memoInput.ifBlank { null }, auth)
             }.onSuccess {
                 _state.update { it.copy(successMessage = "송금이 완료되었습니다.", amountInput = "", memoInput = "") }
                 load()
@@ -278,13 +282,16 @@ class PayViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true) }
             runCatching {
-                walletRepository.reclaimFromChild(childId, amount)
+                val auth = txAuth.authorize(amount, null, childId.toLongOrNull() ?: 0L) ?: return@launch stopLoading()
+                walletRepository.reclaimFromChild(childId, amount, auth)
             }.onSuccess {
                 _state.update { it.copy(successMessage = "회수가 완료되었습니다.", amountInput = "") }
                 load()
             }.onFailure { handlePayError(it) }
         }
     }
+
+    private fun stopLoading() = _state.update { it.copy(loading = false) }
 
     private fun handlePayError(t: Throwable) {
         val msg = when {
