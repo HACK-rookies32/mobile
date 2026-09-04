@@ -549,7 +549,7 @@ private fun AppRuleRow(
 ) {
     val colors = LocalKidhackColors.current
     if (showDivider) {
-        HorizontalDivider(modifier = Modifier.padding(start = 72.dp), color = colors.line)
+        HorizontalDivider(modifier = Modifier.padding(start = 22.dp), color = colors.line)
     }
     Row(
         modifier = Modifier
@@ -558,18 +558,6 @@ private fun AppRuleRow(
             .padding(horizontal = 22.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(colors.surface),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_phone),
-                contentDescription = null,
-                modifier = Modifier.size(19.dp),
-                tint = colors.border,
-            )
-        }
-        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = item.name,
@@ -661,19 +649,6 @@ private fun AppPickerSheet(
                             .padding(horizontal = 22.dp, vertical = 13.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(
-                            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp))
-                                .background(colors.surface),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_phone),
-                                contentDescription = null,
-                                modifier = Modifier.size(17.dp),
-                                tint = colors.border,
-                            )
-                        }
-                        Spacer(Modifier.width(12.dp))
                         Text(
                             text = app.appName,
                             modifier = Modifier.weight(1f),

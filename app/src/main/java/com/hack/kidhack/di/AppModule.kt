@@ -428,7 +428,7 @@ val appModule = module {
     viewModel { ChildPairingViewModel(get()) }
     viewModel { ChildScreenshotViewModel(get(), get()) }
     viewModel { ChildCameraViewModel(get(), get(), get(), get()) }
-    viewModel { ChildPayViewModel(get(), get()) }
+    viewModel { ChildPayViewModel(get(), get(), get()) }
     viewModel { ChildProfileEditViewModel(get(), get()) }
     viewModel { (persistDone: Boolean) ->
         ChildOnboardingViewModel(get(), get(), persistDone)

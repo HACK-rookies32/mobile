@@ -6,6 +6,7 @@ import com.hack.kidhack.data.remote.userMessage
 import com.hack.kidhack.domain.model.QrPaymentHistoryItem
 import com.hack.kidhack.domain.model.QrTicket
 import com.hack.kidhack.domain.repository.QrPayRepository
+import com.hack.kidhack.domain.repository.StoreTerminalRepository
 import com.hack.kidhack.domain.repository.WalletRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -23,6 +24,8 @@ data class ChildPayUiState(
     val ticket: QrTicket? = null,
     val secondsLeft: Int = 0,
     val issuing: Boolean = false,
+    /** 테스트 결제(매장 단말 승인 흉내) 호출 중. 다이얼로그 버튼을 잠근다. */
+    val testPaying: Boolean = false,
     val message: String? = null,
     val error: String? = null,
 )
@@ -38,6 +41,9 @@ data class ChildPayUiState(
 class ChildPayViewModel(
     private val qrPayRepository: QrPayRepository,
     private val walletRepository: WalletRepository,
+    // 테스트 결제 버튼이 매장 단말 승인을 대신 호출하는 데 쓴다. 실제 결제 흐름에서는
+    // 매장 기기가 하는 일이라, 자녀 앱이 이걸 직접 부르는 건 화면 테스트용이다.
+    private val storeTerminalRepository: StoreTerminalRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChildPayUiState())
@@ -87,6 +93,31 @@ class ChildPayViewModel(
     }
 
     fun clearMessage() = _state.update { it.copy(message = null, error = null) }
+
+    /**
+     * 화면에서 바로 결제를 끝내 보는 테스트용 승인.
+     *
+     * <p>실제로는 매장 단말이 QR 을 찍고 승인하는데, 데모에서는 단말이 없으니 자녀 앱이 그
+     * 역할을 대신한다: 임시 매장 단말 토큰을 하나 발급받아 지금 떠 있는 QR 토큰으로 [amount]
+     * 만큼 승인을 호출한다. 승인이 되면 서버가 QR 을 PAID 로 바꾸고, 이미 돌고 있는 폴링이
+     * 그걸 잡아 화면을 「결제 완료」로 넘기고 잔액을 새로고침한다 — 실제 결제와 같은 경로다.
+     */
+    fun testPay(storeName: String, amount: Int) {
+        val ticket = _state.value.ticket ?: return
+        if (amount <= 0 || _state.value.testPaying) return
+        viewModelScope.launch {
+            _state.update { it.copy(testPaying = true, error = null, message = null) }
+            runCatching {
+                val terminal = storeTerminalRepository.issueTerminal(storeName.ifBlank { "테스트 매장" })
+                storeTerminalRepository.approve(terminal.terminalToken, ticket.qrToken, amount)
+            }.onSuccess {
+                // 성공 메시지·잔액·QR 상태는 폴링이 PAID 를 잡아 처리한다. 여기서는 플래그만 내린다.
+                _state.update { it.copy(testPaying = false) }
+            }.onFailure { t ->
+                _state.update { it.copy(testPaying = false, error = t.userMessage("테스트 결제에 실패했어요")) }
+            }
+        }
+    }
 
     private fun startCountdownAndPoll(ticket: QrTicket) {
         pollJob?.cancel()

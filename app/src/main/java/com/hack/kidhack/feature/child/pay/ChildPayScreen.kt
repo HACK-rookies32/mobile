@@ -15,17 +15,24 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,6 +44,7 @@ import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidLabeledSection
 import com.hack.kidhack.core.designsystem.component.KidSectionCard
+import com.hack.kidhack.core.designsystem.component.KidTextField
 import com.hack.kidhack.core.designsystem.component.QrCode
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
@@ -73,6 +81,10 @@ fun ChildPayScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
     val context = LocalContext.current
+    // 매장 단말 테스트 다이얼로그 입력값. 화면 로컬 상태로만 둔다.
+    var showTestDialog by remember { mutableStateOf(false) }
+    var testStore by remember { mutableStateOf("") }
+    var testAmount by remember { mutableStateOf("") }
 
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
@@ -182,6 +194,19 @@ fun ChildPayScreen(
                         textAlign = TextAlign.Center,
                     )
                     Spacer(Modifier.height(12.dp))
+                    // 매장 단말이 QR 을 찍는 걸 대신하는 테스트 버튼. 이 화면에서 결제를 끝까지
+                    // 돌려 볼 수 있게 둔다(시연·개발용).
+                    KidButton(
+                        text = stringResource(R.string.child_pay_test),
+                        onClick = {
+                            testStore = ""
+                            testAmount = ""
+                            showTestDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = KidButtonVariant.Secondary,
+                    )
+                    Spacer(Modifier.height(8.dp))
                     KidButton(
                         text = stringResource(R.string.child_pay_cancel),
                         onClick = viewModel::cancelTicket,
@@ -190,6 +215,78 @@ fun ChildPayScreen(
                     )
                 }
             }
+        }
+
+        if (showTestDialog && ticket != null) {
+            val amountValue = testAmount.toIntOrNull() ?: 0
+            AlertDialog(
+                onDismissRequest = { if (!state.testPaying) showTestDialog = false },
+                title = {
+                    Text(
+                        stringResource(R.string.child_pay_test_dialog_title),
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            stringResource(R.string.child_pay_test_dialog_desc),
+                            color = colors.muted,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontSemibold,
+                            fontSize = 12.sp,
+                        )
+                        Spacer(Modifier.height(14.dp))
+                        KidTextField(
+                            value = testStore,
+                            onValueChange = { testStore = it },
+                            label = stringResource(R.string.child_pay_test_store_label),
+                            placeholder = stringResource(R.string.child_pay_test_store_hint),
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        KidTextField(
+                            value = testAmount,
+                            onValueChange = { input -> testAmount = input.filter { it.isDigit() }.take(9) },
+                            label = stringResource(R.string.child_pay_test_amount_label),
+                            placeholder = stringResource(R.string.child_pay_test_amount_hint),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = amountValue > 0 && !state.testPaying,
+                        onClick = {
+                            viewModel.testPay(testStore, amountValue)
+                            showTestDialog = false
+                        },
+                    ) {
+                        Text(
+                            stringResource(
+                                if (state.testPaying) R.string.child_pay_test_approving
+                                else R.string.child_pay_test_approve,
+                            ),
+                            color = colors.brand,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        enabled = !state.testPaying,
+                        onClick = { showTestDialog = false },
+                    ) {
+                        Text(
+                            stringResource(R.string.child_pay_cancel),
+                            color = colors.muted,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                        )
+                    }
+                },
+            )
         }
 
         KidLabeledSection(
