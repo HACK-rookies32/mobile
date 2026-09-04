@@ -64,6 +64,10 @@ import com.hack.kidhack.domain.model.User
 import com.hack.kidhack.domain.repository.AllowanceRepository
 import com.hack.kidhack.domain.repository.QrPayRepository
 import com.hack.kidhack.domain.repository.StoreTerminalRepository
+import com.hack.kidhack.domain.repository.EfinRepository
+import com.hack.kidhack.domain.repository.IdentityResult
+import com.hack.kidhack.domain.repository.OtpIssue
+import com.hack.kidhack.domain.repository.TxSecurity
 import com.hack.kidhack.domain.model.Wallet
 import com.hack.kidhack.domain.model.WalletTransaction
 import com.hack.kidhack.domain.repository.AppControlRepository
@@ -712,16 +716,16 @@ class FakeWalletRepository : WalletRepository {
         WalletTransaction("tx1", "CHARGE", 50000, 50000, null, "08.15"),
         WalletTransaction("tx2", "TRANSFER_OUT", -5000, 45000, "101", "08.20")
     )
-    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult {
+    override suspend fun transferToChild(childId: String, amount: Int, memo: String?, security: TxSecurity?): TransferResult {
         balance -= amount
         return TransferResult(balance, 10000 + amount, "tx-${System.currentTimeMillis()}")
     }
-    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult {
+    override suspend fun reclaimFromChild(childId: String, amount: Int, security: TxSecurity?): TransferResult {
         balance += amount
         return TransferResult(balance, 10000 - amount, "tx-${System.currentTimeMillis()}")
     }
     override suspend fun getChildWallet(childId: String): Wallet = Wallet("w-child", 10000, "방금")
-    override suspend fun prepareCharge(amount: Int, method: String, cardId: String): Charge = Charge("c1", amount, "PENDING", "key1", method)
+    override suspend fun prepareCharge(amount: Int, method: String, cardId: String, security: TxSecurity?): Charge = Charge("c1", amount, "PENDING", "key1", method)
     override suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet {
         balance += amount
         return Wallet("w-parent", balance, "방금")
@@ -1169,4 +1173,26 @@ class FakeStoreTerminalRepository : StoreTerminalRepository {
             item
         }
     }
+}
+
+/**
+ * 목 전자금융 — 데모에서도 실서버처럼 틀린 값을 거부한다(2차 설계: 데모 충실성).
+ * OTP 는 고정 코드 428193, 계좌비번은 마지막으로 설정한 값(없으면 기본 135790)만 통과.
+ */
+class FakeEfinRepository : EfinRepository {
+    private var accountPw: String = "135790" // 데모 기본값(설정 화면에서 바꾸면 갱신)
+    override suspend fun issueOtp(): OtpIssue = OtpIssue(phone = "010-****-5678", code = "428193", expiresIn = 180)
+    override suspend fun verifyOtp(code: String): Boolean = code == "428193"
+    override suspend fun verifyAccountPassword(password: String): Boolean = password == accountPw
+    override suspend fun setAccountPassword(password: String, loginPassword: String) { accountPw = password }
+    override suspend fun changeAccountPassword(currentPassword: String, newPassword: String, loginPassword: String) {
+        accountPw = newPassword
+    }
+    override suspend fun verifyIdentity(
+        name: String,
+        birthDate: String,
+        idType: String,
+        idNumber: String,
+        issuedDate: String,
+    ): IdentityResult = IdentityResult(verified = name.isNotBlank(), name = name, verifiedAt = "방금")
 }

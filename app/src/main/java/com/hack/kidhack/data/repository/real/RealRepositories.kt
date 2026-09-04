@@ -50,6 +50,16 @@ import com.hack.kidhack.data.remote.dto.QrApproveRequest
 import com.hack.kidhack.data.remote.dto.TerminalIssueRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
 import com.hack.kidhack.data.remote.api.WalletApi
+import com.hack.kidhack.data.remote.api.EfinApi
+import com.hack.kidhack.data.remote.dto.EfinAccountPasswordRequest
+import com.hack.kidhack.data.remote.dto.EfinAccountPasswordChangeRequest
+import com.hack.kidhack.data.remote.dto.EfinIdentityVerifyRequest
+import com.hack.kidhack.data.remote.dto.EfinOtpVerifyRequest
+import com.hack.kidhack.data.remote.dto.EfinAccountPasswordVerifyRequest
+import com.hack.kidhack.domain.repository.EfinRepository
+import com.hack.kidhack.domain.repository.IdentityResult
+import com.hack.kidhack.domain.repository.OtpIssue
+import com.hack.kidhack.domain.repository.TxSecurity
 import com.hack.kidhack.data.remote.dto.AppControlCreateRequest
 import com.hack.kidhack.data.remote.dto.AppControlUpdateRequest
 import com.hack.kidhack.data.remote.dto.AppSyncItemDto
@@ -666,23 +676,32 @@ class RealWalletRepository(
     override suspend fun getTransactions(type: String?, page: Int): List<WalletTransaction> =
         walletApi.me(type = type, page = page).unwrap().content.map { it.toDomain() }
 
-    override suspend fun transferToChild(childId: String, amount: Int, memo: String?): TransferResult {
+    override suspend fun transferToChild(childId: String, amount: Int, memo: String?, security: TxSecurity?): TransferResult {
         // memo 는 서버 계약에 필드가 없어 전송하지 않는다(파라미터는 상위 호환 위해 유지).
-        val r = walletApi.transfer(WalletTransferRequest(childId.toServerId(), amount.toLong())).unwrap()
+        // 전자금융 보안 필드(otp·signature·nonce·accountHolder)는 security 로 함께 싣는다.
+        val r = walletApi.transfer(WalletTransferRequest(
+            childId = childId.toServerId(), amount = amount.toLong(),
+            otp = security?.otp, signature = security?.signature,
+            nonce = security?.nonce, accountHolder = security?.accountHolder)).unwrap()
         return TransferResult(parentBalance = r.fromBalance.toInt(), childBalance = r.toBalance.toInt(), txId = "")
     }
 
-    override suspend fun reclaimFromChild(childId: String, amount: Int): TransferResult {
+    override suspend fun reclaimFromChild(childId: String, amount: Int, security: TxSecurity?): TransferResult {
         // 회수는 자녀→부모: 받는 쪽(부모)=toBalance, 보내는 쪽(자녀)=fromBalance.
-        val r = walletApi.recover(WalletTransferRequest(childId.toServerId(), amount.toLong())).unwrap()
+        val r = walletApi.recover(WalletTransferRequest(
+            childId = childId.toServerId(), amount = amount.toLong(),
+            otp = security?.otp, signature = security?.signature,
+            nonce = security?.nonce, accountHolder = security?.accountHolder)).unwrap()
         return TransferResult(parentBalance = r.toBalance.toInt(), childBalance = r.fromBalance.toInt(), txId = "")
     }
 
     override suspend fun getChildWallet(childId: String): Wallet =
         walletApi.childWallet(childId.toServerId()).unwrap().toWallet()
 
-    override suspend fun prepareCharge(amount: Int, method: String, cardId: String): com.hack.kidhack.domain.model.Charge =
-        walletApi.chargePrepare(WalletChargePrepareRequest(amount.toLong())).unwrap().toCharge()
+    override suspend fun prepareCharge(amount: Int, method: String, cardId: String, security: TxSecurity?): com.hack.kidhack.domain.model.Charge =
+        walletApi.chargePrepare(WalletChargePrepareRequest(
+            amount = amount.toLong(), otp = security?.otp, accountPassword = security?.accountPassword,
+            signature = security?.signature, nonce = security?.nonce)).unwrap().toCharge()
 
     override suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet {
         // chargeId = prepare 가 발급한 merchantUid. paymentKey 는 토스 결제위젯 성공 콜백의 paymentKey —
@@ -1059,4 +1078,43 @@ class RealAllowanceRepository(private val api: AllowanceApi) : AllowanceReposito
         merchant: String?,
     ): AllowancePayment =
         api.pay(childId, AllowancePaymentRequest(token, amount, merchant)).unwrap().toDomain()
+}
+
+/**
+ * 전자금융 거래 보안(#59) — 거래 OTP·계좌비밀번호·실명확인. (/api/efin)
+ */
+class RealEfinRepository(
+    private val efinApi: EfinApi
+) : EfinRepository {
+    override suspend fun issueOtp(): OtpIssue {
+        val r = efinApi.issueOtp().unwrap()
+        return OtpIssue(phone = r.phone, code = r.code, expiresIn = r.expiresIn)
+    }
+
+    override suspend fun verifyOtp(code: String): Boolean =
+        efinApi.verifyOtp(EfinOtpVerifyRequest(code)).unwrap().valid
+
+    override suspend fun verifyAccountPassword(password: String): Boolean =
+        efinApi.verifyAccountPassword(EfinAccountPasswordVerifyRequest(password)).unwrap().valid
+
+    override suspend fun setAccountPassword(password: String, loginPassword: String) {
+        efinApi.setAccountPassword(EfinAccountPasswordRequest(password, loginPassword)).unwrap()
+    }
+
+    override suspend fun changeAccountPassword(currentPassword: String, newPassword: String, loginPassword: String) {
+        efinApi.changeAccountPassword(
+            EfinAccountPasswordChangeRequest(currentPassword, newPassword, loginPassword)).unwrap()
+    }
+
+    override suspend fun verifyIdentity(
+        name: String,
+        birthDate: String,
+        idType: String,
+        idNumber: String,
+        issuedDate: String,
+    ): IdentityResult {
+        val r = efinApi.verifyIdentity(
+            EfinIdentityVerifyRequest(name, birthDate, idType, idNumber, issuedDate)).unwrap()
+        return IdentityResult(verified = r.verified, name = r.name, verifiedAt = r.verifiedAt)
+    }
 }

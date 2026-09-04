@@ -395,6 +395,7 @@ fun ParentMypageScreen(
     }
 
     // 충전·송금 미니 시트. 지갑 화면과 같은 것을 쓴다.
+    // 거래 승인(계좌비번+OTP) 다이얼로그는 앱 루트(TxAuthHost)에 하나만 있어 여기서 띄우지 않는다.
     WalletSheetHost(state = walletState, viewModel = walletViewModel, onRegisterCard = onOpenCards)
 }
 

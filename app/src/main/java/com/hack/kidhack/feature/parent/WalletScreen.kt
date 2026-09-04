@@ -79,6 +79,7 @@ import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.QrPayRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
 import com.hack.kidhack.domain.repository.WalletRepository
+import com.hack.kidhack.feature.efin.TxAuthCoordinator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -123,6 +124,7 @@ sealed interface WalletConfirm {
  * 화면이 두 곳을 맞춰 보지 않도록 여기서 합쳐 둔다.
  */
 data class ChildWalletSummary(val id: String, val name: String, val balance: Int)
+
 
 data class WalletUiState(
     val wallet: Wallet? = null,
@@ -174,6 +176,7 @@ class WalletViewModel(
     private val childRepository: ChildRepository,
     private val selectedChildRepository: SelectedChildRepository,
     private val qrPayRepository: QrPayRepository,
+    private val txAuth: TxAuthCoordinator,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(WalletUiState())
@@ -329,44 +332,57 @@ class WalletViewModel(
     fun selectCard(cardId: String) = _state.update { it.copy(selectedCardId = cardId) }
     fun selectSheetChild(childId: String) = _state.update { it.copy(sheetChildId = childId) }
 
-    /** 열린 시트에 맞는 동작을 보낸다. 성공하면 시트를 닫고 잔액을 다시 읽는다. */
+    /**
+     * 열린 시트에 맞는 동작을 보낸다.
+     *
+     * 돈이 움직이는 세 동작(송금·회수·충전)은 모두 공용 승인 플로우([TxAuthCoordinator])를 거친다 —
+     * 계좌비밀번호 + OTP 를 받아 서명·nonce 를 붙인 뒤 실제 거래를 실행한다. 승인 다이얼로그는 앱 루트에
+     * 하나만 떠 있어(TxAuthHost), 화면마다 붙일 필요가 없다.
+     */
     fun submitSheet() {
         val s = _state.value
         val amount = s.amount
         if (amount <= 0 || s.working) return
         val sheet = s.sheet ?: return
         val childId = s.sheetChildId
+        val childName = s.children.firstOrNull { it.id == childId }?.name
 
         viewModelScope.launch {
-            _state.update { it.copy(working = true, error = null) }
+            _state.update { it.copy(working = true, error = null, sheet = null) }
             runCatching {
                 when (sheet) {
-                    // [VULN-MOBILE-PAY-2] 충전·송금·회수 금액을 클라이언트 입력값 그대로 서버에 보낸다.
-                    // 서버 금액 미검증(백엔드 VULN-WALLET-1/7)과 결합하면 금액 변조 표면이 된다.
-                    // 의도된 취약점(OWASP Mobile M4). 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md
-                    WalletSheet.Charge -> {
-                        val prepared = walletRepository.prepareCharge(amount, "CARD", s.selectedCardId.orEmpty())
-                        // mock PG 라 결제창이 없다. prepare 가 준 merchantUid 로 곧바로 승인한다.
-                        walletRepository.confirmCharge(prepared.chargeId, prepared.paymentKey.orEmpty(), amount)
-                        R.string.parent_wallet_done_charge
-                    }
                     WalletSheet.Send -> {
-                        requireNotNull(childId)
-                        walletRepository.transferToChild(childId, amount, null)
+                        val cid = requireNotNull(childId)
+                        // 공용 승인 — 계좌비번+OTP. 취소하면 null → 거래 중단.
+                        val auth = txAuth.authorize(amount, childName, cid.toLongOrNull() ?: 0L)
+                            ?: return@launch clearWorking()
+                        // [VULN-MOBILE-PAY-2] 금액은 클라이언트 입력값 그대로 전송(의도된 취약점, 보존).
+                        walletRepository.transferToChild(cid, amount, null, auth)
                         R.string.parent_wallet_done_send
                     }
                     WalletSheet.Recover -> {
-                        requireNotNull(childId)
-                        walletRepository.reclaimFromChild(childId, amount)
+                        val cid = requireNotNull(childId)
+                        val auth = txAuth.authorize(amount, childName, cid.toLongOrNull() ?: 0L)
+                            ?: return@launch clearWorking()
+                        walletRepository.reclaimFromChild(cid, amount, auth)
                         R.string.parent_wallet_done_recover
+                    }
+                    WalletSheet.Charge -> {
+                        // 충전도 거래 관문(계좌비번+OTP)을 거친다. 대상 없음 → refId=0.
+                        val auth = txAuth.authorize(amount, null, 0L) ?: return@launch clearWorking()
+                        val prepared = walletRepository.prepareCharge(amount, "CARD", s.selectedCardId.orEmpty(), auth)
+                        walletRepository.confirmCharge(prepared.chargeId, prepared.paymentKey.orEmpty(), amount)
+                        R.string.parent_wallet_done_charge
                     }
                 }
             }.onSuccess { done ->
-                _state.update { it.copy(working = false, sheet = null, amountInput = "", messageRes = done) }
+                _state.update { it.copy(working = false, amountInput = "", messageRes = done) }
                 reloadAll()
             }.onFailure { t -> fail(t) }
         }
     }
+
+    private fun clearWorking() = _state.update { it.copy(working = false) }
 
     // --- 확인이 필요한 동작 ---
 
@@ -521,6 +537,7 @@ fun ParentWalletScreen(
 
     WalletSheetHost(state = state, viewModel = viewModel, onRegisterCard = onRegisterCard)
     WalletConfirmDialog(state = state, viewModel = viewModel)
+    // 거래 승인(계좌비번+OTP) 다이얼로그는 앱 루트(TxAuthHost)에 하나만 있다 — 여기서 띄우지 않는다.
 }
 
 /** 화면이 다시 앞으로 나올 때 한 번 부른다. 첫 진입은 뷰모델 init 이 이미 읽었으므로 건너뛴다. */
