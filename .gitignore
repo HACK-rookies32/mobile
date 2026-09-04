@@ -27,3 +27,6 @@ google-services.json
 
 # 인수인계 메모. 작업자끼리 주고받는 것이라 저장소에 올리지 않는다.
 docs/handoff*.md
+
+# 네이티브 방어 구현/우회 설명 문서(로컬 참고용). 저장소에 올리지 않는다.
+docs/native-defense-bypass.md
