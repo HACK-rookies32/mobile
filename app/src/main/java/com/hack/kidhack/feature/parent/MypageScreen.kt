@@ -369,6 +369,8 @@ fun ParentMypageScreen(
 
     // 충전·송금 미니 시트. 지갑 화면과 같은 것을 쓴다.
     WalletSheetHost(state = walletState, viewModel = walletViewModel, onRegisterCard = onOpenCards)
+    // 송금·회수는 2차 인증(OTP)을 거친다 — 지갑 화면과 동일한 다이얼로그를 여기서도 띄운다.
+    WalletOtpDialog(state = walletState, viewModel = walletViewModel)
 }
 
 @Composable

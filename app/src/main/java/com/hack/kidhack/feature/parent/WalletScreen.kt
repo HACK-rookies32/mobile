@@ -80,6 +80,7 @@ import com.hack.kidhack.domain.repository.WalletRepository
 import com.hack.kidhack.domain.repository.EfinRepository
 import com.hack.kidhack.domain.repository.TxSecurity
 import com.hack.kidhack.data.crypto.TxSigner
+import com.hack.kidhack.feature.efin.OtpNotifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -194,6 +195,7 @@ class WalletViewModel(
     private val selectedChildRepository: SelectedChildRepository,
     private val qrPayRepository: QrPayRepository,
     private val efinRepository: EfinRepository,
+    private val otpNotifier: OtpNotifier,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(WalletUiState())
@@ -393,6 +395,8 @@ class WalletViewModel(
             _state.update { it.copy(working = true, error = null) }
             runCatching { efinRepository.issueOtp() }
                 .onSuccess { issued ->
+                    // 발급 코드를 로컬 알림으로 띄운다 — 실제 SMS/OTP 문자가 온 것처럼 보이게 한다.
+                    otpNotifier.notifyCode(issued.code)
                     _state.update {
                         it.copy(
                             working = false,
@@ -1094,18 +1098,10 @@ internal fun WalletOtpDialog(state: WalletUiState, viewModel: WalletViewModel) {
             Column {
                 Text(
                     "${prompt.accountHolder}님 · ${formatWon(prompt.amount)} $actionLabel\n" +
-                        "인증번호를 ${prompt.phone} 로 전송했습니다.",
+                        "인증번호를 ${prompt.phone} 로 전송했습니다. 알림으로 온 6자리를 입력하세요.",
                     color = colors.text,
                     fontFamily = KidhackFontFamily,
                     fontSize = 13.sp,
-                )
-                Spacer(Modifier.height(6.dp))
-                // [VULN-EFIN-1] mock 발신이라 실제 문자가 없다 → 응답에 노출된 코드를 그대로 노출한다.
-                Text(
-                    "[실습] 발송 코드: ${prompt.sentCode}",
-                    color = colors.muted,
-                    fontFamily = KidhackFontFamily,
-                    fontSize = 12.sp,
                 )
                 Spacer(Modifier.height(12.dp))
                 Box(
