@@ -1,14 +1,28 @@
 package com.hack.kidhack.feature.parent
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -18,7 +32,8 @@ import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
-import com.hack.kidhack.core.designsystem.component.KidCard
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
+import com.hack.kidhack.core.designsystem.component.KidSectionCard
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
@@ -79,34 +94,77 @@ fun ParentWithdrawScreen(
     val colors = LocalKidhackColors.current
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    ParentScreenScaffold(
-        header = { ParentHeaderBar(stringResource(R.string.parent_withdraw_title), onBack) },
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.surface)
+            .statusBarsPadding(),
     ) {
-        KidCard {
-            Text(
-                stringResource(R.string.parent_withdraw_heading),
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 16.sp,
-                color = colors.text,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(stringResource(R.string.parent_withdraw_desc), color = colors.muted, fontSize = 13.sp)
+        Column(Modifier.fillMaxWidth().background(colors.card)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center,
+                ) { Text("‹", color = colors.text, fontSize = 26.sp) }
+                Text(
+                    stringResource(R.string.parent_withdraw_title),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 18.sp,
+                    color = colors.text,
+                )
+            }
+            KidHeaderDivider()
         }
 
-        state.error?.let { Text(it, color = colors.danger, fontSize = 13.sp) }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+        ) {
+            Spacer(Modifier.height(16.dp))
+            KidSectionCard {
+                Column(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+                    Text(
+                        stringResource(R.string.parent_withdraw_heading),
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 16.sp,
+                        color = colors.text,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.parent_withdraw_desc),
+                        color = colors.muted,
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp,
+                    )
+                }
+            }
 
-        KidButton(
-            text = if (state.loading) {
-                stringResource(R.string.parent_withdraw_processing)
-            } else {
-                stringResource(R.string.parent_withdraw_action)
-            },
-            onClick = viewModel::ask,
-            modifier = Modifier.fillMaxWidth(),
-            variant = KidButtonVariant.Danger,
-            enabled = !state.loading,
-        )
+            state.error?.let {
+                Spacer(Modifier.height(12.dp))
+                Text(it, color = colors.danger, fontSize = 13.sp)
+            }
+
+            Spacer(Modifier.height(16.dp))
+            KidButton(
+                text = if (state.loading) {
+                    stringResource(R.string.parent_withdraw_processing)
+                } else {
+                    stringResource(R.string.parent_withdraw_action)
+                },
+                onClick = viewModel::ask,
+                modifier = Modifier.fillMaxWidth(),
+                variant = KidButtonVariant.Danger,
+                enabled = !state.loading,
+            )
+        }
     }
 
     if (state.confirming) {

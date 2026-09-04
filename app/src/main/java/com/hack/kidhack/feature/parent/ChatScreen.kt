@@ -11,16 +11,19 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -33,10 +36,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +65,8 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.hack.kidhack.R
 import com.hack.kidhack.core.common.RemoteUrl
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
+import com.hack.kidhack.navigation.ImmersiveContent
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
@@ -176,12 +181,19 @@ class ParentChatViewModel(
                 if (children.isEmpty()) {
                     emptyList()
                 } else {
+                    // 최근 메시지·안읽음이 든 요약 목록. 방 생성 API(POST)는 이 값을 주지 않아
+                    // 예전엔 목록 미리보기가 늘 비어 있었다. 요약(GET rooms)에서 자녀별로 가져온다.
+                    val summaryByChildId = runCatching { chatRepository.rooms() }
+                        .getOrDefault(emptyList())
+                        .mapNotNull { r -> r.childId?.let { it.toString() to r } }
+                        .toMap()
                     children.map { child ->
                         val childId = child.id.toLongOrNull()
                             ?: error("자녀 회원 번호가 올바르지 않아요")
-                        val cached = roomByChildId[child.id]
-                        val room = cached ?: chatRepository.getOrCreateRoom(parentId, childId)
-                            .also { roomByChildId[child.id] = it }
+                        // 방이 이미 있으면 요약(미리보기 포함)을, 없으면 생성해 목록에 띄운다.
+                        val room = summaryByChildId[child.id]
+                            ?: chatRepository.getOrCreateRoom(parentId, childId)
+                        roomByChildId[child.id] = room
                         // 서버가 자녀 접속 여부를 주지 않는다(ChildSummaryResponse 에 없음).
                         // 방 자체의 상태를 그대로 쓰고 자녀 정보로는 이름만 덮는다.
                         room.copy(title = child.name)
@@ -346,6 +358,13 @@ fun ParentChatScreen(viewModel: ParentChatViewModel = koinViewModel()) {
     // 대화에서 뒤로 가면 목록으로. 여기서 막지 않으면 탭이 통째로 빠진다.
     BackHandler(enabled = selectedRoom != null) { viewModel.selectRoom(null) }
 
+    // 방에 들어가면 하단 탭 바를 접어 풀스크린 대화로 만든다 — 입력창이 탭 바 위에
+    // 떠 있지 않고 화면 맨 아래에 앉는다. 화면을 떠나거나 목록으로 돌아오면 되돌린다.
+    DisposableEffect(selectedRoom != null) {
+        ImmersiveContent.active = selectedRoom != null
+        onDispose { ImmersiveContent.active = false }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -391,6 +410,8 @@ private fun ColumnScope.RoomList(
             color = colors.text,
         )
     }
+    // 마이페이지·자녀관리와 같은 헤더 구분선 — 제목과 방 목록 사이를 다른 탭과 똑같이 가른다.
+    KidHeaderDivider()
 
     when {
         state.loading && state.rooms.isEmpty() ->
@@ -523,16 +544,15 @@ private fun ColumnScope.RoomDetail(
     val listState = rememberLazyListState()
 
     // 새 메시지가 붙으면 아래로. 지난 장을 앞에 붙일 때는 움직이지 않는다 — 읽던 자리가
-    // 튀면 「더 보기」를 누른 사람이 어디를 보고 있었는지 잃는다.
-    var lastCount by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(state.messages.size) {
-        val size = state.messages.size
-        if (size > 0 && size >= lastCount) listState.animateScrollToItem(size - 1)
-        lastCount = size
+    // 튀면 「더 보기」를 누른 사람이 어디를 보고 있었는지 잃는다. 개수가 아니라 「가장 최근
+    // 메시지가 바뀌었는지」로 보면 앞에 붙이는 경우가 저절로 걸러진다.
+    val newestId = state.messages.lastOrNull()?.id
+    LaunchedEffect(newestId) {
+        if (newestId != null) listState.animateScrollToItem(0)
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp, bottom = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -557,11 +577,37 @@ private fun ColumnScope.RoomDetail(
     }
     HorizontalDivider(color = colors.line)
 
+    // 뒤집어 쌓아 목록의 기준점을 <b>맨 아래</b>로 둔다. 키보드가 올라와 목록이 줄어들어도
+    // 마지막 말이 입력창 바로 위에 그대로 붙어 있다. 「더 보기」는 위쪽이라 맨 뒤에 놓는다.
+    val shown = remember(state.messages) { state.messages.asReversed() }
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxWidth().weight(1f),
         contentPadding = PaddingValues(vertical = 8.dp),
+        reverseLayout = true,
     ) {
+        itemsIndexed(shown, key = { _, m -> m.id }) { index, m ->
+            // 뒤집힌 목록이라 더 오래된 메시지가 한 칸 뒤에 있다.
+            val olderDay = shown.getOrNull(index + 1)?.sentAt?.toChatDay()
+            val day = m.sentAt.toChatDay()
+            // Column 으로 묶는다 — 한 칸 안에 여러 개를 늘어놓으면 reverseLayout 이 그 안쪽
+            // 순서까지 뒤집어, 날짜 머리가 말풍선 아래로 내려간다.
+            Column {
+                // 날짜가 바뀌는 자리에만 구분을 넣는다. 줄마다 넣으면 대화가 표가 된다.
+                if (day != null && day != olderDay) {
+                    Text(
+                        text = day,
+                        modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp),
+                        color = colors.subtle,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 10.5.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                MessageRow(message = m)
+            }
+        }
         if (state.hasOlder) {
             item(key = "older") {
                 Text(
@@ -580,23 +626,6 @@ private fun ColumnScope.RoomDetail(
                     textAlign = TextAlign.Center,
                 )
             }
-        }
-        itemsIndexed(state.messages, key = { _, m -> m.id }) { index, m ->
-            // 날짜가 바뀌는 자리에만 구분을 넣는다. 줄마다 넣으면 대화가 표가 된다.
-            val prevDay = state.messages.getOrNull(index - 1)?.sentAt?.toChatDay()
-            val day = m.sentAt.toChatDay()
-            if (day != null && day != prevDay) {
-                Text(
-                    text = day,
-                    modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp),
-                    color = colors.subtle,
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBold,
-                    fontSize = 10.5.sp,
-                    textAlign = TextAlign.Center,
-                )
-            }
-            MessageRow(message = m)
         }
     }
 
@@ -673,6 +702,9 @@ private fun ChatComposer(draft: String, onDraft: (String) -> Unit, onSend: () ->
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                // 탭 껍데기(TabShell)가 비워 둔 만큼을 소비했다고 알려 주므로, 여기서는
+                // 모자란 만큼만 더하면 키보드 바로 위에 앉는다. 전에는 네비바를 직접 빼서
+                // 맞췄는데, 그 식은 탭 바가 접혔을 때만 맞았다.
                 .imePadding()
                 .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,

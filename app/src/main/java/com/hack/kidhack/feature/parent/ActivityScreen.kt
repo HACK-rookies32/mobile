@@ -1,9 +1,11 @@
 package com.hack.kidhack.feature.parent
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -11,14 +13,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,6 +41,7 @@ import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.core.designsystem.component.KidSectionCard
 import com.hack.kidhack.domain.model.Activity
 import com.hack.kidhack.domain.model.ActivityType
 import com.hack.kidhack.domain.repository.UserRepository
@@ -85,6 +92,7 @@ internal fun ColumnScope.ActivityBody(
     onOpenPost: (String) -> Unit,
 ) {
     val colors = LocalKidhackColors.current
+    Column(Modifier.weight(1f).fillMaxWidth().background(colors.surface)) {
         Row(
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -144,42 +152,75 @@ internal fun ColumnScope.ActivityBody(
                 }
             }
         }
+    }
 }
 
 
+/**
+ * 내 활동 한 줄.
+ *
+ * <p>이모지(📝❤️)를 아이콘으로 쓰고 있었다. 앱의 다른 화면은 벡터 아이콘을 쓰는데 여기만
+ * 이모지라 붕 떴다. 종류별 색 타일에 벡터 아이콘을 담고, 오른쪽 「›」로 「눌러서 그 글로
+ * 간다」는 것을 알린다 — 실제로 누르면 글로 가므로 화살표가 기능과 맞다.
+ */
 @Composable
 private fun ActivityRow(activity: Activity, onOpenPost: (String) -> Unit) {
     val colors = LocalKidhackColors.current
     // 글이 지워졌으면 postId 가 없다. 그때는 눌러도 갈 곳이 없으므로 클릭을 막는다.
     val postId = activity.postId?.toString()
     val modifier = if (postId != null) Modifier.clickable { onOpenPost(postId) } else Modifier
+    val tint = activity.type.tint(colors)
 
-    KidCard(modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(activity.type.emoji(), fontSize = 16.sp)
-            Text(
-                stringResource(activity.type.labelRes()),
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 12.sp,
-                color = colors.brandDark,
-            )
-            Spacer(Modifier.weight(1f))
-            Text(activity.createdAtLabel.toDateLabel(), color = colors.muted, fontSize = 12.sp)
-        }
-        if (activity.preview.isNotBlank()) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                activity.preview,
-                color = colors.text,
-                fontSize = 14.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+    KidSectionCard(modifier = modifier, contentPadding = PaddingValues(13.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(tint.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(activity.type.iconRes()),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = tint,
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    activity.preview.ifBlank { stringResource(activity.type.labelRes()) },
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 14.sp,
+                    color = colors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "${stringResource(activity.type.labelRes())} · ${activity.createdAtLabel.toDateLabel()}",
+                    color = colors.muted,
+                    fontSize = 11.5.sp,
+                )
+            }
+            // 글이 살아 있어 이동 가능한 행에만 화살표를 둔다.
+            if (postId != null) {
+                Text("›", color = colors.subtle, fontSize = 18.sp)
+            }
         }
     }
 }
 
+/**
+ * 필터 칩.
+ *
+ * <p>안 고른 칩 배경이 회색(surface)이었는데, 목록 캔버스도 회색이라 칩이 묻혀 글자만
+ * 떠 보였다. 안 고른 칩을 흰 카드 + 테두리로 바꿔 「누를 수 있는 칩」으로 세운다.
+ */
 @Composable
 private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val colors = LocalKidhackColors.current
@@ -187,21 +228,33 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
         label,
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(if (selected) colors.brand else colors.surface)
+            .background(if (selected) colors.brand else colors.card)
+            .then(
+                if (selected) Modifier
+                else Modifier.border(1.dp, colors.border, RoundedCornerShape(999.dp)),
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
-        color = if (selected) androidx.compose.ui.graphics.Color.White else colors.muted,
+        color = if (selected) Color.White else colors.muted,
         fontFamily = KidhackFontFamily,
         fontWeight = FontBold,
         fontSize = 12.sp,
     )
 }
 
-private fun ActivityType.emoji(): String = when (this) {
-    ActivityType.POST -> "📝"
-    ActivityType.COMMENT -> "💬"
-    ActivityType.LIKE -> "❤️"
-    ActivityType.UNKNOWN -> "•"
+private fun ActivityType.iconRes(): Int = when (this) {
+    ActivityType.POST -> R.drawable.ic_pencil
+    ActivityType.COMMENT -> R.drawable.ic_chat
+    ActivityType.LIKE -> R.drawable.ic_heart
+    ActivityType.UNKNOWN -> R.drawable.ic_pencil
+}
+
+/** 종류별 색: 글=브랜드, 댓글=정보(파랑), 좋아요=안전(초록). 타일은 이 색의 옅은 배경. */
+private fun ActivityType.tint(colors: com.hack.kidhack.core.designsystem.theme.KidhackColors): Color = when (this) {
+    ActivityType.POST -> colors.brand
+    ActivityType.COMMENT -> colors.info
+    ActivityType.LIKE -> colors.safe
+    ActivityType.UNKNOWN -> colors.muted
 }
 
 private fun ActivityType.labelRes(): Int = when (this) {

@@ -5,8 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.domain.model.RemoteCommandType
 import com.hack.kidhack.domain.model.Screenshot
 import com.hack.kidhack.domain.repository.CommandRepository
-import com.hack.kidhack.domain.repository.ScreenshotRepository
-import com.hack.kidhack.domain.repository.SessionRepository
+import com.hack.kidhack.data.local.ChildCaptureStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,10 +23,17 @@ data class ChildScreenshotUiState(
     val requestedBy: String? = null,
 )
 
+/**
+ * 자녀 캡처 내역 화면.
+ *
+ * <p>목록은 서버가 아니라 [ChildCaptureStore] — 이 기기에 남은 캡처 파일 — 에서 읽는다.
+ * 서버의 캡처 목록 조회는 부모(PARENT) 전용이라 자녀 토큰으로는 403 이다(명세 4.6). 자녀에게
+ * 「캡처 내역」은 "내 폰에서 찍힌 내 화면"이므로 로컬이 곧 정답이다. 촬영 요청 배너는 여전히
+ * 실시간 커맨드([CommandRepository])로 받는다.
+ */
 class ChildScreenshotViewModel(
-    private val screenshotRepository: ScreenshotRepository,
+    private val captureStore: ChildCaptureStore,
     private val commandRepository: CommandRepository,
-    private val sessionRepository: SessionRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChildScreenshotUiState())
@@ -54,15 +60,9 @@ class ChildScreenshotViewModel(
     fun refresh() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
-            val childId = sessionRepository.current()?.user?.id.orEmpty()
-            runCatching { screenshotRepository.list(childId) }
-                .onSuccess { items ->
-                    _state.update { it.copy(loading = false, items = items, error = null) }
-                }
-                .onFailure {
-                    // 서버가 죽어 있어도 화면이 그냥 비어 보이면 안 된다. 원인을 알리고 재시도를 준다.
-                    _state.update { it.copy(loading = false, error = "캡처 내역을 불러오지 못했어요") }
-                }
+            // 로컬 파일만 읽으므로 네트워크 오류가 없다. 파일이 없으면 그냥 빈 목록이다.
+            val items = runCatching { captureStore.list() }.getOrDefault(emptyList())
+            _state.update { it.copy(loading = false, items = items, error = null) }
         }
     }
 

@@ -1,9 +1,12 @@
 package com.hack.kidhack.background.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.provider.Settings
+import android.provider.Telephony
+import android.telecom.TelecomManager
 import android.view.Gravity
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -167,7 +170,44 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
      * 정작 막아야 할 웹/앱 콘텐츠와 무관하다.
      */
     private fun isExempt(packageName: String): Boolean =
-        packageName == applicationContext.packageName || packageName in EXEMPT_PACKAGES
+        packageName == applicationContext.packageName ||
+            packageName in EXEMPT_PACKAGES ||
+            packageName in deviceExemptPackages()
+
+    private var deviceExemptCache: Set<String> = emptySet()
+    private var deviceExemptCachedAt = 0L
+
+    /**
+     * 기기마다 패키지가 다른 「항상 예외」 앱들 — 고정 목록 대신 시스템에 물어 캐시한다.
+     *
+     * <p>① 홈 런처: 삼성은 `com.sec.android.app.launcher`, 픽셀은 `nexuslauncher` 처럼 제조사마다
+     * 다르다. 런처가 예외가 아니면 한도 초과 시 홈 화면에서 계속 HOME 이 발동하고, 그 여파로
+     * 앱을 여는 전환까지 끊겨 우리 앱(예외)마저 열리다 튕긴다.
+     * ② 기본 전화·문자 앱: 한도를 다 써도 아이가 연락은 할 수 있어야 한다.
+     */
+    private fun deviceExemptPackages(): Set<String> {
+        val now = System.currentTimeMillis()
+        if (now - deviceExemptCachedAt < ESSENTIAL_TTL_MS && deviceExemptCache.isNotEmpty()) return deviceExemptCache
+        val set = buildSet {
+            // 홈 런처(들). AppUsageCollector 가 사용량 집계에서 빼는 것과 같은 방식.
+            runCatching {
+                val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                packageManager.queryIntentActivities(home, 0)
+                    .forEach { it.activityInfo?.packageName?.takeIf { p -> p.isNotBlank() }?.let(::add) }
+            }
+            // 기본 전화 앱.
+            runCatching { getSystemService(TelecomManager::class.java)?.defaultDialerPackage }
+                .getOrNull()?.takeIf { it.isNotBlank() }?.let { add(it) }
+            // 기본 문자 앱.
+            runCatching { Telephony.Sms.getDefaultSmsPackage(this@HarmfulBlockAccessibilityService) }
+                .getOrNull()?.takeIf { it.isNotBlank() }?.let { add(it) }
+        }
+        if (set.isNotEmpty()) {
+            deviceExemptCache = set
+            deviceExemptCachedAt = now
+        }
+        return set.ifEmpty { deviceExemptCache }
+    }
 
     override fun onInterrupt() = Unit
 
@@ -325,6 +365,8 @@ class HarmfulBlockAccessibilityService : AccessibilityService() {
             "com.google.android.inputmethod.latin",
             "com.android.permissioncontroller",
         )
+        /** 기본 전화/문자 앱 조회 캐시 수명. 기본 앱은 자주 바뀌지 않는다. */
+        private const val ESSENTIAL_TTL_MS = 10 * 60 * 1000L
         private const val BLOCKLIST_TTL_MS = 5 * 60 * 1000L
         private const val OVERLAY_MS = 2_500L
         private const val MAX_NODE_DEPTH = 12

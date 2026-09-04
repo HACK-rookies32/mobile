@@ -1,6 +1,7 @@
 package com.hack.kidhack.feature.parent
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,16 +9,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,9 +28,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,14 +45,14 @@ import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.hack.kidhack.R
+import com.hack.kidhack.core.common.RemoteUrl
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
-import com.hack.kidhack.core.designsystem.component.KidCard
+import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
@@ -161,37 +166,38 @@ fun ParentScreenshotScreen(
         viewModel.refreshSignal.collect { items.refresh() }
     }
 
-    ParentScreenScaffold(
-        header = { ParentHeaderBar(stringResource(R.string.parent_screenshot_title), onBack) },
-        scrollable = false,
-        contentPadding = PaddingValues(0.dp),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.card)
+            .statusBarsPadding(),
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("\u2039", color = colors.text, fontSize = 26.sp)
+            }
+            Text(
+                stringResource(R.string.parent_screenshot_title),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 18.sp,
+                color = colors.text,
+            )
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // 캡처 요청 카드(고정 헤더)
-            item {
-                KidCard {
-                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("📸", fontSize = 48.sp)
-                        Spacer(Modifier.height(8.dp))
-                        Text(stringResource(R.string.parent_screenshot_live), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 16.sp, color = colors.text)
-                        Text(stringResource(R.string.parent_screenshot_desc), color = colors.muted, fontSize = 12.sp)
-                        Spacer(Modifier.height(16.dp))
-                        if (state.requesting) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(Modifier.size(16.dp), color = colors.brand, strokeWidth = 2.dp)
-                                Spacer(Modifier.size(8.dp))
-                                Text(stringResource(R.string.parent_screenshot_requesting), color = colors.brand, fontWeight = FontBold)
-                            }
-                        } else {
-                            KidButton(stringResource(R.string.parent_screenshot_request), viewModel::request)
-                        }
-                    }
-                }
-            }
+            // 캡처 요청 히어로
+            item { RequestHero(requesting = state.requesting, onRequest = viewModel::request) }
 
             // 요청 실패 메시지(폴링/캡처 요청 오류)
             if (state.error != null) {
@@ -199,7 +205,14 @@ fun ParentScreenshotScreen(
             }
 
             item {
-                Text(stringResource(R.string.parent_screenshot_recent), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
+                Text(
+                    stringResource(R.string.parent_screenshot_recent),
+                    modifier = Modifier.padding(start = 6.dp, top = 8.dp),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 12.sp,
+                    color = colors.subtle,
+                )
             }
 
             // 목록 첫 로딩 / 에러 / 빈 상태
@@ -212,12 +225,12 @@ fun ParentScreenshotScreen(
                 refresh is LoadState.NotLoading && items.itemCount == 0 ->
                     item {
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 text = stringResource(R.string.parent_screenshot_empty),
-                                color = colors.muted,
+                                color = colors.subtle,
                                 fontFamily = KidhackFontFamily,
                                 fontSize = 14.sp,
                             )
@@ -225,11 +238,23 @@ fun ParentScreenshotScreen(
                     }
             }
 
-            items(
-                count = items.itemCount,
-                key = items.itemKey { it.id },
-            ) { index ->
-                items[index]?.let { shot -> ScreenshotRow(shot, onView = { viewModel.selectShot(shot) }) }
+            // 2열 썸네일 갤러리 — paging 항목을 두 개씩 한 행에 놓는다.
+            val rowCount = (items.itemCount + 1) / 2
+            items(count = rowCount) { rowIndex ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    for (col in 0..1) {
+                        val index = rowIndex * 2 + col
+                        val shot = if (index < items.itemCount) items[index] else null
+                        if (shot != null) {
+                            ScreenshotTile(shot, Modifier.weight(1f), onView = { viewModel.selectShot(shot) })
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
             }
 
             // 다음 페이지 로딩/에러(맨 아래)
@@ -243,14 +268,12 @@ fun ParentScreenshotScreen(
                 is LoadState.Error ->
                     item {
                         Column(Modifier.fillMaxWidth().padding(8.dp)) {
-                            Text("더 불러오지 못했어요", color = colors.danger, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 13.sp)
+                            Text("\ub354 \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc5b4\uc694", color = colors.danger, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 13.sp)
                             KidButton(stringResource(R.string.parent_retry), { items.retry() }, Modifier.fillMaxWidth())
                         }
                     }
                 else -> Unit
             }
-
-            item { Spacer(Modifier.height(8.dp)) }
         }
     }
 
@@ -270,7 +293,7 @@ fun ParentScreenshotScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(shot.imageUrl.takeIf { !it.isNullOrBlank() } ?: R.drawable.ic_launcher_foreground)
+                            .data(RemoteUrl.absolute(shot.imageUrl.orEmpty()).takeIf { it.isNotBlank() } ?: R.drawable.ic_launcher_foreground)
                             .build(),
                         contentDescription = null,
                         modifier = Modifier
@@ -282,45 +305,103 @@ fun ParentScreenshotScreen(
                     Text(stringResource(shot.triggerLabelRes()), color = Color.White, fontWeight = FontBold, fontSize = 16.sp)
                     Text(shot.capturedAt, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
                     Spacer(Modifier.height(24.dp))
-                    KidButton("닫기", { viewModel.selectShot(null) }, variant = KidButtonVariant.Secondary)
+                    KidButton("\ub2eb\uae30", { viewModel.selectShot(null) }, variant = KidButtonVariant.Secondary)
                 }
             }
         }
     }
 }
 
+/** 지금 화면을 캡처 요청하는 히어로. 요청 중이면 스피너로 바뀐다. */
 @Composable
-private fun ScreenshotRow(shot: Screenshot, onView: () -> Unit) {
+private fun RequestHero(requesting: Boolean, onRequest: () -> Unit) {
     val colors = LocalKidhackColors.current
-    KidCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(width = 64.dp, height = 48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(colors.surface),
-                contentAlignment = Alignment.Center,
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(shot.imageUrl.takeIf { !it.isNullOrBlank() } ?: R.drawable.ic_launcher_foreground)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(shot.triggerLabelRes()), fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 14.sp, color = colors.text)
-                Text(shot.capturedAt, color = colors.muted, fontSize = 12.sp)
-            }
-            KidButton(
-                text = stringResource(R.string.parent_screenshot_view),
-                onClick = onView,
-                variant = KidButtonVariant.Ghost,
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(colors.card)
+            .border(width = 1.dp, color = colors.border, shape = RoundedCornerShape(18.dp))
+            .padding(vertical = 22.dp, horizontal = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(colors.brandLight),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_camera),
+                contentDescription = null,
+                modifier = Modifier.size(27.dp),
+                tint = colors.brand,
             )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            stringResource(R.string.parent_screenshot_live),
+            fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 15.5.sp, color = colors.text,
+        )
+        Spacer(Modifier.height(5.dp))
+        Text(
+            stringResource(R.string.parent_screenshot_desc),
+            color = colors.muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Spacer(Modifier.height(16.dp))
+        if (requesting) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(16.dp), color = colors.brand, strokeWidth = 2.dp)
+                Spacer(Modifier.size(8.dp))
+                Text(stringResource(R.string.parent_screenshot_requesting), color = colors.brand, fontWeight = FontBold)
+            }
+        } else {
+            KidButton(stringResource(R.string.parent_screenshot_request), onRequest, Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/** 갤러리 한 칸. 썸네일 위에 자동/수동 배지와 캡처 시각을 얹는다. */
+@Composable
+private fun ScreenshotTile(shot: Screenshot, modifier: Modifier = Modifier, onView: () -> Unit) {
+    val colors = LocalKidhackColors.current
+    val manual = !shot.trigger.equals("SCHEDULED", ignoreCase = true)
+    Box(
+        modifier = modifier
+            .aspectRatio(9f / 16f)
+            .clip(RoundedCornerShape(14.dp))
+            .background(colors.surface)
+            .clickable(onClick = onView),
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(RemoteUrl.absolute(shot.imageUrl.orEmpty()).takeIf { it.isNotBlank() } ?: R.drawable.ic_launcher_foreground)
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        // 트리거 배지(좌상단)
+        Text(
+            text = stringResource(shot.triggerLabelRes()),
+            modifier = Modifier
+                .padding(7.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (manual) colors.brandDark.copy(alpha = 0.92f) else Color(0xB81F2937))
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+            color = Color.White,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 10.sp,
+        )
+        // 캡처 시각(하단 그라데이션)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0x8C000000))))
+                .padding(start = 9.dp, end = 9.dp, top = 18.dp, bottom = 7.dp),
+        ) {
+            Text(shot.capturedAt, color = Color.White, fontSize = 10.5.sp, fontWeight = FontBold)
         }
     }
 }

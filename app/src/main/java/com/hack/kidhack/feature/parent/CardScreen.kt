@@ -2,6 +2,7 @@ package com.hack.kidhack.feature.parent
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -45,6 +47,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
+import com.hack.kidhack.data.remote.userMessage
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidTextField
@@ -54,6 +57,8 @@ import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidLineBreak
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
+import com.hack.kidhack.core.designsystem.component.KidSectionCard
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
 import com.hack.kidhack.domain.model.Card
 import com.hack.kidhack.domain.repository.CardRepository
 import com.hack.kidhack.domain.repository.EfinRepository
@@ -71,6 +76,8 @@ data class CardUiState(
     val items: List<Card> = emptyList(),
     val loading: Boolean = true,
     val adding: Boolean = false,
+    /** 삭제 요청 중인 카드 id. 진행 중엔 다시 못 누르게 하고, 스피너를 그 카드에 보인다. */
+    val deletingId: String? = null,
     val error: String? = null,
 
     // 위저드
@@ -198,6 +205,7 @@ class CardViewModel(
 
     fun register() {
         val s = _state.value
+        if (s.loading) return // 이미 등록 요청 중이면 무시(중복 제출로 멈춘 것처럼 보이던 것 방지)
         if (s.cardNumber.length != 16 || s.expiry.length < 4 || s.cvc.length < 3 ||
             s.cardPassword2.length < 2 || s.birthDate.length < 6 || s.ownerName.isBlank() ||
             s.paymentPw.length != 4) {
@@ -234,9 +242,19 @@ class CardViewModel(
     }
 
     fun delete(cardId: String) {
+        // 이미 삭제 요청 중이면 무시 — 무응답 카드를 연타하면 요청만 쌓였다.
+        if (_state.value.deletingId != null) return
         viewModelScope.launch {
+            _state.update { it.copy(deletingId = cardId, error = null) }
             runCatching { cardRepository.delete(cardId) }
-                .onSuccess { load() }
+                .onSuccess {
+                    _state.update { it.copy(deletingId = null) }
+                    load()
+                }
+                .onFailure { t ->
+                    // 무응답(타임아웃)·서버 오류를 조용히 넘기지 않고 그대로 보여 준다.
+                    _state.update { it.copy(deletingId = null, error = t.userMessage("카드를 삭제하지 못했어요")) }
+                }
         }
     }
 }
@@ -263,29 +281,32 @@ fun ParentCardsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.card)
+            .background(colors.surface)
             .statusBarsPadding(),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
+        Column(Modifier.fillMaxWidth().background(colors.card)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("\u2039", color = colors.text, fontSize = 26.sp)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("\u2039", color = colors.text, fontSize = 26.sp)
+                }
+                Text(
+                    stringResource(R.string.parent_cards_title),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 18.sp,
+                    color = colors.text,
+                )
             }
-            Text(
-                stringResource(R.string.parent_cards_title),
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 16.sp,
-                color = colors.text,
-            )
+            KidHeaderDivider()
         }
 
         Column(
@@ -293,6 +314,7 @@ fun ParentCardsScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
         ) {
+            Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.parent_cards_lead),
                 modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 6.dp, bottom = 18.dp),
@@ -306,10 +328,33 @@ fun ParentCardsScreen(
                 Box(Modifier.padding(horizontal = 22.dp)) {
                     ParentLoadingOrError(true, state.error, viewModel::load)
                 }
-            } else if (state.error != null) {
+            } else if (state.error != null && state.items.isEmpty()) {
+                // 목록 자체를 못 불러온 경우 — 큰 재시도 블록.
                 Box(Modifier.padding(horizontal = 22.dp)) {
                     ParentLoadingOrError(false, state.error, viewModel::load)
                 }
+            } else if (state.error != null) {
+                // 목록은 있는데 삭제/등록이 실패한 경우 — 카드 위에 얇은 경고 배너.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colors.danger.copy(alpha = 0.08f))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        state.error ?: "",
+                        modifier = Modifier.weight(1f),
+                        color = colors.danger,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 12.5.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
             }
 
             state.items.forEach { card ->
@@ -326,7 +371,8 @@ fun ParentCardsScreen(
                         .padding(horizontal = 20.dp)
                         .height(52.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(colors.surface)
+                        .background(colors.card)
+                        .border(1.dp, colors.border, RoundedCornerShape(16.dp))
                         .clickable { viewModel.toggleAdding(true) },
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
@@ -349,32 +395,35 @@ fun ParentCardsScreen(
 
                 Text(
                     stringResource(R.string.parent_cards_group),
-                    modifier = Modifier.padding(start = 22.dp, top = 30.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(start = 22.dp, top = 30.dp, bottom = 8.dp),
                     color = colors.subtle,
                     fontFamily = KidhackFontFamily,
                     fontWeight = FontBold,
                     fontSize = 12.sp,
                 )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 22.dp), color = colors.line)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onOpenWallet)
-                        .padding(horizontal = 22.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                KidSectionCard(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(0.dp),
                 ) {
-                    Text(
-                        stringResource(R.string.parent_cards_go_wallet),
-                        modifier = Modifier.weight(1f),
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBold,
-                        fontSize = 14.5.sp,
-                        letterSpacing = (-0.25).sp,
-                        color = colors.text,
-                    )
-                    Text("\u203a", color = colors.border, fontSize = 17.sp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenWallet)
+                            .padding(horizontal = 16.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.parent_cards_go_wallet),
+                            modifier = Modifier.weight(1f),
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 14.5.sp,
+                            letterSpacing = (-0.25).sp,
+                            color = colors.text,
+                        )
+                        Text("\u203a", color = colors.border, fontSize = 17.sp)
+                    }
                 }
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 22.dp), color = colors.line)
             }
 
             Spacer(Modifier.height(30.dp))

@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,10 +34,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.hack.kidhack.core.common.RemoteUrl
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
+import com.hack.kidhack.core.designsystem.component.KidSectionCard
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import org.koin.androidx.compose.koinViewModel
 
@@ -68,113 +73,120 @@ fun ParentAccountSettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.card)
-            .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp),
+            .background(colors.surface)
+            .statusBarsPadding(),
     ) {
-        Row(
-            modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "‹",
-                modifier = Modifier
-                    .clip(RoundedCornerShape(99.dp))
-                    .clickable(onClick = onBack)
-                    .padding(horizontal = 12.dp, vertical = 2.dp),
-                color = colors.text,
-                fontSize = 26.sp,
-            )
-            Text(
-                text = stringResource(R.string.parent_account_settings),
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBlack,
-                fontSize = 21.sp,
-                color = colors.text,
-            )
+        Column(Modifier.fillMaxWidth().background(colors.card)) {
+            Row(
+                modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "‹",
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(99.dp))
+                        .clickable(onClick = onBack)
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                    color = colors.text,
+                    fontSize = 26.sp,
+                )
+                Text(
+                    text = stringResource(R.string.parent_account_settings),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 18.sp,
+                    color = colors.text,
+                )
+            }
+            KidHeaderDivider()
         }
 
-        // 프로필을 화면 주인공으로. 사진은 옆의 카메라로 바로 바꾼다 — 「프로필 수정」까지
-        // 들어가야 사진을 갈 수 있으면, 사진만 바꾸려는 사람이 폼 전체를 지나야 한다.
         Column(
-            modifier = Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(contentAlignment = Alignment.BottomEnd) {
-                Box(
-                    modifier = Modifier
-                        .size(88.dp)
-                        .clip(CircleShape)
-                        .background(colors.brandLight),
-                    contentAlignment = Alignment.Center,
+            Spacer(Modifier.height(4.dp))
+            // 프로필을 화면 주인공으로. 사진은 옆의 카메라로 바로 바꾼다.
+            KidSectionCard {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    val photo = user?.profileImageUrl
-                    if (photo.isNullOrBlank()) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_person),
-                            contentDescription = null,
-                            modifier = Modifier.size(44.dp),
-                            tint = colors.brandDark,
-                        )
-                    } else {
-                        AsyncImage(
-                            model = photo,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                        )
+                    Box(contentAlignment = Alignment.BottomEnd) {
+                        Box(
+                            modifier = Modifier
+                                .size(88.dp)
+                                .clip(CircleShape)
+                                .background(colors.brandLight),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            val photo = user?.profileImageUrl
+                            if (photo.isNullOrBlank()) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_person),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(44.dp),
+                                    tint = colors.brandDark,
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = RemoteUrl.absolute(photo),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(colors.card)
+                                .border(1.dp, colors.border, CircleShape)
+                                .clickable(onClick = onOpenEditProfile),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_camera),
+                                contentDescription = stringResource(R.string.parent_account_change_photo),
+                                modifier = Modifier.size(15.dp),
+                                tint = colors.muted,
+                            )
+                        }
                     }
-                }
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(colors.card)
-                        .border(1.dp, colors.border, CircleShape)
-                        .clickable(onClick = onOpenEditProfile),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_camera),
-                        contentDescription = stringResource(R.string.parent_account_change_photo),
-                        modifier = Modifier.size(15.dp),
-                        tint = colors.muted,
+                    Spacer(Modifier.height(13.dp))
+                    Text(
+                        text = user?.name.orEmpty(),
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 17.sp,
+                        color = colors.text,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = user?.email ?: user?.loginId.orEmpty(),
+                        color = colors.muted,
+                        fontSize = 12.5.sp,
+                    )
+                    Spacer(Modifier.height(9.dp))
+                    Text(
+                        text = stringResource(R.string.parent_account_role_parent),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(colors.brandLight)
+                            .padding(horizontal = 11.dp, vertical = 5.dp),
+                        color = colors.brandDark,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 11.5.sp,
                     )
                 }
             }
-            Spacer(Modifier.height(13.dp))
-            Text(
-                text = user?.name.orEmpty(),
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBlack,
-                fontSize = 19.sp,
-                color = colors.text,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = user?.email ?: user?.loginId.orEmpty(),
-                color = colors.muted,
-                fontSize = 12.5.sp,
-            )
-            Spacer(Modifier.height(9.dp))
-            Text(
-                text = stringResource(R.string.parent_account_role_parent),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(99.dp))
-                    .background(colors.brandLight)
-                    .padding(horizontal = 11.dp, vertical = 5.dp),
-                color = colors.brandDark,
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 11.5.sp,
-            )
-        }
 
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
             // 비밀번호 재설정 폼은 열었을 때만 나타난다. 접혀 있을 땐 줄 하나만 차지한다.
             PasswordChangeSection(state = state, viewModel = viewModel)
 
@@ -222,9 +234,9 @@ fun ParentAccountSettingsScreen(
     }
 }
 
-/** 작은 회색 라벨 + 흰 카드. 자녀관리 목록과 같은 모양이다. */
+/** 작은 회색 라벨 + 그림자로 뜬 흰 카드. 줄이 스스로 좌우 여백을 가져 구분선이 카드 폭을 다 쓴다. */
 @Composable
-private fun AccountGroup(title: String, content: @Composable () -> Unit) {
+private fun AccountGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     val colors = LocalKidhackColors.current
     Column {
         Text(
@@ -235,12 +247,7 @@ private fun AccountGroup(title: String, content: @Composable () -> Unit) {
             fontWeight = FontBold,
             fontSize = 12.sp,
         )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, colors.border.copy(alpha = 0.9f), RoundedCornerShape(16.dp)),
-        ) { content() }
+        KidSectionCard(contentPadding = PaddingValues(0.dp), content = content)
     }
 }
 

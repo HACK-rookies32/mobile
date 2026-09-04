@@ -20,6 +20,7 @@
 
     <!-- 공지 목록. 부모·자녀 화면이 같은 본문을 쓴다. -->
     <string name="notice_search_hint">공지 제목 검색</string>
+    <string name="notice_badge">공지</string>
     <string name="search_clear">검색어 지우기</string>
     <string name="notice_attachment_count">첨부 %1$d</string>
     <string name="notice_link_count">링크 %1$d</string>
@@ -27,7 +28,7 @@
     <string name="notice_empty">등록된 공지가 없어요.</string>
     <string name="notice_loading">불러오는 중…</string>
     <string name="notice_load_more">더 보기</string>
-    <string name="notice_back_to_list">← 목록으로 돌아가기</string>
+    <string name="notice_back_to_list">목록</string>
     <string name="screen_time_block_toast">오늘 사용 시간이 끝났어요. 내일 다시 만나요!</string>
     <string name="server_alert_channel">알림</string>
     <string name="server_alert_channel_desc">채팅·안전 알림처럼 바로 확인해야 하는 알림</string>

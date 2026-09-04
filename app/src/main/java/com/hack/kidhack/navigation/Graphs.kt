@@ -1,20 +1,30 @@
 package com.hack.kidhack.navigation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -295,13 +305,7 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
             )
         }
         childTab(Route.ChildHome.path, navController) {
-            ChildHomeScreen(
-                onChat = { navController.navigateChildTab(Route.ChildChat.path) },
-                onServices = { navController.navigateChildTab(Route.ChildServices.path) },
-                onMypage = { navController.navigateChildTab(Route.ChildMypage.path) },
-                onScreenshot = { navController.navigate(Route.ChildScreenshot.path) },
-                onCamera = { navController.navigateChildTab(Route.ChildCamera.path) },
-            )
+            ChildHomeScreen()
         }
         childTab(Route.ChildChat.path, navController) { ChildChatScreen() }
         childTab(Route.ChildServices.path, navController) { ChildServicesScreen() }
@@ -328,12 +332,9 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
         }
         childTab(Route.ChildMypage.path, navController) {
             ChildMypageScreen(
-                onServices = { navController.navigateChildTab(Route.ChildServices.path) },
                 onLinkParent = { navController.navigate(Route.ChildPairing.path) },
-                onScreenshot = { navController.navigate(Route.ChildScreenshot.path) },
-                onCamera = { navController.navigateChildGallery() },
-                onPay = { navController.navigate(Route.ChildPay.path) },
                 onEditProfile = { navController.navigate(Route.ChildProfileEdit.path) },
+                onScreenshots = { navController.navigate(Route.ChildScreenshot.path) },
                 onTerms = { navController.navigate(Route.ChildTerms.path) },
                 onNotice = { navController.navigate(Route.ChildNotice.path) },
             )
@@ -348,12 +349,11 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
                 ChildPairingScreen(onBack = { navController.popBackStack() })
             }
         }
-        composable(Route.ChildPay.path) {
-            ChildShell(navController) {
-                // [보안 방어] 결제 입구 게이트 — 진입 시 새로 검사(런타임 후킹 포착).
-                DefenseGate {
-                    ChildPayScreen(onBack = { navController.popBackStack() })
-                }
+        // 페이는 이제 하단 탭이다. 탭이라 별도 뒤로가기 대신 홈 탭으로 돌린다(추후 페이 화면 재설계 시 헤더 정리).
+        childTab(Route.ChildPay.path, navController) {
+            // [보안 방어] 결제 입구 게이트 — 진입 시 새로 검사(런타임 후킹 포착).
+            DefenseGate {
+                ChildPayScreen(onBack = { navController.navigateChildTab(Route.ChildHome.path) })
             }
         }
         composable(Route.ChildProfileEdit.path) {
@@ -437,6 +437,17 @@ private fun ChildShell(navController: NavHostController, content: @Composable ()
     )
 }
 
+/**
+ * 탭 껍데기 안에서 「지금은 하단 탭 바를 접어 달라」고 알리는 스위치.
+ *
+ * <p>채팅방은 탭 화면의 하위 상태(선택된 방)라 라우트가 따로 없다. 라우트로 탭 바를
+ * 여닫는 [TabShell] 이 이 방을 알 길이 없어, 콘텐츠가 이 값을 켜면 바를 접는다.
+ * 화면을 떠날 때 반드시 되돌려야 하므로 켠 쪽에서 DisposableEffect 로 끈다.
+ */
+object ImmersiveContent {
+    var active by mutableStateOf(false)
+}
+
 @Composable
 private fun TabShell(
     navController: NavHostController,
@@ -448,7 +459,9 @@ private fun TabShell(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     // 카메라 탭은 `child/camera?requestId={requestId}` 패턴으로 등록돼 있어 쿼리부를 떼고 비교한다.
     val currentRoute = navBackStackEntry?.destination?.route?.substringBefore('?')
-    val showBar = tabs.any { it.route.path == currentRoute }
+    // 채팅방처럼 몰입이 필요한 화면에 들어가면 탭 바를 접어 풀스크린으로 만든다.
+    // 그래야 입력창이 탭 바 위에 떠 있지 않고 화면 맨 아래에 앉는다.
+    val showBar = tabs.any { it.route.path == currentRoute } && !ImmersiveContent.active
     Scaffold(
         // 상단 인셋은 BrandGradientHeader가 statusBarsPadding()으로 직접 처리한다.
         // 여기서 함께 넘기면 상태바 높이가 두 번 쌓여 헤더 제목이 아래로 밀린다.
@@ -456,7 +469,17 @@ private fun TabShell(
             .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
         bottomBar = {
             if (showBar) {
-                NavigationBar(containerColor = colors.card, contentColor = colors.muted) {
+              Column {
+                // 위로 은은한 그림자 + 얇은 실선. 흰 콘텐츠와 흰 바를 확실히 가르되,
+                // Material 기본의 흐릿한 톤 elevation(tonalElevation=0 으로 끔) 대신 이 조합을 쓴다.
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.045f)))),
+                )
+                HorizontalDivider(thickness = 1.dp, color = colors.border)
+                NavigationBar(containerColor = colors.card, contentColor = colors.muted, tonalElevation = 0.dp) {
                     tabs.forEach { tab ->
                         val selected = currentRoute == tab.route.path
                         // 카메라 탭만 예외: 마이페이지 「카메라 갤러리」로 들어간 적이 있으면
@@ -503,9 +526,20 @@ private fun TabShell(
                         )
                     }
                 }
+              }
             }
         },
     ) { padding ->
-        Box(Modifier.padding(padding)) { content() }
+        // padding 만 주고 끝내면, 그 안의 화면이 「아직 아무 인셋도 안 먹었다」고 알고 산다.
+        // 그래서 채팅 입력창이 imePadding 을 걸면 이미 비워 둔 탭 바 높이 위에 키보드 높이를
+        // 통째로 또 얹어, 입력창이 키보드보다 탭 바 하나만큼 더 떠올랐다.
+        //
+        // consumeWindowInsets 로 「여기까지는 내가 이미 비웠다」고 알려 주면, 아래 화면의
+        // imePadding 은 모자란 만큼만 더한다 — 탭 바가 보이든 접혔든 식이 같아진다.
+        Box(
+            Modifier
+                .padding(padding)
+                .consumeWindowInsets(padding),
+        ) { content() }
     }
 }

@@ -687,6 +687,7 @@ data class AllowancePaymentDto(
 )
 
 /** 자녀 기기에 설치된 앱 (서버 `AppResponse`). 서버에 category 는 없다. */
+@Serializable
 data class InstalledAppDto(
     @Serializable(with = FlexibleStringSerializer::class)
     val id: String = "",
@@ -1129,9 +1130,11 @@ data class CardPlainPayload(
 @Serializable
 data class CardResponse(
     val id: Long = 0,
-    val maskedCardNumber: String = "",
-    val ownerName: String = "",
-    val expiry: String = "",
+    // 서버가 명시적으로 null 을 준다(옛 카드는 소유자명이 없다). non-null 이면 그 null 에서
+    // 목록 파싱이 통째로 터진다($data[N].ownerName). null 허용 후 매퍼에서 빈 문자열로 내린다.
+    val maskedCardNumber: String? = null,
+    val ownerName: String? = null,
+    val expiry: String? = null,
     @Serializable(with = FlexibleDateTimeSerializer::class)
     val createdAt: String = "",
 )

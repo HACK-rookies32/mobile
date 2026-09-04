@@ -1,24 +1,34 @@
 package com.hack.kidhack.feature.parent
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,8 +40,7 @@ import com.hack.kidhack.R
 import com.hack.kidhack.background.alert.ServerAlertSync
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
-import com.hack.kidhack.core.designsystem.component.KidCard
-import com.hack.kidhack.core.designsystem.component.KidSwitch
+import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
@@ -146,114 +155,214 @@ fun ParentNotificationsScreen(
     viewModel: NotificationsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val s = state.settings
     val colors = LocalKidhackColors.current
     val context = LocalContext.current
 
-    // 알림 목록은 명세상 비페이징(배열 그대로) — 일반 스크롤 Column 으로 전부 렌더.
-    ParentScreenScaffold(
-        header = { ParentHeaderBar(stringResource(R.string.parent_notifications_title), onBack = onBack) },
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.card)
+            .statusBarsPadding(),
     ) {
-        ParentLoadingOrError(state.loading && state.notifications.isEmpty(), state.error, viewModel::load)
-
-        // 개발 빌드에서만 보이는 알림 점검 도구. 릴리즈에는 들어가지 않는다.
-        // 버튼을 누를수록 아래 목록이 길어지므로 목록 위에 둔다.
-        if (BuildConfig.DEBUG) {
-            TestAlertCard(state.notice) { sample ->
-                viewModel.sendTestAlert(
-                    label = context.getString(sample.labelRes),
-                    type = sample.type,
-                    title = context.getString(sample.titleRes),
-                    body = context.getString(sample.bodyRes),
-                )
+        // 헤더 — ‹ 알림
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onBack != null) {
+                Box(
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center,
+                ) { Text("‹", color = colors.text, fontSize = 26.sp) }
+            } else {
+                Spacer(Modifier.width(14.dp))
             }
+            Text(
+                stringResource(R.string.parent_notif_list_title),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 18.sp,
+                color = colors.text,
+            )
         }
 
-        Spacer(Modifier.height(8.dp))
-
-        // 알림 목록 영역
-        Text(
-            text = stringResource(R.string.parent_dashboard_recent),
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 16.sp,
-            color = colors.text,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
-        )
-
-        if (!state.loading && state.notifications.isEmpty()) {
-            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.parent_empty), color = colors.muted, fontSize = 14.sp)
+        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            if (state.loading && state.notifications.isEmpty() || state.error != null) {
+                Box(Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
+                    ParentLoadingOrError(state.loading && state.notifications.isEmpty(), state.error, viewModel::load)
+                }
             }
+
+            if (!state.loading && state.notifications.isEmpty()) {
+                Box(Modifier.fillMaxWidth().padding(vertical = 56.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        stringResource(R.string.parent_empty),
+                        color = colors.muted,
+                        fontFamily = KidhackFontFamily,
+                        fontSize = 14.sp,
+                    )
+                }
+            }
+
+            // 오늘 / 이전 으로 나눈다. 목록은 최신순이라 각 묶음 안의 순서는 그대로 둔다.
+            val today = state.notifications.filter { isToday(it.createdAt) }
+            val older = state.notifications.filterNot { isToday(it.createdAt) }
+
+            if (today.isNotEmpty()) {
+                NotifGroupLabel(stringResource(R.string.parent_notif_group_today))
+                today.forEachIndexed { i, n ->
+                    NotificationRow(n)
+                    if (i < today.lastIndex) NotifDivider()
+                }
+            }
+            if (older.isNotEmpty()) {
+                NotifGroupLabel(stringResource(R.string.parent_notif_group_older))
+                older.forEachIndexed { i, n ->
+                    NotificationRow(n)
+                    if (i < older.lastIndex) NotifDivider()
+                }
+            }
+
+            // 개발 빌드 전용 알림 점검 도구. 릴리즈에는 들어가지 않는다.
+            if (BuildConfig.DEBUG) {
+                TestAlertSection(state.notice) { sample ->
+                    viewModel.sendTestAlert(
+                        label = context.getString(sample.labelRes),
+                        type = sample.type,
+                        title = context.getString(sample.titleRes),
+                        body = context.getString(sample.bodyRes),
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
         }
-
-        state.notifications.forEach { n -> NotificationCard(n) }
-
-        Spacer(Modifier.height(16.dp))
     }
 }
 
 @Composable
-private fun NotificationCard(n: AppNotification) {
+private fun NotifGroupLabel(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 4.dp),
+        color = LocalKidhackColors.current.subtle,
+        fontFamily = KidhackFontFamily,
+        fontWeight = FontBold,
+        fontSize = 12.sp,
+    )
+}
+
+@Composable
+private fun NotifDivider() {
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp), color = LocalKidhackColors.current.line)
+}
+
+/** 알림 종류. 색은 종류로만 가른다(무지개 대신 위험/긍정/위치/기본 네 갈래). */
+private enum class NotifKind { Danger, Positive, Location, Neutral }
+
+private fun notifKind(type: String): NotifKind = when (type) {
+    "DEVICE_POWER_OFF", "HARMFUL_SITE", "SCREEN_TIME_LIMIT" -> NotifKind.Danger
+    "PAYMENT_APPROVED", "ALLOWANCE_RECEIVED" -> NotifKind.Positive
+    "LOCATION_ENTER", "LOCATION_ARRIVED", "LOCATION_EXIT" -> NotifKind.Location
+    else -> NotifKind.Neutral
+}
+
+private fun notifIcon(type: String): Int = when (type) {
+    "LOCATION_ENTER", "LOCATION_ARRIVED", "LOCATION_EXIT" -> R.drawable.ic_place
+    "DEVICE_POWER_OFF" -> R.drawable.ic_warning
+    "HARMFUL_SITE" -> R.drawable.ic_shield
+    "PAYMENT_APPROVED", "PAYMENT_CANCELED", "ALLOWANCE_RECEIVED", "ALLOWANCE_RECLAIMED" -> R.drawable.ic_card
+    "CHAT_MESSAGE", "INQUIRY_ANSWERED" -> R.drawable.ic_chat
+    "SCREEN_TIME_LIMIT" -> R.drawable.ic_clock
+    "APP_USAGE" -> R.drawable.ic_apps
+    "NOTICE" -> R.drawable.ic_bell
+    else -> R.drawable.ic_bell
+}
+
+@Composable
+private fun NotificationRow(n: AppNotification) {
     val colors = LocalKidhackColors.current
-    KidCard {
-        // 명세 type enum 기준 아이콘 매핑.
-        val icon = when (n.type) {
-            "LOCATION_ENTER" -> "📍"
-            "LOCATION_ARRIVED" -> "🏫"
-            "LOCATION_EXIT" -> "🚶"
-            "DEVICE_POWER_OFF" -> "📵"
-            "HARMFUL_SITE" -> "🚫"
-            "PAYMENT_APPROVED" -> "💳"
-            "PAYMENT_CANCELED" -> "↩️"
-            "CHAT_MESSAGE" -> "💬"
-            "SCREEN_TIME_LIMIT" -> "⏰"
-            "APP_USAGE" -> "📊"
-            "NOTICE" -> "📢"
-            "INQUIRY_ANSWERED" -> "📮"
-            "ALLOWANCE_RECEIVED" -> "💰"
-            "ALLOWANCE_RECLAIMED" -> "↪️"
-            else -> "🔔"
+    val tint = when (notifKind(n.type)) {
+        NotifKind.Danger -> colors.danger
+        NotifKind.Positive -> colors.safe
+        NotifKind.Location -> colors.brand
+        NotifKind.Neutral -> colors.muted
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            // 안 읽은 알림은 옅은 주황 바탕으로 눈에 띄게 한다.
+            .background(if (!n.read) colors.brandLight.copy(alpha = 0.5f) else colors.card)
+            .padding(horizontal = 20.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(colors.card)
+                .border(1.dp, colors.line, RoundedCornerShape(11.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(notifIcon(n.type)),
+                contentDescription = null,
+                modifier = Modifier.size(19.dp),
+                tint = tint,
+            )
         }
-        Row(verticalAlignment = Alignment.Top) {
-            Text(icon, fontSize = 20.sp)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                // 서버가 제목을 준다(#150 이후). 없으면 message 첫 줄로 떨어진다.
+        Spacer(Modifier.width(13.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = n.displayTitle,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 14.sp,
+                letterSpacing = (-0.2).sp,
+                color = colors.text,
+            )
+            if (n.body.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    text = n.displayTitle,
+                    text = n.body,
                     fontFamily = KidhackFontFamily,
-                    fontWeight = FontBold,
-                    fontSize = 14.sp,
-                    color = colors.text,
-                )
-                if (n.body.isNotBlank()) {
-                    Text(
-                        text = n.body,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontSemibold,
-                        fontSize = 13.sp,
-                        color = colors.muted,
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = n.createdAt,
-                    fontSize = 11.sp,
-                    color = colors.muted.copy(alpha = 0.7f),
+                    fontWeight = FontSemibold,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    color = colors.muted,
                 )
             }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(relativeNotifTime(n.createdAt), fontSize = 11.sp, color = colors.subtle)
             if (!n.read) {
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(colors.brand),
-                )
+                Spacer(Modifier.height(6.dp))
+                Box(Modifier.size(8.dp).clip(CircleShape).background(colors.brand))
             }
         }
     }
 }
+
+/** 오늘 자정 이후에 온 알림인지. 파싱 실패하면 「이전」으로 본다. */
+private fun isToday(raw: String): Boolean = runCatching {
+    java.time.LocalDateTime.parse(raw).toLocalDate() == java.time.LocalDate.now()
+}.getOrDefault(false)
+
+/** "방금 전 / N분 전 / N시간 전 / 어제 / M월 D일". 파싱 실패하면 원문 뒤 5글자. */
+private fun relativeNotifTime(raw: String): String = runCatching {
+    val dt = java.time.LocalDateTime.parse(raw)
+    val instant = dt.atZone(java.time.ZoneId.systemDefault()).toInstant()
+    val min = java.time.Duration.between(instant, java.time.Instant.now()).toMinutes().coerceAtLeast(0)
+    val today = java.time.LocalDate.now()
+    when {
+        min < 1 -> "방금 전"
+        min < 60 -> min.toString() + "분 전"
+        dt.toLocalDate() == today -> (min / 60).toString() + "시간 전"
+        dt.toLocalDate() == today.minusDays(1) -> "어제"
+        else -> dt.monthValue.toString() + "월 " + dt.dayOfMonth + "일"
+    }
+}.getOrDefault(raw.takeLast(5))
 
 /**
  * 알림 종류별 테스트 샘플.
@@ -276,21 +385,17 @@ private val TestAlertSamples = listOf(
     AlertSample("NOTICE", R.string.parent_notif_test_notice, R.string.parent_notif_test_notice_title, R.string.parent_notif_test_notice_body),
 )
 
+/** 개발 빌드 전용. 목록 맨 아래에 옅게 둔다 — 릴리즈에는 없다. */
 @Composable
-private fun TestAlertCard(notice: String?, onSend: (AlertSample) -> Unit) {
+private fun TestAlertSection(notice: String?, onSend: (AlertSample) -> Unit) {
     val colors = LocalKidhackColors.current
-    KidCard {
-        Text(
-            stringResource(R.string.parent_notif_test_section),
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 14.sp,
-            color = colors.text,
-        )
+    NotifGroupLabel(stringResource(R.string.parent_notif_test_section))
+    Column(Modifier.padding(horizontal = 20.dp)) {
         Text(
             stringResource(R.string.parent_notif_test_desc),
             fontSize = 12.sp,
-            color = colors.muted,
+            color = colors.subtle,
+            lineHeight = 17.sp,
         )
         TestAlertSamples.forEach { sample ->
             KidButton(
@@ -301,31 +406,8 @@ private fun TestAlertCard(notice: String?, onSend: (AlertSample) -> Unit) {
             )
         }
         if (notice != null) {
-            Spacer(Modifier.height(4.dp))
-            Text(notice, fontSize = 12.sp, color = colors.muted)
+            Spacer(Modifier.height(8.dp))
+            Text(notice, fontSize = 12.sp, color = colors.muted, lineHeight = 17.sp)
         }
-    }
-}
-
-@Composable
-private fun NotifRow(
-    title: String,
-    subtitle: String?,
-    checked: Boolean,
-    showDivider: Boolean = true,
-    onChecked: (Boolean) -> Unit,
-) {
-    val colors = LocalKidhackColors.current
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title, fontFamily = KidhackFontFamily, fontWeight = FontSemibold, fontSize = 14.sp, color = colors.text)
-                if (subtitle != null) {
-                    Text(subtitle, color = colors.muted, fontSize = 12.sp)
-                }
-            }
-            KidSwitch(checked, onChecked)
-        }
-        if (showDivider) HorizontalDivider(color = colors.border)
     }
 }

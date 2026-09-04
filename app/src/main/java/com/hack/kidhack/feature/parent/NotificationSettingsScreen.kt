@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -31,6 +33,8 @@ import com.hack.kidhack.core.designsystem.component.KidSwitch
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
+import com.hack.kidhack.core.designsystem.component.KidSectionCard
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import org.koin.androidx.compose.koinViewModel
 
@@ -58,43 +62,49 @@ fun ParentNotificationSettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.card)
-            .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp),
+            .background(colors.surface)
+            .statusBarsPadding(),
     ) {
-        Row(
-            modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Column(Modifier.fillMaxWidth().background(colors.card)) {
+            Row(
+                modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "‹",
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(99.dp))
+                        .clickable(onClick = onBack)
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                    color = colors.text,
+                    fontSize = 26.sp,
+                )
+                Text(
+                    text = stringResource(R.string.parent_notif_settings_title),
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 18.sp,
+                    color = colors.text,
+                )
+            }
             Text(
-                text = "‹",
-                modifier = Modifier
-                    .clip(RoundedCornerShape(99.dp))
-                    .clickable(onClick = onBack)
-                    .padding(horizontal = 12.dp, vertical = 2.dp),
-                color = colors.text,
-                fontSize = 26.sp,
+                text = stringResource(R.string.parent_notif_settings_lead),
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
+                color = colors.muted,
+                fontSize = 12.5.sp,
             )
-            Text(
-                text = stringResource(R.string.parent_notif_settings_title),
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBlack,
-                fontSize = 21.sp,
-                color = colors.text,
-            )
+            KidHeaderDivider()
         }
-        Text(
-            text = stringResource(R.string.parent_notif_settings_lead),
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 6.dp),
-            color = colors.muted,
-            fontSize = 12.5.sp,
-        )
 
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Spacer(Modifier.height(4.dp))
             SettingsGroup(stringResource(R.string.parent_notif_group_safety)) {
                 ToggleRow(
                     title = stringResource(R.string.parent_notif_location),
@@ -134,7 +144,7 @@ fun ParentNotificationSettingsScreen(
 
 /** 작은 회색 라벨 + 흰 카드. 계정 설정·자녀관리와 같은 모양이다. */
 @Composable
-private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
+private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     val colors = LocalKidhackColors.current
     Column {
         Text(
@@ -145,12 +155,7 @@ private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
             fontWeight = FontBold,
             fontSize = 12.sp,
         )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, colors.border.copy(alpha = 0.9f), RoundedCornerShape(16.dp)),
-        ) { content() }
+        KidSectionCard(contentPadding = PaddingValues(0.dp), content = content)
     }
 }
 

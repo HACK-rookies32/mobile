@@ -98,6 +98,8 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import com.hack.kidhack.core.designsystem.component.KidSearchBar
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
+import com.hack.kidhack.core.designsystem.component.KidSectionCard
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.Flow
@@ -362,15 +364,16 @@ internal fun ColumnScope.CommunityListBody(
     onWrite: () -> Unit,
 ) {
     val colors = LocalKidhackColors.current
-    // 공지사항과 같은 검색바를 쓴다. 서버는 제목과 작성자 닉네임에서 찾는다.
-    KidSearchBar(
+    Column(Modifier.weight(1f).fillMaxWidth().background(colors.surface)) {
+      // 공지사항과 같은 검색바를 쓴다. 서버는 제목과 작성자 닉네임에서 찾는다.
+      KidSearchBar(
         value = keyword,
         onValueChange = onKeyword,
         onSearch = onSearch,
         hint = stringResource(R.string.parent_community_search_hint),
         modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp),
-    )
-    Box(Modifier.fillMaxWidth().weight(1f)) {
+      )
+      Box(Modifier.fillMaxWidth().weight(1f)) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             // 아래 여백은 동그란 글쓰기 버튼이 마지막 글을 가리지 않도록 비워 둔다.
@@ -470,6 +473,7 @@ internal fun ColumnScope.CommunityListBody(
                 letterSpacing = (-0.2).sp,
             )
         }
+      }
     }
 }
 
@@ -485,11 +489,12 @@ internal fun ColumnScope.CommunityListBody(
 @Composable
 private fun PostRow(post: Post, onClick: () -> Unit) {
     val colors = LocalKidhackColors.current
-    Row(
+    KidSectionCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+      Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 15.dp),
+            .padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
         Column(Modifier.weight(1f)) {
@@ -537,14 +542,11 @@ private fun PostRow(post: Post, onClick: () -> Unit) {
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(66.dp).clip(RoundedCornerShape(10.dp)),
+                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(10.dp)),
             )
         }
+      }
     }
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 20.dp),
-        color = colors.line,
-    )
 }
 
 /** 곁가지 글씨. 작성자·시간·좋아요가 모두 같은 크기·같은 색으로 한 줄에 눕는다. */
@@ -633,10 +635,17 @@ fun ParentCommunityDetailScreen(
             .statusBarsPadding(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             BackTapTarget(onBack)
+            Text(
+                stringResource(R.string.parent_community_post_title),
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 18.sp,
+                color = colors.text,
+            )
             Spacer(Modifier.weight(1f))
             // 수정·삭제는 내 글에만, 그리고 「더 보기」 안에 넣는다. 좋아요 줄에 작은 글씨로
             // 붙여 두면 읽는 도중 지우기 버튼이 늘 시야에 있다.
@@ -682,6 +691,7 @@ fun ParentCommunityDetailScreen(
                 }
             }
         }
+        KidHeaderDivider()
 
         Column(
             modifier = Modifier
@@ -802,16 +812,29 @@ fun ParentCommunityDetailScreen(
                     )
                 }
 
+                // 글 본문·액션과 댓글을 실선 한 줄로 확실히 가른다 — 어디까지가 글이고
+                // 어디부터 댓글인지 스크롤 중에 헷갈리지 않게.
+                Spacer(Modifier.height(18.dp))
+                HorizontalDivider(color = colors.border)
+
                 Text(
                     text = stringResource(R.string.parent_community_comment_head, state.comments.size),
-                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 2.dp),
+                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 2.dp),
                     fontFamily = KidhackFontFamily,
                     fontWeight = FontBold,
                     fontSize = 13.sp,
                     color = colors.text,
                 )
 
-                state.comments.forEach { c ->
+                // 댓글끼리도 얇은 선으로 나눈다. 예전엔 아바타 색만으로 갈라 두 댓글이
+                // 이어 읽혔다 — 첫 댓글 위에는 선을 두지 않아 머리글과 붙여 둔다.
+                state.comments.forEachIndexed { index, c ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            color = colors.line,
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                        )
+                    }
                     CommentRow(
                         comment = c,
                         mine = c.memberId.isNotBlank() && c.memberId == state.myMemberId,
@@ -1089,7 +1112,7 @@ fun ParentCommunityWriteScreen(
             .statusBarsPadding(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 10.dp, top = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 10.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -1327,7 +1350,7 @@ fun ParentCommunityWriteScreen(
  * 먼저 눈에 들어와, 두 칸을 안내 글씨만 남긴 맨 입력으로 둔다.
  */
 @Composable
-private fun PlainField(
+internal fun PlainField(
     value: String,
     onValueChange: (String) -> Unit,
     hint: String,
@@ -1376,7 +1399,7 @@ private fun PlainField(
  * `contentDescription` 으로 남는다.
  */
 @Composable
-private fun ToolButton(
+internal fun ToolButton(
     @DrawableRes icon: Int,
     @StringRes label: Int,
     enabled: Boolean = true,

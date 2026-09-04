@@ -1,20 +1,9 @@
 package com.hack.kidhack.feature.child.mypage
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.hack.kidhack.R
-import com.hack.kidhack.core.designsystem.theme.FontBlack
-import com.hack.kidhack.core.designsystem.theme.FontBold
-import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
-import com.hack.kidhack.feature.child.components.ChildScreenScaffold
+import com.hack.kidhack.feature.child.components.ChildSubScaffold
 import com.hack.kidhack.feature.common.TermsBody
 
 /**
@@ -24,25 +13,9 @@ import com.hack.kidhack.feature.common.TermsBody
  */
 @Composable
 fun ChildTermsScreen(onBack: () -> Unit = {}) {
-    ChildScreenScaffold(
-        header = {
-            Text(
-                text = stringResource(R.string.child_profile_back),
-                modifier = Modifier.clickable(onClick = onBack),
-                color = Color.White,
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 18.sp,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.child_terms_title),
-                color = Color.White,
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBlack,
-                fontSize = 24.sp,
-            )
-        },
+    ChildSubScaffold(
+        title = stringResource(R.string.child_terms_title),
+        onBack = onBack,
     ) {
         TermsBody()
     }

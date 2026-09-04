@@ -38,6 +38,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
+import com.hack.kidhack.core.common.recentDaysRange
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
@@ -135,15 +136,16 @@ class AppUsageDetailViewModel(
             }
 
             val period = _state.value.period
-            val today = LocalDate.now()
-            val from = today.minusDays(period.days)
+            // 서버는 시각 포함 LocalDateTime 구간을 받는다. 날짜만 보내면 '오늘'은 from==to(0시==0시)라
+            // 빈 구간이 돼 아무것도 안 나온다. 오늘 0시~지금을 포함하도록 헬퍼를 쓴다.
+            val (from, to) = recentDaysRange(period.days.toInt() + 1)
 
             runCatching {
                 appUsageRepository.list(
                     childId = id,
                     groupBy = _state.value.groupBy.apiValue,
-                    from = from.toString(),
-                    to = today.toString(),
+                    from = from,
+                    to = to,
                 )
             }.onSuccess { items ->
                 _state.update { it.copy(loading = false, items = items) }
@@ -152,17 +154,19 @@ class AppUsageDetailViewModel(
                 return@launch
             }
 
-            // 직전 기간 합계. 같은 API 를 기간만 바꿔 한 번 더 부른다 — 새 엔드포인트가
-            // 필요 없다. 실패하면 증감만 빠지고 화면은 그대로 뜬다.
-            val prevTo = from.minusDays(1)
-            val prevFrom = prevTo.minusDays(period.days)
+            // 직전 같은 길이의 구간 합계(증감 배지용). 현재 구간 시작 하루 전까지를 같은 길이로 잡는다.
+            // 실패하면 증감만 빠지고 화면은 그대로 뜬다.
+            val curStartDay = LocalDate.now().minusDays(period.days)
+            val prevEndDay = curStartDay.minusDays(1)
+            val prevStartDay = prevEndDay.minusDays(period.days)
             runCatching {
                 appUsageRepository.list(
                     childId = id,
                     // 합계만 쓰므로 어느 묶음으로 불러도 같다. 가장 적게 쪼개지는 것으로 부른다.
                     groupBy = UsageGroupBy.DAY.apiValue,
-                    from = prevFrom.toString(),
-                    to = prevTo.toString(),
+                    from = prevStartDay.atStartOfDay().toString(),
+                    // prevEndDay 하루를 통째로 포함하도록 다음날 0시를 끝으로 둔다.
+                    to = prevEndDay.plusDays(1).atStartOfDay().toString(),
                 ).sumOf { it.durationSec }
             }.onSuccess { total ->
                 _state.update { it.copy(previousTotalSeconds = total) }
@@ -198,7 +202,7 @@ fun ParentAppUsageDetailScreen(
             .statusBarsPadding(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 14.dp, top = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 14.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -214,7 +218,7 @@ fun ParentAppUsageDetailScreen(
                 stringResource(R.string.parent_usage_detail_title),
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 color = colors.text,
             )
             Spacer(Modifier.weight(1f))

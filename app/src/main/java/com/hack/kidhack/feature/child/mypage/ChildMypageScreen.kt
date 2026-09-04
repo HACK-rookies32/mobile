@@ -1,254 +1,194 @@
 package com.hack.kidhack.feature.child.mypage
 
-import android.widget.Toast
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.R
-import com.hack.kidhack.core.designsystem.component.KidCard
-import com.hack.kidhack.core.designsystem.component.ListRow
-import com.hack.kidhack.core.designsystem.theme.FontBlack
+import com.hack.kidhack.core.designsystem.component.KidLabeledSection
+import com.hack.kidhack.core.designsystem.component.KidSectionCard
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
-import com.hack.kidhack.feature.child.components.ChildScreenScaffold
+import com.hack.kidhack.feature.child.components.ChildTabScaffold
 import org.koin.androidx.compose.koinViewModel
 
+/**
+ * 자녀 마이 — 프로필 한 장 + 「계정」·「앱 정보」 두 덩이.
+ *
+ * <p>메뉴 셋이 라벨 없이 나란히 있으니 화면이 비어 보였다. 성격이 다른 것끼리 묶고 이름을
+ * 붙이면 개수는 그대로여도 화면이 짜여 보인다.
+ *
+ * <p>로그아웃은 카드 한 장을 통째로 먹는 빨간 블록이었다. 자주 누를 것도 아닌데 화면에서
+ * 제일 붉은 자리를 차지했다 — 맨 아래 회색 글씨로 내린다.
+ *
+ * <p>「연결된 보호자」 값은 여기 없다. 전에 채팅방 유무로 판단하다가, 부모가 채팅을 한 번도
+ * 열지 않으면 페어링이 돼 있어도 「없음」으로 보여서 걷어낸 값이다. 근거가 생기기 전에는
+ * 메뉴만 두고 값은 적지 않는다.
+ */
 @Composable
 fun ChildMypageScreen(
-    onServices: () -> Unit = {},
     onLinkParent: () -> Unit = {},
-    onScreenshot: () -> Unit = {},
-    onCamera: () -> Unit = {},
-    onPay: () -> Unit = {},
     onEditProfile: () -> Unit = {},
+    onScreenshots: () -> Unit = {},
     onTerms: () -> Unit = {},
     onNotice: () -> Unit = {},
     viewModel: ChildMypageViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
-    val context = LocalContext.current
-    // 부모가 용돈을 보내거나 회수했을 수 있으니 탭 복귀 때마다 잔액을 다시 읽는다.
+
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
         onPauseOrDispose { }
     }
 
-    val comingSoon = {
-        Toast.makeText(context, context.getString(R.string.child_mypage_coming_soon), Toast.LENGTH_SHORT).show()
-    }
-
-    ChildScreenScaffold(
-        header = {
+    ChildTabScaffold(title = stringResource(R.string.child_tab_mypage)) {
+        KidSectionCard(
+            modifier = Modifier.clickable(onClick = onEditProfile),
+            contentPadding = PaddingValues(16.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White.copy(alpha = 0.2f)),
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(colors.brandLight),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("😊", fontSize = 28.sp)
-                }
-                Spacer(Modifier.size(16.dp))
-                Column {
                     Text(
-                        text = state.name,
-                        color = Color.White,
+                        state.name.trim().take(1).ifBlank { "?" },
+                        color = colors.brandDark,
                         fontFamily = KidhackFontFamily,
-                        fontWeight = FontBlack,
-                        fontSize = 20.sp,
-                    )
-                    Text(
-                        text = state.email,
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 12.sp,
+                        fontWeight = FontBold,
+                        fontSize = 19.sp,
                     )
                 }
-            }
-        },
-    ) {
-        KidCard {
-            Text(
-                text = stringResource(R.string.child_mypage_today),
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 14.sp,
-                color = colors.text,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row {
-                TodayStat(
-                    emoji = "⏱️",
-                    value = state.screenTime,
-                    label = stringResource(R.string.child_mypage_stat_screentime),
-                    background = colors.brandLight,
-                    tint = colors.brandDark,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.size(8.dp))
-                TodayStat(
-                    emoji = "💬",
-                    value = stringResource(R.string.child_mypage_chat_count, state.chatCount),
-                    label = stringResource(R.string.child_mypage_stat_chat),
-                    background = Color(0xFFEFF6FF),
-                    tint = colors.info,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.size(8.dp))
-                TodayStat(
-                    emoji = "🚫",
-                    value = stringResource(R.string.child_mypage_blocked_count, state.blockedCount),
-                    label = stringResource(R.string.child_mypage_stat_blocked),
-                    background = Color(0xFFFEF2F2),
-                    tint = colors.danger,
-                    modifier = Modifier.weight(1f),
-                )
+                Spacer(Modifier.width(13.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        state.name,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 16.sp,
+                        color = colors.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(1.dp))
+                    Text(
+                        state.email,
+                        color = colors.subtle,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontSemibold,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text("›", color = colors.subtle, fontSize = 20.sp)
             }
         }
 
-        KidCard {
-            Text(
-                text = stringResource(R.string.child_mypage_section_info),
-                color = colors.muted,
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 12.sp,
-            )
-            ListRow(title = stringResource(R.string.child_mypage_edit_profile), onClick = onEditProfile)
-            ListRow(
-                title = stringResource(R.string.child_mypage_link_parent),
-                leading = "\uD83D\uDD17",
-                onClick = onLinkParent,
-            )
+        KidLabeledSection(
+            label = stringResource(R.string.child_mypage_section_account),
+            contentPadding = PaddingValues(horizontal = 14.dp),
+        ) {
+            MyRow(R.drawable.ic_link, stringResource(R.string.child_mypage_link_parent), onLinkParent)
+            HorizontalDivider(modifier = Modifier.padding(start = 46.dp), color = colors.line)
+            MyRow(R.drawable.ic_image, stringResource(R.string.child_mypage_menu_screenshots), onScreenshots)
         }
 
-        KidCard {
-            Text(
-                text = stringResource(R.string.child_mypage_section_service),
-                color = colors.muted,
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 12.sp,
-            )
-            ListRow(
-                title = stringResource(R.string.child_mypage_menu_pay),
-                leading = "💳",
-                subtitle = stringResource(
-                    R.string.child_mypage_menu_pay_balance,
-                    formatPoint(state.payBalance),
-                ),
-                onClick = onPay,
-            )
-            ListRow(title = stringResource(R.string.child_mypage_menu_services), onClick = onServices)
-            ListRow(title = stringResource(R.string.child_mypage_menu_screenshots), onClick = onScreenshot)
-            ListRow(
-                title = stringResource(R.string.child_mypage_menu_gallery),
-                onClick = onCamera,
-                showDivider = false,
-            )
+        KidLabeledSection(
+            label = stringResource(R.string.child_mypage_section_app),
+            contentPadding = PaddingValues(horizontal = 14.dp),
+        ) {
+            MyRow(R.drawable.ic_report, stringResource(R.string.child_mypage_notice), onNotice)
+            HorizontalDivider(modifier = Modifier.padding(start = 46.dp), color = colors.line)
+            MyRow(R.drawable.ic_file, stringResource(R.string.child_mypage_terms), onTerms)
         }
 
-        KidCard {
-            Text(
-                text = stringResource(R.string.child_mypage_section_etc),
-                color = colors.muted,
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 12.sp,
-            )
-            ListRow(title = stringResource(R.string.child_mypage_notice), onClick = onNotice)
-            ListRow(title = stringResource(R.string.child_mypage_terms), onClick = onTerms)
-            ListRow(title = stringResource(R.string.child_mypage_version), onClick = null)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = viewModel::logout)
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.child_mypage_logout),
-                    modifier = Modifier.weight(1f),
-                    color = colors.danger,
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontSemibold,
-                    fontSize = 14.sp,
-                )
-                Text("›", color = colors.border, fontSize = 16.sp)
-            }
-            // 자녀 로그아웃은 서버상 부모 권한(POST /children/{id}/logout)이다.
-            // 이 버튼은 테스트 중 계정 전환용 임시 조치라 그 사실을 화면에 밝혀 둔다.
-            Text(
-                text = stringResource(R.string.child_mypage_logout_temp_notice),
-                color = colors.muted,
-                fontSize = 11.sp,
-            )
-        }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.child_mypage_logout),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = viewModel::logout)
+                .padding(vertical = 14.dp),
+            color = colors.subtle,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(4.dp))
     }
 }
 
-/** 1234567 → "1,234,567" */
-private fun formatPoint(value: Int): String =
-    value.toString().reversed().chunked(3).joinToString(",").reversed()
-
 @Composable
-private fun TodayStat(
-    emoji: String,
-    value: String,
-    label: String,
-    background: Color,
-    tint: Color,
-    modifier: Modifier = Modifier,
-) {
+private fun MyRow(@DrawableRes icon: Int, title: String, onClick: () -> Unit) {
     val colors = LocalKidhackColors.current
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(background)
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .heightIn(min = 52.dp)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(emoji, fontSize = 20.sp)
-        Spacer(Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(colors.line),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = null,
+                modifier = Modifier.size(17.dp),
+                tint = colors.muted,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
         Text(
-            text = value,
-            color = tint,
+            title,
+            modifier = Modifier.weight(1f),
             fontFamily = KidhackFontFamily,
-            fontWeight = FontBlack,
+            fontWeight = FontBold,
             fontSize = 14.sp,
+            color = colors.text,
         )
-        Text(
-            text = label,
-            color = colors.muted,
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontSemibold,
-            fontSize = 12.sp,
-        )
+        Text("›", color = colors.subtle, fontSize = 18.sp)
     }
 }

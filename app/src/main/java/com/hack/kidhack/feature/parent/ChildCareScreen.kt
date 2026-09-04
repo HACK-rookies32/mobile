@@ -50,6 +50,7 @@ import com.hack.kidhack.background.alert.ServerAlertSync
 import com.hack.kidhack.core.common.todayRange
 import com.hack.kidhack.core.permission.KidhackPermissions
 import com.hack.kidhack.permissionRequester
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
@@ -144,6 +145,9 @@ class ChildCareViewModel(
     private val _state = MutableStateFlow(ChildCareUiState())
     val state: StateFlow<ChildCareUiState> = _state.asStateFlow()
 
+    /** 마지막으로 load() 한 시각. 화면 재진입 시 잦은 재조회를 막는 데 쓴다. */
+    private var lastLoadedAt = 0L
+
     init {
         load()
         // 보관함을 구독해 안 읽은 알림이 있는지만 본다. 목록은 알림 화면이 그린다.
@@ -154,7 +158,17 @@ class ChildCareViewModel(
         }
     }
 
+    /**
+     * 화면 재진입용. 사용 리포트에 갔다 돌아오면 뷰모델이 유지돼 init 의 조회가 다시 돌지
+     * 않아 「오늘 사용」이 그대로였다. 최근 [CARE_REFRESH_MIN_MS] 안에 읽었으면 건너뛴다.
+     */
+    fun refreshIfStale() {
+        if (System.currentTimeMillis() - lastLoadedAt < CARE_REFRESH_MIN_MS) return
+        load()
+    }
+
     fun load() {
+        lastLoadedAt = System.currentTimeMillis()
         viewModelScope.launch {
             val loaded = runCatching {
                 val children = childRepository.children()
@@ -333,12 +347,11 @@ fun ParentChildrenScreen(
                 }
             }
         }
-        Text(
-            text = stringResource(R.string.parent_childcare_pick_child),
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
-            color = colors.muted,
-            fontSize = 13.sp,
-        )
+        // 마이페이지·위치·채팅과 같은 헤더 규격 — 제목 아래 구분선으로 마무리한다.
+        // 「설정할 자녀를 골라주세요」 안내는 목록만 봐도 자명해 걷어냈다.
+        KidHeaderDivider()
+
+        Spacer(Modifier.height(8.dp))
 
         // 남은 자리를 다 차지해서 줄들이 화면 한가운데 놓이게 한다. 제목 바로 아래에
         // 붙여 두면 아래쪽이 텅 비어 화면이 미완성처럼 보인다.
@@ -569,6 +582,9 @@ private fun usageLabel(totalSeconds: Int): String {
     }
 }
 
+/** 대시보드 재진입 시 이 간격 안에 이미 읽었으면 다시 읽지 않는다. */
+private const val CARE_REFRESH_MIN_MS = 5_000L
+
 private const val SECONDS_PER_MINUTE = 60
 
 /**
@@ -693,6 +709,9 @@ fun ParentChildCareScreen(
     val childId = state.selectedChildId
     val child = state.children.firstOrNull { it.id == childId }
 
+    // 사용 리포트 등에서 돌아올 때 「오늘 사용」을 다시 읽는다(뷰모델이 유지돼 init 이 다시 안 돎).
+    LaunchedEffect(Unit) { viewModel.refreshIfStale() }
+
     // 탭을 두지 않고 이름표로만 가른다. 대시보드와 탭이 한 화면에 있으면 스크롤이 서로
     // 다툰다 — 요약을 보려고 올리고 목록을 보려고 내리는데, 탭을 누르면 또 위로 튄다.
     // 「사용 관리 / 안전 케어」라는 갈래는 이름표로 그대로 남는다.
@@ -752,27 +771,22 @@ fun ParentChildCareScreen(
             .background(colors.card)
             .statusBarsPadding(),
     ) {
+        // \uc774\ub984\uc740 \ubc14\ub85c \uc544\ub798 \ud504\ub85c\ud544(ChildHero)\uc774 \ud06c\uac8c \ubcf4\uc5ec \uc8fc\ubbc0\ub85c \ud5e4\ub354\uc5d0\ub294 \ub450\uc9c0 \uc54a\ub294\ub2e4 \u2014
+        // \ub4a4\ub85c\uac00\uae30 \uc606\uc5d0\ub3c4 \uac19\uc740 \uc774\ub984\uc744 \uc801\uc73c\uba74 \ud55c \ud654\uba74\uc5d0 \uc774\ub984\uc774 \ub450 \ubc88 \ub098\uc628\ub2e4.
+        // \ub4a4\ub85c\uac00\uae30 \ubc84\ud2bc\uc740 \uce74\ub4dc\uad00\ub9ac \ub4f1 \ub2e4\ub978 \uc11c\ube0c \ud398\uc774\uc9c0\uc640 \uac19\uc740 \uaddc\uaca9(40dp \uc0c1\uc790\u00b7\uc704 12).
         Row(
-            modifier = Modifier.padding(start = 8.dp, end = 20.dp, top = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "\u2039",
+            Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(99.dp))
-                    .clickable(onClick = onBack)
-                    .padding(horizontal = 14.dp, vertical = 2.dp),
-                color = colors.text,
-                fontSize = 26.sp,
-            )
-            Text(
-                text = state.selectedChildName,
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBlack,
-                fontSize = 18.sp,
-                letterSpacing = (-0.5).sp,
-                color = colors.text,
-            )
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("\u2039", color = colors.text, fontSize = 26.sp)
+            }
         }
 
         Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -850,8 +864,8 @@ private fun ChildHero(child: ChildProfile?, status: ChildWatchStatus?, onEditPro
                 text = child?.name.orEmpty(),
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBlack,
-                fontSize = 19.sp,
-                letterSpacing = (-0.6).sp,
+                fontSize = 17.sp,
+                letterSpacing = (-0.5).sp,
                 color = colors.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

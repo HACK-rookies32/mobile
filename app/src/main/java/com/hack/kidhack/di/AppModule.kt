@@ -8,6 +8,7 @@ import com.hack.kidhack.data.local.CapturedShotStore
 import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.local.BlocklistStore
 import com.hack.kidhack.data.local.ChildAlertStore
+import com.hack.kidhack.data.local.ChildCaptureStore
 import com.hack.kidhack.data.local.HarmfulSettingsStore
 import com.hack.kidhack.data.local.AppUsageReportStore
 import com.hack.kidhack.data.local.PushTokenStore
@@ -213,6 +214,7 @@ val appModule = module {
     single<ChildOnboardingStore> { ChildOnboardingStoreImpl(androidContext()) }
     single { ChatMessageStore(androidContext()) }
     single { ChildAlertStore(androidContext(), get()) }
+    single { ChildCaptureStore(androidContext()) }
     single { ServerAlertStore(androidContext(), get()) }
     single { HarmfulSettingsStore(androidContext()) }
     single { ParentWatchStore(androidContext()) }
@@ -398,9 +400,9 @@ val appModule = module {
     viewModel { ParentChatViewModel(get(), get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get(), get(), get()) }
     viewModel { MypageViewModel(get(), get(), get(), get()) }
-    viewModel { EditProfileViewModel(get()) }
+    viewModel { EditProfileViewModel(get(), get()) }
     viewModel { ActivityViewModel(get()) }
-    viewModel { ChildAccountViewModel(get()) }
+    viewModel { ChildAccountViewModel(get(), get()) }
     viewModel { WithdrawViewModel(get(), get()) }
     viewModel { AppControlViewModel(get(), get(), get()) }
     viewModel { ScreenshotViewModel(get(), get(), get()) }
@@ -422,14 +424,14 @@ val appModule = module {
     // 매장 단말 테스트 화면 (숨은 라우트, 디버그/시연용)
     viewModel { StoreTerminalViewModel(get()) }
 
-    viewModel { ChildHomeViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { ChildHomeViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildChatViewModel(get(), get()) }
     viewModel { ChildServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildMypageViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildPairingViewModel(get()) }
-    viewModel { ChildScreenshotViewModel(get(), get(), get()) }
+    viewModel { ChildScreenshotViewModel(get(), get()) }
     viewModel { ChildCameraViewModel(get(), get(), get(), get()) }
-    viewModel { ChildPayViewModel(get(), get()) }
+    viewModel { ChildPayViewModel(get(), get(), get()) }
     viewModel { ChildProfileEditViewModel(get(), get()) }
     viewModel { (persistDone: Boolean) ->
         ChildOnboardingViewModel(get(), get(), persistDone)

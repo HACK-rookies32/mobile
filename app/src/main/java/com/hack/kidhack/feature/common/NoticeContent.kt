@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -51,7 +53,9 @@ import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
 import com.hack.kidhack.core.designsystem.component.KidCard
 import com.hack.kidhack.core.designsystem.component.KidSearchBar
+import com.hack.kidhack.core.designsystem.component.KidSectionCard
 import com.hack.kidhack.core.designsystem.component.KidTextField
+import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
@@ -176,14 +180,34 @@ fun ColumnScope.NoticeBody(
     val opened = state.opened
 
     if (opened != null) {
-        NoticeDetailCard(opened)
-        KidButton(
-            text = stringResource(R.string.notice_back_to_list),
-            onClick = onClose,
-            modifier = Modifier.fillMaxWidth(),
-            variant = KidButtonVariant.Secondary,
-        )
-        Spacer(Modifier.height(8.dp))
+        // 「목록」을 본문 아래 풀폭 버튼으로 두면 다른 상세 페이지와 어긋나고, 그냥 텍스트로
+        // 두면 위에 붕 떠 보였다. 테두리 칩으로 만들어 위쪽에 딱 붙는 「누를 것」으로 세운다.
+        //
+        // 호출부 Column 이 spacedBy 를 걸면 칩·카드 사이에 그 간격이 중복으로 끼어 위쪽을
+        // 크게 먹었다. 하나의 Column 으로 감싸 부모 spacedBy 간섭을 끊고 간격을 직접 준다.
+        Column {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(colors.card)
+                    .border(1.dp, colors.border, RoundedCornerShape(99.dp))
+                    .clickable(onClick = onClose)
+                    .padding(start = 10.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("‹", color = colors.muted, fontSize = 16.sp)
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    stringResource(R.string.notice_back_to_list),
+                    color = colors.muted,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 12.5.sp,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            NoticeDetailCard(opened)
+        }
         return
     }
 
@@ -207,49 +231,47 @@ fun ColumnScope.NoticeBody(
         }
     }
 
-    // 공지 하나하나를 카드로 감싸면 제목 한 줄짜리 상자가 줄줄이 늘어선다. 게시판 탭과
-    // 같은 구분선 목록으로 둔다. 바깥 Column 의 줄 간격이 사이에 끼지 않도록 한 겹 묶는다.
-    Column(Modifier.fillMaxWidth()) {
-        state.items.forEachIndexed { index, notice ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpen(notice) }
-                    .padding(vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        notice.title,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBold,
-                        fontSize = 14.5.sp,
-                        lineHeight = 20.sp,
-                        letterSpacing = (-0.3).sp,
-                        color = colors.text,
-                    )
-                    Spacer(Modifier.height(5.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(notice.createdAt.toDisplayDate(), color = colors.subtle, fontSize = 11.5.sp)
-                        // 첨부·링크는 목록에 개수만 온다. 실물은 상세에서 받는다.
-                        val extras = buildList {
-                            if (notice.attachmentCount > 0) {
-                                add(stringResource(R.string.notice_attachment_count, notice.attachmentCount))
+    // 공지 하나하나를 흰 카드로 — 연회색 캔버스 위에서 떠 보이게(마이페이지 규격).
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        state.items.forEach { notice ->
+            KidSectionCard {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpen(notice) }
+                        .padding(vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            notice.title,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 14.5.sp,
+                            lineHeight = 20.sp,
+                            letterSpacing = (-0.3).sp,
+                            color = colors.text,
+                        )
+                        Spacer(Modifier.height(5.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(notice.createdAt.toDisplayDate(), color = colors.subtle, fontSize = 11.5.sp)
+                            // 첨부·링크는 목록에 개수만 온다. 실물은 상세에서 받는다.
+                            val extras = buildList {
+                                if (notice.attachmentCount > 0) {
+                                    add(stringResource(R.string.notice_attachment_count, notice.attachmentCount))
+                                }
+                                if (notice.linkCount > 0) {
+                                    add(stringResource(R.string.notice_link_count, notice.linkCount))
+                                }
                             }
-                            if (notice.linkCount > 0) {
-                                add(stringResource(R.string.notice_link_count, notice.linkCount))
+                            extras.forEach { label ->
+                                Text(" · ", color = colors.subtle, fontSize = 11.5.sp)
+                                Text(label, color = colors.subtle, fontSize = 11.5.sp)
                             }
-                        }
-                        extras.forEach { label ->
-                            Text(" · ", color = colors.subtle, fontSize = 11.5.sp)
-                            Text(label, color = colors.subtle, fontSize = 11.5.sp)
                         }
                     }
+                    Text("›", color = colors.border, fontSize = 17.sp)
                 }
-                Text("›", color = colors.border, fontSize = 17.sp)
-            }
-            if (index != state.items.lastIndex) {
-                HorizontalDivider(color = colors.line)
             }
         }
     }
@@ -289,62 +311,106 @@ private fun NoticeDetailCard(notice: NoticeDetail) {
     val context = LocalContext.current
 
     KidCard {
-        Text(notice.title, fontFamily = KidhackFontFamily, fontWeight = FontBold, fontSize = 16.sp, color = colors.text)
-        Text(notice.createdAt.toDisplayDate(), color = colors.muted, fontSize = 12.sp)
-        Spacer(Modifier.height(12.dp))
-        Text(notice.content, fontSize = 14.sp, color = colors.text)
+        // 「공지」 배지 — 게시글 상세의 배지 자리와 같은 위치·모양이라 두 상세가 한 가족처럼 읽힌다.
+        Text(
+            text = stringResource(R.string.notice_badge),
+            modifier = Modifier
+                .clip(RoundedCornerShape(7.dp))
+                .background(colors.brandLight)
+                .padding(horizontal = 10.dp, vertical = 3.dp),
+            color = colors.brandDark,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 11.sp,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            notice.title,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBlack,
+            fontSize = 20.sp,
+            lineHeight = 28.sp,
+            color = colors.text,
+        )
+        Spacer(Modifier.height(9.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                painter = painterResource(R.drawable.ic_clock),
+                contentDescription = null,
+                modifier = Modifier.size(13.dp),
+                tint = colors.subtle,
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(notice.createdAt.toDisplayDate(), color = colors.subtle, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(15.dp))
+        HorizontalDivider(color = colors.line)
+        Spacer(Modifier.height(15.dp))
+        Text(notice.content, fontSize = 14.sp, lineHeight = 24.sp, color = colors.text)
 
         // 서버는 첨부가 이미지인지 알려주지 않는다. 확장자로 갈라 이미지만 미리보기로 띄운다.
+        // 썸네일 줄이 아니라 본문 폭을 다 쓰는 한 장씩으로 — 공지 이미지는 대개 안내문 한 장이다.
         val images = notice.attachments.filter { RemoteUrl.isImage(it) }
         val files = notice.attachments - images.toSet()
 
-        if (images.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(images) { path ->
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(RemoteUrl.absolute(path))
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(width = 200.dp, height = 120.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(colors.surface),
-                    )
-                }
-            }
+        images.forEach { path ->
+            Spacer(Modifier.height(14.dp))
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(RemoteUrl.absolute(path))
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colors.surface),
+            )
         }
 
         if (files.isNotEmpty() || notice.links.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             files.forEach { path ->
-                AttachmentRow("📎", path.substringAfterLast('/')) { context.openLink(path) }
+                AttachmentRow(R.drawable.ic_file, path.substringAfterLast('/')) { context.openLink(path) }
             }
             notice.links.forEach { link ->
-                AttachmentRow("🔗", link) { context.openLink(link) }
+                AttachmentRow(R.drawable.ic_link, link) { context.openLink(link) }
             }
         }
     }
 }
 
+/** 첨부·링크 한 줄. 이모지 대신 벡터 아이콘 + 테두리 행으로 「누르는 항목」임을 분명히 한다. */
 @Composable
-private fun AttachmentRow(icon: String, label: String, onClick: () -> Unit) {
+private fun AttachmentRow(icon: Int, label: String, onClick: () -> Unit) {
     val colors = LocalKidhackColors.current
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(colors.surface)
+            .clip(RoundedCornerShape(11.dp))
+            .background(colors.card)
+            .border(1.dp, colors.border, RoundedCornerShape(11.dp))
             .clickable(onClick = onClick)
-            .padding(8.dp),
+            .padding(horizontal = 13.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(icon, fontSize = 14.sp)
-        Spacer(Modifier.width(8.dp))
-        Text(label, fontSize = 13.sp, color = colors.brand, maxLines = 1)
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = colors.brand,
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            label,
+            fontSize = 12.5.sp,
+            color = colors.text,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(8.dp))
 }

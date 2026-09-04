@@ -33,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
 import com.hack.kidhack.core.designsystem.component.KidSwitch
 import com.hack.kidhack.core.designsystem.component.WheelGuides
 import com.hack.kidhack.core.designsystem.component.WheelPicker
@@ -296,33 +297,34 @@ fun ParentScreenTimeScreen(
 }
 
 /** 화면 맨 위 제목 줄. 뒤로가기는 왼쪽 끝, 제목은 가운데. */
+/** 카드관리 등 다른 서브 페이지와 같은 헤더 규격 — 좌측 제목 18 Bold, 40dp ‹, 아래 구분선. */
 @Composable
 private fun TitleBar(title: String, onBack: () -> Unit) {
     val colors = LocalKidhackColors.current
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp),
-        contentAlignment = Alignment.Center,
+            .padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "‹",
+        Box(
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .clip(RoundedCornerShape(50))
-                .clickable(onClick = onBack)
-                .padding(horizontal = 18.dp, vertical = 2.dp),
-            color = colors.text,
-            fontSize = 26.sp,
-        )
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("‹", color = colors.text, fontSize = 26.sp)
+        }
         Text(
             text = title,
             fontFamily = KidhackFontFamily,
             fontWeight = FontBold,
-            fontSize = 17.sp,
+            fontSize = 18.sp,
             color = colors.text,
         )
     }
+    KidHeaderDivider()
 }
 
 /** 구역 사이를 가르는 실선. 카드로 감싸는 대신 선 하나로만 나눈다. */

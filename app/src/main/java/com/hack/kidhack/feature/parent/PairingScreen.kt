@@ -54,6 +54,7 @@ import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidLineBreak
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.data.remote.userMessage
 import com.hack.kidhack.domain.model.ChildProfile
@@ -194,7 +195,8 @@ fun ParentPairingScreen(
             .statusBarsPadding(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 2.dp),
+            // 카드관리 등 다른 서브 페이지와 같은 헤더 규격(위 12·아래 4).
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -210,10 +212,11 @@ fun ParentPairingScreen(
                 stringResource(R.string.parent_pairing_title),
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 color = colors.text,
             )
         }
+        KidHeaderDivider()
 
         Text(
             text = stringResource(R.string.parent_pairing_step, state.step + 1, 3),

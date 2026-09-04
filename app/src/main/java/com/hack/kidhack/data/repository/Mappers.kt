@@ -578,9 +578,9 @@ fun ChargeHistoryResponseDto.toDomain(): ChargeHistoryItem = ChargeHistoryItem(
 
 fun CardResponse.toDomain(): Card = Card(
     cardId = id.toString(),
-    last4 = maskedCardNumber.filter { it.isDigit() }.takeLast(4),
-    expiry = expiry,
-    ownerName = ownerName,
+    last4 = maskedCardNumber.orEmpty().filter { it.isDigit() }.takeLast(4),
+    expiry = expiry.orEmpty(),
+    ownerName = ownerName.orEmpty(),
 )
 
 fun QrIssueResponse.toDomain(): QrTicket = QrTicket(
