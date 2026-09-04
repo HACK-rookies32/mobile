@@ -2,6 +2,7 @@ package com.hack.kidhack.feature.child.pay
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,9 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,9 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -33,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
 import com.hack.kidhack.core.designsystem.component.KidButtonVariant
+import com.hack.kidhack.core.designsystem.component.KidLabeledSection
 import com.hack.kidhack.core.designsystem.component.KidSectionCard
 import com.hack.kidhack.core.designsystem.component.QrCode
 import com.hack.kidhack.core.designsystem.theme.FontBlack
@@ -48,7 +51,19 @@ import org.koin.androidx.compose.koinViewModel
  *
  * 자녀는 잔액 한도 안에서 **결제 QR** 을 띄우고, 매장 단말이 스캔·승인하면 결제가 완료된다.
  * 금액은 자녀가 정하지 않고 단말이 확정한다(보내기·회수는 부모 기능이라 여기 없다).
- * 하단 탭이므로 뒤로가기 헤더 대신 「페이」 제목만 둔다.
+ *
+ * <p>잔액을 흰 카드 위 숫자로만 두었더니 페이 화면인데 얼굴이 없었다. 잔액이 곧 이 화면의
+ * 주인공이므로 <b>색 있는 카드</b>로 세우고, 결제 QR 버튼을 그 안에 넣는다 — 결제는 잔액이
+ * 하는 일이지 따로 떠 있는 버튼이 아니다. 화면에서 색을 쓰는 곳은 이 카드 하나뿐이다.
+ *
+ * <p>바탕은 [Brand] 다. 이 앱에서 <b>채워진 면</b>은 버튼이든 말풍선이든 전부 이 색이고,
+ * [BrandDark] 는 흰 바탕 위 글자·아이콘 색으로만 쓴다. 한때 대비를 벌어 보려고 이 카드만
+ * BrandDark 로 깔았는데, 큰 면에 쓰이는 순간 홈과 다른 주황으로 보였다. 색은 한 벌로 보이는
+ * 것이 먼저다.
+ *
+ * <p>흰 글씨 대비는 2.6:1 로 WCAG 기준에 못 미친다. 이 앱의 주황 버튼(KidButton Primary)이
+ * 모두 같은 조건이라, 이 카드만 다르게 두면 화면이 갈라진다. 고치려면 [Brand] 자체를 한 단
+ * 내려야 한다 — 한 곳이 아니라 색 하나를 바꾸는 일이다.
  */
 @Composable
 fun ChildPayScreen(
@@ -73,34 +88,51 @@ fun ChildPayScreen(
     }
 
     ChildTabScaffold(title = stringResource(R.string.child_tab_pay)) {
-        // 잔액 — 깔끔한 흰 카드. 브랜드색은 결제 버튼에만 남기고 숫자는 먹색으로 차분하게.
-        KidSectionCard(contentPadding = PaddingValues(18.dp)) {
+        val ticket = state.ticket
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(colors.brand)
+                .padding(18.dp),
+        ) {
             Text(
                 stringResource(R.string.child_pay_balance_label),
-                color = colors.muted,
+                color = Color.White,
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
-                fontSize = 12.5.sp,
+                fontSize = 14.sp,
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.child_pay_balance_value, formatPoint(state.balance)),
-                color = colors.text,
+                color = Color.White,
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBlack,
                 fontSize = 30.sp,
             )
+            // QR 이 이미 떠 있으면 아래 카드가 그 일을 하고 있으므로 버튼을 두 번 두지 않는다.
+            if (ticket == null) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.child_pay_issue),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (state.issuing) colors.brandLight else colors.card)
+                        .clickable(enabled = !state.issuing, onClick = viewModel::issueQr)
+                        .padding(vertical = 14.dp),
+                    color = colors.brandDark,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 15.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
 
-        val ticket = state.ticket
         if (ticket == null) {
-            // QR 발급 버튼 — 이 화면의 유일한 브랜드색.
-            KidButton(
-                text = stringResource(R.string.child_pay_issue),
-                onClick = viewModel::issueQr,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !state.issuing,
-            )
             Text(
                 stringResource(R.string.child_pay_balance_note),
                 color = colors.muted,
@@ -138,12 +170,14 @@ fun ChildPayScreen(
                         color = colors.brand,
                         fontFamily = KidhackFontFamily,
                         fontWeight = FontBold,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         stringResource(R.string.child_pay_qr_hint),
                         color = colors.muted,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontSemibold,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center,
                     )
@@ -158,64 +192,73 @@ fun ChildPayScreen(
             }
         }
 
-        // 결제 내역
-        KidSectionCard(contentPadding = PaddingValues(16.dp)) {
-            Text(
-                stringResource(R.string.child_pay_history),
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 14.sp,
-                color = colors.text,
-            )
-            Spacer(Modifier.height(6.dp))
+        KidLabeledSection(
+            label = stringResource(R.string.child_pay_history),
+            contentPadding = PaddingValues(horizontal = 14.dp),
+        ) {
             if (state.history.isEmpty()) {
                 Text(
                     stringResource(R.string.child_pay_history_empty),
                     color = colors.muted,
                     fontFamily = KidhackFontFamily,
                     fontWeight = FontSemibold,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(vertical = 6.dp),
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(vertical = 14.dp),
                 )
             }
             state.history.forEachIndexed { index, item ->
                 val cancelled = item.status == "CANCELLED"
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 11.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // 같은 카드 아이콘을 줄마다 반복하면 아이콘이 줄을 구분해 주지 못한다.
+                    // 가게 이름 첫 글자가 훨씬 빨리 읽힌다.
                     Box(
                         modifier = Modifier
                             .size(34.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(colors.surface),
+                            .clip(CircleShape)
+                            .background(colors.line),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_card),
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = colors.muted,
+                        Text(
+                            item.storeName.trim().take(1).ifBlank { "?" },
+                            color = if (cancelled) colors.subtle else colors.muted,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 13.sp,
                         )
                     }
-                    Spacer(Modifier.size(12.dp))
+                    Spacer(Modifier.width(11.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             item.storeName,
                             fontFamily = KidhackFontFamily,
                             fontWeight = FontBold,
                             fontSize = 14.sp,
-                            color = colors.text,
+                            color = if (cancelled) colors.subtle else colors.text,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                        Text(item.paidAtLabel, color = colors.subtle, fontSize = 11.5.sp)
+                        Spacer(Modifier.height(1.dp))
+                        Text(
+                            item.paidAtLabel,
+                            color = colors.subtle,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontSemibold,
+                            fontSize = 12.sp,
+                        )
                     }
+                    Spacer(Modifier.width(8.dp))
                     Text(
-                        text = if (cancelled) stringResource(R.string.child_pay_cancelled) else "-" + formatPoint(item.amount) + "원",
+                        text = if (cancelled) {
+                            stringResource(R.string.child_pay_cancelled)
+                        } else {
+                            stringResource(R.string.child_pay_amount_spent, formatPoint(item.amount))
+                        },
                         color = if (cancelled) colors.subtle else colors.text,
                         fontFamily = KidhackFontFamily,
-                        fontWeight = FontBlack,
+                        fontWeight = FontBold,
                         fontSize = 14.sp,
                     )
                 }

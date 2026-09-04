@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import com.hack.kidhack.R
 import com.hack.kidhack.background.ChildNotifications
 import com.hack.kidhack.background.command.ChildCommandNotifier
+import com.hack.kidhack.data.local.ChildCaptureStore
 import com.hack.kidhack.domain.model.CommandAckStatus
 import com.hack.kidhack.domain.repository.CommandRepository
 import com.hack.kidhack.domain.repository.ScreenshotRepository
@@ -33,8 +34,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
-import java.io.File
-import java.io.FileOutputStream
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -56,6 +55,7 @@ class ScreenCaptureService : Service() {
     private val sessionRepository: SessionRepository by inject()
     private val commandRepository: CommandRepository by inject()
     private val notifier: ChildCommandNotifier by inject()
+    private val captureStore: ChildCaptureStore by inject()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val handled = AtomicBoolean(false)
@@ -173,16 +173,15 @@ class ScreenCaptureService : Service() {
     private fun uploadAndFinish(bitmap: Bitmap) {
         scope.launch {
             val childId = sessionRepository.current()?.user?.id.orEmpty()
-            val capturedAt = Instant.now().toString()
-            val file = File(cacheDir, "capture-" + System.currentTimeMillis() + ".jpg")
+            val capturedMillis = System.currentTimeMillis()
+            val capturedAt = Instant.ofEpochMilli(capturedMillis).toString()
+            // 기기에 남긴 사본이 곧 자녀 화면의 「캡처 내역」이다(서버 목록은 부모 전용).
+            // 업로드도 이 파일로 하므로 사본을 두 번 만들지 않는다. 지우지 않는다.
+            val file = captureStore.save(bitmap, capturedMillis, trigger)
             val ok = runCatching {
-                FileOutputStream(file).use { out ->
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
-                }
                 screenshotRepository.upload(childId, file, capturedAt, trigger)
             }.isSuccess
             bitmap.recycle()
-            runCatching { file.delete() }
 
             if (requestId.isNotBlank()) notifier.cancel(requestId)
             ackIfRemote(childId, if (ok) CommandAckStatus.DONE else CommandAckStatus.FAILED)
@@ -249,7 +248,6 @@ class ScreenCaptureService : Service() {
 
         private const val VIRTUAL_DISPLAY_NAME = "kidhack-screen"
         private const val IMAGE_BUFFER_SIZE = 2
-        private const val JPEG_QUALITY = 80
 
         fun startCapture(
             context: Context,

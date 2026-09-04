@@ -17,11 +17,15 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
@@ -67,6 +71,10 @@ fun ChildTabScaffold(
                 fontWeight = FontBlack,
                 fontSize = 21.sp,
                 color = colors.text,
+                // 오른쪽에 붙는 것이 많은 탭에서 제목이 두 줄로 접히면 헤더 높이가 탭마다
+                // 달라진다. 탭을 옮길 때 제목이 들썩이는 것보다는 말줄임이 낫다.
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             action?.invoke(this)
         }
@@ -94,6 +102,13 @@ fun ChildSubScaffold(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     action: (@Composable RowScope.() -> Unit)? = null,
+    /**
+     * 화면 맨 아래에 붙박이로 앉는 줄. 「저장」·「연결하기」처럼 그 화면의 결론이 되는 버튼용이다.
+     *
+     * <p>스크롤 안에 두면 폼이 길어질 때 버튼이 화면 밖으로 사라져, 다 채우고도 어디를 눌러야
+     * 하는지 찾아 내려가야 한다. 키보드가 올라오면 이 줄도 함께 올라온다.
+     */
+    bottomBar: (@Composable () -> Unit)? = null,
     scrollable: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -141,5 +156,18 @@ fun ChildSubScaffold(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             content = content,
         )
+        if (bottomBar != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.card)
+                    // 탭 껍데기가 이미 비워 둔 만큼은 소비됐으므로 모자란 만큼만 더한다.
+                    .imePadding()
+                    .navigationBarsPadding(),
+            ) {
+                HorizontalDivider(thickness = 1.dp, color = colors.border)
+                Column(modifier = Modifier.padding(16.dp)) { bottomBar() }
+            }
+        }
     }
 }

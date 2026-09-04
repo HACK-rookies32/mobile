@@ -7,6 +7,9 @@ import com.hack.kidhack.background.usage.AppUsageCollector
 import com.hack.kidhack.background.usage.ScreenTimeWatcher
 import com.hack.kidhack.data.local.ChildAlertStore
 import com.hack.kidhack.domain.model.AppNotification
+import com.hack.kidhack.domain.model.AppUsage
+import com.hack.kidhack.domain.repository.AppControlRepository
+import com.hack.kidhack.domain.repository.childId
 import com.hack.kidhack.domain.repository.notificationRecipientId
 import com.hack.kidhack.domain.repository.NotificationRepository
 import com.hack.kidhack.domain.repository.SessionRepository
@@ -32,6 +35,33 @@ data class HomeServiceRow(
     val settingsAction: String? = null,
 )
 
+/**
+ * 부모가 걸어 둔 앱 규칙 한 줄 — 「무엇이 어느 기준이고 얼마나 썼는지」.
+ *
+ * <p>서버 규약상 하루 한도 0분이 곧 완전 차단이다([blocked]). 규칙이 있는데 아직 안 쓴 앱도
+ * 목록에 남긴다 — 규칙이 걸려 있다는 사실은 쓰기 전에 알아야 쓸모가 있다.
+ */
+data class RuledAppRow(
+    val name: String,
+    /** 기기에 깔린 앱 아이콘을 찾는 열쇠. 안 깔린 앱이면 못 찾는다. */
+    val packageName: String,
+    /** 부모가 정한 하루 한도(분). 0 이면 아예 못 쓰는 앱. */
+    val limitMinutes: Int,
+    val usedMinutes: Int,
+    /** 사용 기록 권한이 꺼져 있어 실제로 얼마나 썼는지 못 읽은 상태. */
+    val usageKnown: Boolean = true,
+) {
+    val blocked: Boolean get() = limitMinutes <= 0
+
+    /** 한도를 채웠거나 넘겼는지. */
+    val over: Boolean get() = !blocked && usageKnown && usedMinutes >= limitMinutes
+
+    /** 막대 길이. 차단된 앱은 잴 것이 없다. */
+    val fraction: Float
+        get() = if (blocked || !usageKnown) 0f
+        else (usedMinutes.toFloat() / limitMinutes).coerceIn(0f, 1f)
+}
+
 data class HomeAlertRow(
     val message: String,
     val time: String,
@@ -52,7 +82,9 @@ data class ChildHomeUiState(
     /** 부모가 서버에 정한 하루 총 사용 한도(분). 없으면 null 이라 「남은 시간」을 적지 않는다. */
     val limitMinutes: Int? = null,
     /** 오늘 앱별 사용 — 자녀가 「내가 뭘 얼마나 썼는지」 직접 본다. 많이 쓴 순. */
-    val usages: List<com.hack.kidhack.domain.model.AppUsage> = emptyList(),
+    val usages: List<AppUsage> = emptyList(),
+    /** 부모가 한도·차단을 걸어 둔 앱. 규칙이 없으면 비어 있다. */
+    val ruledApps: List<RuledAppRow> = emptyList(),
     val protectedNow: Boolean = false,
     val services: List<HomeServiceRow> = emptyList(),
     val alerts: List<HomeAlertRow> = emptyList(),
@@ -72,6 +104,17 @@ data class ChildHomeUiState(
     val needsAttention: List<HomeServiceRow>
         get() = services.filter { !it.active && it.settingsAction != null }
 
+    /**
+     * 규칙이 걸리지 <b>않은</b> 앱의 사용량.
+     *
+     * <p>규칙 있는 앱은 위쪽 「약속한 앱」에서 한도와 함께 보여 주므로, 아래 「많이 쓴 앱」에
+     * 다시 적으면 같은 앱이 한 화면에 두 번 나온다.
+     */
+    val otherUsages: List<AppUsage>
+        get() {
+            val ruled = ruledApps.map { it.name }.toSet()
+            return usages.filterNot { it.appName in ruled }
+        }
 }
 
 /**
@@ -83,6 +126,7 @@ data class ChildHomeUiState(
 class ChildHomeViewModel(
     private val sessionRepository: SessionRepository,
     private val usageCollector: AppUsageCollector,
+    private val appControlRepository: AppControlRepository,
     private val notificationRepository: NotificationRepository,
     private val deviceStatus: ChildDeviceStatus,
     private val alertStore: ChildAlertStore,
@@ -112,6 +156,10 @@ class ChildHomeViewModel(
             // 하루 총 한도(부모가 서버에 설정)를 한 번 읽어 화면에 남은 시간을 보여 준다.
             val limitMinutes = runCatching { screenTimeWatcher.refreshLimit() }.getOrNull()
 
+            // 앱별 규칙. 지금까지 이 값을 읽는 곳은 접근성 서비스뿐이라, 아이는 무엇이 얼마로
+            // 묶여 있는지 <b>막히고 나서야</b> 알았다. 홈에서 미리 보여 준다.
+            val ruledApps = buildRuledApps(usage)
+
             // 한도 도달을 여기서도 확인한다(시간당 워커만 믿으면 최대 1시간 늦게 뜬다).
             screenTimeWatcher.check(usedMinutes)
 
@@ -130,6 +178,7 @@ class ChildHomeViewModel(
                     usedMinutes = usedMinutes,
                     limitMinutes = limitMinutes,
                     usages = usage.usages,
+                    ruledApps = ruledApps,
                     protectedNow = locationOn || harmfulOn,
                     services = listOf(
                         HomeServiceRow(
@@ -172,6 +221,41 @@ class ChildHomeViewModel(
                 )
             }
         }
+    }
+
+    /**
+     * 규칙 × 오늘 사용량을 잇는다.
+     *
+     * <p>기준은 패키지명이다. 다만 「사용정보 접근」이 꺼져 있으면 기기에서 못 읽어 서버
+     * 대체값이 오는데 거기엔 패키지명이 없다 — 그때만 앱 이름으로 맞춰 보고, 그것도 없으면
+     * 사용량을 <b>모른다</b>고 표시한다(0분으로 적으면 다 쓴 앱을 안 쓴 것처럼 보여 준다).
+     */
+    private suspend fun buildRuledApps(usage: AppUsageCollector.Result): List<RuledAppRow> {
+        val id = sessionRepository.childId().takeIf { it.isNotBlank() } ?: return emptyList()
+        val rules = runCatching { appControlRepository.items(id) }.getOrDefault(emptyList())
+            // dailyLimitMinutes 가 null 이면 「제한 없음」이라 보여 줄 기준이 없다.
+            .filter { it.enabled && it.dailyLimitMinutes != null }
+        if (rules.isEmpty()) return emptyList()
+
+        val byPackage = usage.usages
+            .mapNotNull { u -> u.packageName?.let { it to u.durationSec / 60 } }
+            .toMap()
+        val byName = usage.usages.associate { it.appName to it.durationSec / 60 }
+
+        return rules
+            .map { rule ->
+                val minutes = byPackage[rule.packageName] ?: byName[rule.name]
+                RuledAppRow(
+                    name = rule.name,
+                    packageName = rule.packageName,
+                    limitMinutes = rule.dailyLimitMinutes ?: 0,
+                    usedMinutes = minutes ?: 0,
+                    // 기기에서 실측했다면 목록에 없는 앱은 진짜로 0분이다.
+                    usageKnown = usage.fromDevice || minutes != null,
+                )
+            }
+            // 아예 못 쓰는 앱은 잴 것이 없으니 맨 아래로, 나머지는 많이 쓴 순으로.
+            .sortedWith(compareBy({ it.blocked }, { -it.usedMinutes }))
     }
 
     private fun usageDesc(tracked: Boolean, count: Int): String = when {

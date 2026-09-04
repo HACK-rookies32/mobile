@@ -8,17 +8,35 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,22 +62,35 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hack.kidhack.R
 import com.hack.kidhack.core.designsystem.component.KidButton
-import com.hack.kidhack.core.designsystem.component.KidButtonVariant
-import com.hack.kidhack.core.designsystem.component.KidCard
+import com.hack.kidhack.core.designsystem.component.KidHeaderDivider
+import com.hack.kidhack.core.designsystem.component.KidSectionCard
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.core.permission.KidhackPermissions
-import com.hack.kidhack.feature.child.components.ChildScreenScaffold
 import com.hack.kidhack.permissionRequester
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 
 /**
  * Single-screen permission list. Runtime permissions use [PermissionRequester]
- * (Activity-registered) so the system dialog is shown. Deny → tap 「허용하기」 again.
+ * (Activity-registered) so the system dialog is shown. Deny → tap 「허용」 again.
+ *
+ * <p>로그인 바로 다음에 나오는 화면이라 로그인과 같은 껍데기를 쓴다 — 흰 배경에 왼쪽 정렬,
+ * 오버라인 + 큰 제목. 전에는 주황 그라데이션 히어로 아래 겹치는 시트였는데, 그 규격은 앱
+ * 나머지가 이미 버린 것이라 로그인에서 넘어오는 순간 다른 앱처럼 보였다.
+ *
+ * <p>상태는 <b>회색 → 주황</b> 한 갈래로만 말한다. 아직인 줄은 회색 아이콘, 허용된 줄은 주황
+ * 아이콘에 주황 체크. 색이 하나라 "주황이 다 찼으면 끝"이 한눈에 읽히고, 위쪽 진행 바가 차는
+ * 것과 같은 이야기를 한다. 색맹이어도 구분되도록 체크 <b>모양</b>과 「허용됨」 <b>글자</b>가
+ * 함께 붙는다.
+ *
+ * <p>주황은 오로지 「됐다」는 뜻으로만 쓴다. 아직인 줄은 오른쪽 「허용 ›」·「설정 ↗」까지
+ * 회색이다 — 색으로 재촉하지 않아도 목록에서 주황이 안 찬 자리가 곧 할 일이고, 진행 바가
+ * 몇 개 남았는지 세어 준다. 누를 수 있다는 신호는 색이 아니라 <b>화살표 모양</b>과 눌렀을
+ * 때의 물결이 맡는다.
  */
 @Composable
 fun ChildPermissionWizard(
@@ -136,7 +168,7 @@ fun ChildPermissionWizard(
                 }
                 else -> Unit
             }
-            if (item.required) viewModel.denyOrMissingRequired()
+            if (item.required) viewModel.denyOrMissingRequired(item.key)
         }
     }
 
@@ -174,8 +206,8 @@ fun ChildPermissionWizard(
     val allRequiredGranted = KidhackPermissions.hasAllRequiredForChildControl(context)
     val activity = KidhackPermissions.findActivity(context)
 
-    fun openPermissionSettings() {
-        viewModel.notifyPermissionBlocked()
+    fun openPermissionSettings(key: String?) {
+        viewModel.notifyPermissionBlocked(key)
         runCatching {
             settingsLauncher.launch(KidhackPermissions.appDetailsSettingsIntent(context))
         }
@@ -193,7 +225,7 @@ fun ChildPermissionWizard(
             needed.isNotEmpty() &&
             KidhackPermissions.shouldOpenSettingsForAny(act, *needed)
         ) {
-            openPermissionSettings()
+            openPermissionSettings(item.key)
             return
         }
         permissions.request(
@@ -214,7 +246,7 @@ fun ChildPermissionWizard(
                             KidhackPermissions.locationFine,
                         )
                     ) {
-                        openPermissionSettings()
+                        openPermissionSettings(item.key)
                     } else {
                         permissions.requestOne(KidhackPermissions.locationFine) {
                             afterRuntimeAttempt(item)
@@ -255,7 +287,7 @@ fun ChildPermissionWizard(
                 if (act != null &&
                     KidhackPermissions.shouldOpenSettingsForPermission(act, permission)
                 ) {
-                    openPermissionSettings()
+                    openPermissionSettings(item.key)
                     return
                 }
                 permissions.requestOne(permission) {
@@ -265,7 +297,7 @@ fun ChildPermissionWizard(
             OnboardingPermissionKind.SettingsUsage -> {
                 runCatching {
                     settingsLauncher.launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                }.onFailure { viewModel.denyOrMissingRequired() }
+                }.onFailure { viewModel.denyOrMissingRequired(item.key) }
             }
             OnboardingPermissionKind.SettingsOverlay -> {
                 runCatching {
@@ -275,18 +307,18 @@ fun ChildPermissionWizard(
                             Uri.parse("package:${context.packageName}"),
                         ),
                     )
-                }.onFailure { viewModel.denyOrMissingRequired() }
+                }.onFailure { viewModel.denyOrMissingRequired(item.key) }
             }
             OnboardingPermissionKind.SettingsAccessibility -> {
                 runCatching {
                     settingsLauncher.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                }.onFailure { viewModel.denyOrMissingRequired() }
+                }.onFailure { viewModel.denyOrMissingRequired(item.key) }
             }
             OnboardingPermissionKind.SettingsAppDetails -> {
                 viewModel.clearError()
                 runCatching {
                     settingsLauncher.launch(KidhackPermissions.appDetailsSettingsIntent(context))
-                }.onFailure { viewModel.denyOrMissingRequired() }
+                }.onFailure { viewModel.denyOrMissingRequired(item.key) }
             }
             OnboardingPermissionKind.MediaProjection -> {
                 if (KidhackPermissions.hasScreenCaptureConsent(context)) {
@@ -296,12 +328,12 @@ fun ChildPermissionWizard(
                 val projectionManager =
                     context.getSystemService(MediaProjectionManager::class.java)
                 if (projectionManager == null) {
-                    viewModel.denyOrMissingRequired()
+                    viewModel.denyOrMissingRequired(item.key)
                     return
                 }
                 runCatching {
                     mediaProjectionLauncher.launch(projectionManager.createScreenCaptureIntent())
-                }.onFailure { viewModel.denyOrMissingRequired() }
+                }.onFailure { viewModel.denyOrMissingRequired(item.key) }
             }
         }
     }
@@ -366,149 +398,325 @@ fun ChildPermissionWizard(
         )
     }
 
-    ChildScreenScaffold(
-        header = {
+    val totalCount = state.items.size
+    val grantedCount = state.items.count { isGranted(it) }
+    val requiredRemaining = state.items.count { it.required && !isGranted(it) }
+    val progress by animateFloatAsState(
+        targetValue = if (totalCount == 0) 0f else grantedCount.toFloat() / totalCount,
+        animationSpec = tween(durationMillis = 320),
+        label = "onboardingProgress",
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.card)
+            // 상태 표시줄과 제스처 바를 한 번에 피한다. 하단 버튼이 고정이라 특히 아래쪽이 중요하다.
+            .windowInsetsPadding(WindowInsets.safeDrawing),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(top = 18.dp, bottom = 14.dp),
+        ) {
+            Text(
+                text = "ROOKIES",
+                color = colors.brand,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 11.sp,
+                letterSpacing = 1.5.sp,
+            )
+            Spacer(Modifier.height(10.dp))
             Text(
                 text = stringResource(titleRes),
-                color = Color.White,
+                color = colors.text,
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBlack,
                 fontSize = 24.sp,
             )
+            Spacer(Modifier.height(6.dp))
             Text(
-                text = stringResource(subtitleRes),
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = 14.sp,
+                text = stringResource(subtitleRes, totalCount),
+                color = colors.muted,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontSemibold,
+                fontSize = 13.sp,
             )
-        },
-    ) {
-        state.items.forEach { item ->
-            val isBackgroundLocation =
-                item.runtimePermission == KidhackPermissions.backgroundLocation
-            val needsForegroundFirst =
-                isBackgroundLocation && !foregroundLocationGranted && !isGranted(item)
-            PermissionRow(
-                item = item,
-                granted = isGranted(item),
-                // Keep clickable so the warning dialog can show (disabled buttons swallow taps).
-                allowEnabled = true,
-                lockedHint = if (needsForegroundFirst) {
-                    stringResource(R.string.child_onboarding_bg_need_location_hint)
-                } else {
-                    null
-                },
-                onAllow = { requestItem(item) },
-            )
-        }
-
-        if (state.error != null) {
-            Text(state.error.orEmpty(), color = colors.danger, fontSize = 13.sp)
-        }
-
-        KidButton(
-            text = stringResource(continueRes),
-            onClick = {
-                if (KidhackPermissions.hasAllRequiredForChildControl(context)) {
-                    viewModel.finish()
-                } else {
-                    viewModel.denyOrMissingRequired()
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = allRequiredGranted,
-        )
-        Spacer(Modifier.height(8.dp))
-    }
-}
-
-@Composable
-private fun PermissionRow(
-    item: OnboardingStep,
-    granted: Boolean,
-    onAllow: () -> Unit,
-    allowEnabled: Boolean = true,
-    lockedHint: String? = null,
-) {
-    val colors = LocalKidhackColors.current
-    KidCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(stringResource(item.emojiRes), fontSize = 28.sp)
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(colors.line),
                 ) {
-                    Text(
-                        text = stringResource(item.titleRes),
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBold,
-                        fontSize = 15.sp,
-                        color = colors.text,
-                    )
-                    Text(
-                        text = stringResource(
-                            if (item.required) {
-                                R.string.child_onboarding_required_badge
-                            } else {
-                                R.string.child_onboarding_optional_badge
-                            },
-                        ),
-                        color = if (item.required) colors.danger else colors.muted,
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontBold,
-                        fontSize = 11.sp,
+                    Box(
+                        Modifier
+                            .fillMaxWidth(progress)
+                            .fillMaxHeight()
+                            .background(colors.brand),
                     )
                 }
+                Spacer(Modifier.width(10.dp))
                 Text(
-                    text = stringResource(item.bodyRes),
+                    text = stringResource(
+                        R.string.child_onboarding_progress,
+                        grantedCount,
+                        totalCount,
+                    ),
                     color = colors.muted,
                     fontFamily = KidhackFontFamily,
-                    fontWeight = FontSemibold,
-                    fontSize = 12.sp,
+                    fontWeight = FontBold,
+                    fontSize = 11.sp,
                 )
-                if (lockedHint != null) {
-                    Spacer(Modifier.height(4.dp))
+            }
+        }
+        KidHeaderDivider()
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .background(colors.surface)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            OnboardingGroup.entries.forEach { group ->
+                val rows = state.items.filter { it.group == group }
+                if (rows.isEmpty()) return@forEach
+                PermissionGroup(titleRes = group.titleRes) {
+                    rows.forEachIndexed { index, item ->
+                        val isBackgroundLocation =
+                            item.runtimePermission == KidhackPermissions.backgroundLocation
+                        val granted = isGranted(item)
+                        val needsForegroundFirst =
+                            isBackgroundLocation && !foregroundLocationGranted && !granted
+                        PermissionRow(
+                            item = item,
+                            granted = granted,
+                            showDivider = index != rows.lastIndex,
+                            hint = when {
+                                needsForegroundFirst ->
+                                    stringResource(R.string.child_onboarding_bg_need_location_hint)
+                                state.errorKey == item.key -> state.error
+                                else -> null
+                            },
+                            onAllow = { requestItem(item) },
+                        )
+                    }
+                }
+            }
+        }
+
+        Column(modifier = Modifier.fillMaxWidth().background(colors.card)) {
+            HorizontalDivider(thickness = 1.dp, color = colors.border)
+            Column(modifier = Modifier.padding(16.dp)) {
+                // 어느 줄 이야기인지 못 가리는 오류만 여기 남는다. 나머지는 그 줄 아래 붙는다.
+                if (state.error != null && state.errorKey == null) {
                     Text(
-                        text = lockedHint,
+                        text = state.error.orEmpty(),
                         color = colors.danger,
                         fontFamily = KidhackFontFamily,
                         fontWeight = FontSemibold,
                         fontSize = 12.sp,
                     )
+                    Spacer(Modifier.height(10.dp))
                 }
+                KidButton(
+                    // 꺼진 버튼이 왜 꺼졌는지 스스로 말한다. 「시작하기」만 회색으로 두면
+                    // 무엇이 모자란지 화면 어디에도 적혀 있지 않다.
+                    text = if (allRequiredGranted) {
+                        stringResource(continueRes)
+                    } else {
+                        stringResource(
+                            R.string.child_onboarding_remaining,
+                            requiredRemaining.coerceAtLeast(1),
+                        )
+                    },
+                    onClick = {
+                        if (KidhackPermissions.hasAllRequiredForChildControl(context)) {
+                            viewModel.finish()
+                        } else {
+                            viewModel.denyOrMissingRequired()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = allRequiredGranted,
+                )
+            }
+        }
+    }
+}
+
+/** 묶음 제목 + 그 아래 줄들을 담은 흰 카드. */
+@Composable
+private fun PermissionGroup(
+    @StringRes titleRes: Int,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = LocalKidhackColors.current
+    Column {
+        Text(
+            text = stringResource(titleRes),
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            color = colors.subtle,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 11.sp,
+            letterSpacing = 0.3.sp,
+        )
+        // 줄이 카드 폭을 다 쓰도록 카드 안쪽 여백을 없앤다. 여백은 줄이 스스로 갖는다.
+        KidSectionCard(contentPadding = PaddingValues(0.dp), content = content)
+    }
+}
+
+/** 아이콘 · 이름 · 상태 한 줄. 줄 전체가 누를 수 있는 자리다. */
+@Composable
+private fun PermissionRow(
+    item: OnboardingStep,
+    granted: Boolean,
+    showDivider: Boolean,
+    onAllow: () -> Unit,
+    hint: String? = null,
+) {
+    val colors = LocalKidhackColors.current
+    val opensSettingsApp = when (item.kind) {
+        OnboardingPermissionKind.SettingsUsage,
+        OnboardingPermissionKind.SettingsOverlay,
+        OnboardingPermissionKind.SettingsAccessibility,
+        OnboardingPermissionKind.SettingsAppDetails,
+        -> true
+        else -> false
+    }
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                // 허용된 줄은 더 할 일이 없다. 아직인 줄은 잠긴 것처럼 보여도 눌러야
+                // 「먼저 위치부터」 안내가 뜨므로 계속 눌린다.
+                .clickable(enabled = !granted, onClick = onAllow)
+                .heightIn(min = 56.dp)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (granted) colors.brandLight else colors.line),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(item.iconRes),
+                    // 바로 옆에 이름이 적혀 있다. 읽어 주면 같은 말을 두 번 하게 된다.
+                    contentDescription = null,
+                    tint = if (granted) colors.brand else colors.muted,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(item.titleRes),
+                        color = colors.text,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 14.sp,
+                    )
+                    // 「필수」는 거의 모든 줄에 붙어 아무것도 못 가린다. 예외만 말한다.
+                    if (!item.required) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.child_onboarding_optional_badge),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(colors.line)
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                            color = colors.subtle,
+                            fontFamily = KidhackFontFamily,
+                            fontWeight = FontBold,
+                            fontSize = 10.sp,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = if (granted) {
+                        stringResource(R.string.child_onboarding_granted)
+                    } else {
+                        stringResource(item.bodyRes)
+                    },
+                    color = if (granted) colors.subtle else colors.muted,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontSemibold,
+                    fontSize = 12.sp,
+                )
             }
             Spacer(Modifier.width(8.dp))
             if (granted) {
-                Text(
-                    text = stringResource(R.string.child_onboarding_granted),
-                    color = colors.brand,
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBold,
-                    fontSize = 13.sp,
+                Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(colors.brandLight)
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                )
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(colors.brand),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_check),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(13.dp),
+                    )
+                }
             } else {
-                KidButton(
-                    text = when (item.kind) {
-                        OnboardingPermissionKind.SettingsUsage,
-                        OnboardingPermissionKind.SettingsOverlay,
-                        OnboardingPermissionKind.SettingsAccessibility,
-                        OnboardingPermissionKind.SettingsAppDetails,
-                        -> stringResource(R.string.child_onboarding_settings)
-                        else -> stringResource(R.string.child_onboarding_allow)
-                    },
-                    onClick = onAllow,
-                    variant = KidButtonVariant.Secondary,
-                    enabled = allowEnabled,
-                )
+                // 아직인 줄은 오른쪽 글자까지 회색이다. 주황은 오로지 「됐다」는 뜻으로만 쓴다.
+                // 누를 수 있다는 신호는 색이 아니라 화살표 모양과 눌렀을 때의 물결이 맡는다.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (opensSettingsApp) {
+                            stringResource(R.string.child_onboarding_settings)
+                        } else {
+                            stringResource(R.string.child_onboarding_allow)
+                        },
+                        color = colors.muted,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 13.sp,
+                    )
+                    Spacer(Modifier.width(3.dp))
+                    // 설정 앱으로 나간다 vs 이 화면에 팝업이 뜬다 — 화살표가 그 차이를 말한다.
+                    Text(
+                        text = if (opensSettingsApp) "↗" else "›",
+                        color = colors.subtle,
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 14.sp,
+                    )
+                }
             }
+        }
+        if (hint != null) {
+            Text(
+                text = hint,
+                modifier = Modifier.padding(start = 64.dp, end = 16.dp, bottom = 10.dp),
+                color = colors.danger,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontSemibold,
+                fontSize = 12.sp,
+            )
+        }
+        if (showDivider) {
+            // 아이콘(36) + 사이(12) + 카드 여백(16) — 글자 시작점에 맞춰 들여 긋는다.
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 64.dp),
+                thickness = 1.dp,
+                color = colors.line,
+            )
         }
     }
 }

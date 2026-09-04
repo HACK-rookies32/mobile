@@ -11,7 +11,13 @@ val Safe = Color(0xFF16A34A)
 val Warn = Color(0xFFF59E0B)
 val Danger = Color(0xFFDC2626)
 val Info = Color(0xFF2563EB)
-val Surface = Color(0xFFF7F8FA)
+/**
+ * 카드가 얹히는 캔버스.
+ *
+ * <p>전에는 #F7F8FA 였는데 흰 카드(#FFFFFF)와 밝기가 거의 같아, 카드가 그림자 1.5dp 하나로만
+ * 겨우 떠 있었다. 한 단 내려서 카드 경계가 그림자 없이도 읽히게 한다.
+ */
+val Surface = Color(0xFFF2F4F7)
 val Card = Color(0xFFFFFFFF)
 val Border = Color(0xFFE5E7EB)
 val Muted = Color(0xFF6B7280)

@@ -406,6 +406,7 @@
     <string name="parent_contact_photo_count">사진 %1$d장</string>
     <string name="parent_contact_answer_from">루키즈 고객센터</string>
     <string name="parent_contact_received">%1$s 접수</string>
+    <string name="parent_contact_answered_at">%1$s 답변</string>
     <string name="parent_contact_title">관리자 문의</string>
 
     <string name="parent_pay_title">루키즈 페이</string>

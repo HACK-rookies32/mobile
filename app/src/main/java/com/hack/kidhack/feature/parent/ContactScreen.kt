@@ -628,95 +628,107 @@ private fun ColumnScope.InquiryDetailBody(
         return
     }
 
-    Box(Modifier.padding(start = 22.dp, top = 6.dp)) { AnswerState(answered = detail.answered) }
-    Text(
-        detail.title,
-        modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 12.dp),
-        fontFamily = KidhackFontFamily,
-        fontWeight = FontBlack,
-        fontSize = 21.sp,
-        lineHeight = 29.sp,
-        letterSpacing = (-0.7).sp,
-        color = colors.text,
-        style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
-    )
-    // 기다리는 사람이 알고 싶은 것은 「얼마나 지났나」다. 「답변을 기다리는 중입니다」보다
-    // 접수된 날짜가 쓸모 있다.
-    Text(
-        stringResource(R.string.parent_contact_received, detail.createdAt.toDisplayDate()),
-        modifier = Modifier.padding(start = 22.dp, top = 9.dp),
-        color = colors.subtle,
-        fontSize = 11.5.sp,
-        fontWeight = FontSemibold,
-    )
-    Text(
-        detail.content,
-        modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 18.dp),
-        color = colors.text,
-        fontSize = 14.5.sp,
-        lineHeight = 26.sp,
-        style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
-    )
+    // 질문 한 덩이 — 상태 배지 · 제목 · 접수일 · <구분선> · 본문 · 첨부를 흰 카드 하나에 담는다.
+    // 전에는 이 모두가 회색 캔버스에 여백만으로 흘러, 제목(21 Black)과 본문(14.5)이 크기 차이로만
+    // 갈렸다. 카드가 경계를 만들고, 제목과 본문 사이 얇은 실선이 「여기까지 제목」을 못박는다.
+    KidSectionCard(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(18.dp),
+    ) {
+        StatusChip(answered = detail.answered)
+        Spacer(Modifier.height(12.dp))
+        // 제목은 21 Black -> 18 Bold 로 낮춘다. 21 은 헤더(화면 이름)만큼 커서, 본문으로 이어지는
+        // 글의 머리치고는 과했다.
+        Text(
+            detail.title,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 18.sp,
+            lineHeight = 25.sp,
+            letterSpacing = (-0.4).sp,
+            color = colors.text,
+            style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
+        )
+        Spacer(Modifier.height(8.dp))
+        // 자기 문의만 보므로 작성자는 적지 않는다. 기다리는 사람이 알고 싶은 건 「언제 접수됐나」다.
+        Text(
+            stringResource(R.string.parent_contact_received, detail.createdAt.toDisplayDate()),
+            color = colors.subtle,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontSemibold,
+            fontSize = 12.sp,
+        )
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = colors.line)
+        Spacer(Modifier.height(16.dp))
+        Text(
+            detail.content,
+            color = colors.text,
+            fontSize = 14.5.sp,
+            lineHeight = 25.sp,
+            style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
+        )
 
-    if (detail.attachments.isNotEmpty()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 22.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            detail.attachments.forEach { path ->
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(RemoteUrl.absolute(path))
-                        .crossfade(true)
-                        .build(),
+        if (detail.attachments.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                detail.attachments.forEach { path ->
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(RemoteUrl.absolute(path))
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(88.dp).clip(RoundedCornerShape(12.dp)),
+                    )
+                }
+            }
+        }
+
+        if (!detail.linkUrl.isNullOrBlank()) {
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colors.surface)
+                    .clickable {
+                        val url = RemoteUrl.absolute(detail.linkUrl.filterNot { ch -> ch.isWhitespace() })
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                    }
+                    .padding(horizontal = 13.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_link),
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(104.dp).clip(RoundedCornerShape(14.dp)),
+                    modifier = Modifier.size(15.dp),
+                    tint = colors.muted,
+                )
+                Spacer(Modifier.width(9.dp))
+                Text(
+                    detail.linkUrl,
+                    color = colors.muted,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontBold,
+                    fontSize = 12.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
     }
 
-    if (!detail.linkUrl.isNullOrBlank()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 22.dp, end = 22.dp, top = 12.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(colors.card)
-                .clickable {
-                    val url = RemoteUrl.absolute(detail.linkUrl.filterNot { ch -> ch.isWhitespace() })
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-                }
-                .padding(horizontal = 13.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_link),
-                contentDescription = null,
-                modifier = Modifier.size(15.dp),
-                tint = colors.muted,
-            )
-            Spacer(Modifier.width(9.dp))
-            Text(
-                detail.linkUrl,
-                color = colors.muted,
-                fontFamily = KidhackFontFamily,
-                fontWeight = FontBold,
-                fontSize = 12.5.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-
-    // 답변이 달리면 서버가 수정·삭제를 막는다(400). 그때는 버튼을 감춘다.
+    // 답변이 달리면 서버가 수정/삭제를 막는다(400). 그때는 버튼을 감춘다.
     if (!detail.answered) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 22.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Text(
@@ -743,41 +755,90 @@ private fun ColumnScope.InquiryDetailBody(
             )
         }
     } else {
-        Spacer(Modifier.height(30.dp))
+        Spacer(Modifier.height(12.dp))
     }
 
     val answer = detail.answer
     if (answer != null) {
-        // 내 문의는 그냥 글로, 답변만 옅은 바탕에 담는다. 카드 두 장을 쌓으면 누가 한
-        // 말인지 제목을 읽어야 안다.
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(colors.card)
-                .padding(horizontal = 18.dp, vertical = 16.dp),
+        // 답변은 브랜드 연색 카드에 담아 내 질문(흰 카드)과 확실히 가른다. 고객센터 아바타 +
+        // 이름이 붙어, 카드 제목을 읽지 않아도 누가 한 말인지 안다.
+        KidSectionCard(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            containerColor = colors.brandLight,
+            contentPadding = PaddingValues(18.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.parent_contact_answer_from),
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBlack,
-                    fontSize = 12.5.sp,
-                    color = colors.text,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(answer.createdAt.toDisplayDate(), color = colors.subtle, fontSize = 11.sp, fontWeight = FontSemibold)
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(colors.brand),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_chat),
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp),
+                        tint = Color.White,
+                    )
+                }
+                Spacer(Modifier.width(9.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.parent_contact_answer_from),
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontBold,
+                        fontSize = 13.sp,
+                        color = colors.brandDark,
+                    )
+                    Spacer(Modifier.height(1.dp))
+                    Text(
+                        stringResource(R.string.parent_contact_answered_at, answer.createdAt.toDisplayDate()),
+                        color = colors.brandDark.copy(alpha = 0.7f),
+                        fontFamily = KidhackFontFamily,
+                        fontWeight = FontSemibold,
+                        fontSize = 11.sp,
+                    )
+                }
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             Text(
                 answer.content,
                 color = colors.text,
                 fontSize = 14.sp,
-                lineHeight = 25.sp,
+                lineHeight = 24.sp,
                 style = LocalTextStyle.current.copy(lineBreak = KidLineBreak),
             )
         }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+/**
+ * 답변 여부를 색 있는 알약으로. 색만으로 나누지 않도록 점 + 글자를 함께 둔다.
+ * 대기 = 호박색, 완료 = 초록.
+ */
+@Composable
+private fun StatusChip(answered: Boolean) {
+    val colors = LocalKidhackColors.current
+    val bg = if (answered) colors.safe.copy(alpha = 0.12f) else colors.warn.copy(alpha = 0.14f)
+    val fg = if (answered) colors.safe else colors.warn
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(bg)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(5.dp).clip(CircleShape).background(fg))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            stringResource(if (answered) R.string.parent_contact_answered else R.string.parent_contact_waiting),
+            color = fg,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 11.5.sp,
+        )
     }
 }
 

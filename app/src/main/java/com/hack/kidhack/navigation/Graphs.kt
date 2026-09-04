@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.Icon
@@ -289,9 +290,7 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
             )
         }
         childTab(Route.ChildHome.path, navController) {
-            ChildHomeScreen(
-                onScreenshot = { navController.navigate(Route.ChildScreenshot.path) },
-            )
+            ChildHomeScreen()
         }
         childTab(Route.ChildChat.path, navController) { ChildChatScreen() }
         childTab(Route.ChildServices.path, navController) { ChildServicesScreen() }
@@ -320,6 +319,7 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
             ChildMypageScreen(
                 onLinkParent = { navController.navigate(Route.ChildPairing.path) },
                 onEditProfile = { navController.navigate(Route.ChildProfileEdit.path) },
+                onScreenshots = { navController.navigate(Route.ChildScreenshot.path) },
                 onTerms = { navController.navigate(Route.ChildTerms.path) },
                 onNotice = { navController.navigate(Route.ChildNotice.path) },
             )
@@ -512,6 +512,16 @@ private fun TabShell(
             }
         },
     ) { padding ->
-        Box(Modifier.padding(padding)) { content() }
+        // padding 만 주고 끝내면, 그 안의 화면이 「아직 아무 인셋도 안 먹었다」고 알고 산다.
+        // 그래서 채팅 입력창이 imePadding 을 걸면 이미 비워 둔 탭 바 높이 위에 키보드 높이를
+        // 통째로 또 얹어, 입력창이 키보드보다 탭 바 하나만큼 더 떠올랐다.
+        //
+        // consumeWindowInsets 로 「여기까지는 내가 이미 비웠다」고 알려 주면, 아래 화면의
+        // imePadding 은 모자란 만큼만 더한다 — 탭 바가 보이든 접혔든 식이 같아진다.
+        Box(
+            Modifier
+                .padding(padding)
+                .consumeWindowInsets(padding),
+        ) { content() }
     }
 }

@@ -16,6 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.sp
+import com.hack.kidhack.core.designsystem.theme.FontBold
+import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 
 /**
@@ -49,17 +53,48 @@ fun KidSectionCard(
     modifier: Modifier = Modifier,
     // 줄이 스스로 좌우 여백을 갖는 목록(구분선을 카드 폭 끝까지)이면 PaddingValues(0) 을 넘긴다.
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
+    // 요청 배너처럼 색을 얹어야 하는 카드면 브랜드 연색을 넘긴다. null 이면 흰 카드.
+    containerColor: androidx.compose.ui.graphics.Color? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = LocalKidhackColors.current
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = colors.card,
+        color = containerColor ?: colors.card,
         // 은은하게만 띄운다 — 3dp 는 버튼처럼 그림자가 세 보였다.
         shadowElevation = 1.5.dp,
         tonalElevation = 0.dp,
     ) {
         Column(modifier = Modifier.padding(contentPadding), content = content)
+    }
+}
+
+/**
+ * 회색 캔버스 위 「라벨 → 카드」 한 덩이.
+ *
+ * <p>섹션 제목을 카드 <b>안</b>에 넣으면 카드가 어디서 시작하는지 경계가 흐려져, 화면을
+ * 훑을 때마다 눈이 다시 판단해야 한다. 제목을 카드 밖 작은 회색 글씨로 빼면 화면이
+ * 「라벨 → 카드」 리듬으로 읽힌다. 자녀·부모 탭이 모두 이 규칙을 쓴다.
+ */
+@Composable
+fun KidLabeledSection(
+    label: String,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = LocalKidhackColors.current
+    Column(modifier) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            color = colors.subtle,
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 11.sp,
+            letterSpacing = 0.3.sp,
+        )
+        KidSectionCard(contentPadding = contentPadding, content = content)
     }
 }

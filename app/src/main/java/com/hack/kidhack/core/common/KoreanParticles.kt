@@ -15,6 +15,13 @@ object KoreanParticles {
     /** 은/는 */
     fun topic(word: String): String = word + if (hasFinalConsonant(word)) "은" else "는"
 
+    /**
+     * 야/아 — 이름을 부를 때.
+     *
+     * 「지호야」/「민준아」. 받침이 있으면 「아」다.
+     */
+    fun vocative(word: String): String = word + if (hasFinalConsonant(word)) "아" else "야"
+
     /** 을/를 */
     fun objective(word: String): String = word + if (hasFinalConsonant(word)) "을" else "를"
 

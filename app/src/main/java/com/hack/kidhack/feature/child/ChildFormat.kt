@@ -1,12 +1,18 @@
 package com.hack.kidhack.feature.child
 
+/**
+ * 사용 시간 표기.
+ *
+ * <p>전에는 「1h 42m」과 「3시간」이 한 화면에 같이 나왔다. 아이가 보는 화면에서 단위가
+ * 두 나라 말로 섞이면 두 값을 비교하는 데 눈이 한 번 더 걸린다. 전부 우리말로 맞춘다.
+ */
 internal fun formatDurationSec(sec: Int): String {
     val hours = sec / 3600
     val minutes = (sec % 3600) / 60
     return when {
-        hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
+        hours > 0 && minutes > 0 -> "${hours}시간 ${minutes}분"
         hours > 0 -> "${hours}시간"
-        else -> "${minutes}m"
+        else -> "${minutes}분"
     }
 }
 
