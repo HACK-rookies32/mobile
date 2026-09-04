@@ -50,6 +50,7 @@ import com.hack.kidhack.data.remote.api.WalletApi
 import com.hack.kidhack.data.remote.api.QrPayApi
 import com.hack.kidhack.data.remote.api.StoreTerminalApi
 import com.hack.kidhack.data.remote.api.EfinApi
+import com.hack.kidhack.data.remote.api.AttestationApi
 import com.hack.kidhack.domain.repository.EfinRepository
 import com.hack.kidhack.data.repository.real.RealEfinRepository
 import com.hack.kidhack.data.repository.fake.FakeEfinRepository
@@ -175,7 +176,7 @@ import com.hack.kidhack.feature.parent.PairingViewModel
 import com.hack.kidhack.feature.parent.ParentChatViewModel
 import com.hack.kidhack.feature.parent.PayViewModel
 import com.hack.kidhack.feature.parent.WalletViewModel
-import com.hack.kidhack.feature.efin.AccountPasswordViewModel
+import com.hack.kidhack.feature.efin.PaymentPasswordViewModel
 import com.hack.kidhack.feature.efin.IdentityVerifyViewModel
 import com.hack.kidhack.feature.efin.OtpNotifier
 import com.hack.kidhack.feature.efin.TxAuthCoordinator
@@ -296,6 +297,7 @@ val appModule = module {
     single { get<Retrofit>().create(QrPayApi::class.java) }
     single { get<Retrofit>().create(StoreTerminalApi::class.java) }
     single { get<Retrofit>().create(EfinApi::class.java) }
+    single { get<Retrofit>().create(AttestationApi::class.java) }
 
     single<AuthRepository> {
         if (useMock) {
@@ -361,7 +363,8 @@ val appModule = module {
     }
     // 매장 단말 — 회원 앱과 분리된 테스트/시연 전용
     single<StoreTerminalRepository> {
-        if (useMock) FakeStoreTerminalRepository() else RealStoreTerminalRepository(get())
+        if (useMock) FakeStoreTerminalRepository()
+        else RealStoreTerminalRepository(get(), get(), androidContext())
     }
     // 전자금융 거래 보안 (거래 OTP · 계좌비밀번호 · 실명확인)
     single<EfinRepository> {
@@ -413,9 +416,9 @@ val appModule = module {
     viewModel { ContactViewModel(get<InquiryRepository>()) }
     viewModel { PayViewModel(get(), get(), get(), get(), get()) }
     viewModel { WalletViewModel(get(), get(), get(), get(), get(), get()) }
-    viewModel { AccountPasswordViewModel(get()) }
+    viewModel { PaymentPasswordViewModel(get()) }
     viewModel { IdentityVerifyViewModel(get()) }
-    viewModel { CardViewModel(get()) }
+    viewModel { CardViewModel(get(), get()) }
     // 매장 단말 테스트 화면 (숨은 라우트, 디버그/시연용)
     viewModel { StoreTerminalViewModel(get()) }
 

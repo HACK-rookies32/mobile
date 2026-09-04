@@ -73,12 +73,12 @@ import com.hack.kidhack.feature.parent.ParentNotificationsScreen
 import com.hack.kidhack.feature.parent.ParentPairingScreen
 import com.hack.kidhack.feature.parent.ParentPayScreen
 import com.hack.kidhack.feature.parent.ParentWalletScreen
-import com.hack.kidhack.feature.efin.AccountPasswordScreen
-import com.hack.kidhack.feature.efin.IdentityVerifyScreen
+import com.hack.kidhack.feature.efin.PaymentPasswordScreen
 import com.hack.kidhack.feature.terminal.StoreTerminalScreen
 import com.hack.kidhack.feature.parent.ParentCameraRequestScreen
 import com.hack.kidhack.feature.parent.ParentScreenshotScreen
 import com.hack.kidhack.feature.parent.ParentTermsScreen
+import com.hack.kidhack.security.DefenseGate
 
 fun NavGraphBuilder.authGraph(
     navController: NavHostController,
@@ -156,16 +156,12 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                     onOpenEditProfile = { navController.navigate(Route.ParentEditProfile.path) },
                     onOpenNotificationSettings = { navController.navigate(Route.ParentNotificationSettings.path) },
                     onWithdraw = { navController.navigate(Route.ParentWithdraw.path) },
-                    onOpenAccountPassword = { navController.navigate(Route.ParentAccountPassword.path) },
-                    onOpenIdentityVerify = { navController.navigate(Route.ParentIdentityVerify.path) },
+                    onOpenPaymentPassword = { navController.navigate(Route.ParentPaymentPassword.path) },
                 )
             }
         }
-        composable(Route.ParentAccountPassword.path) {
-            ParentShell(navController) { AccountPasswordScreen(onBack = { navController.popBackStack() }) }
-        }
-        composable(Route.ParentIdentityVerify.path) {
-            ParentShell(navController) { IdentityVerifyScreen(onBack = { navController.popBackStack() }) }
+        composable(Route.ParentPaymentPassword.path) {
+            ParentShell(navController) { PaymentPasswordScreen(onBack = { navController.popBackStack() }) }
         }
         composable(Route.ParentNotificationSettings.path) {
             ParentShell(navController) {
@@ -243,20 +239,26 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
         composable(Route.ParentTerms.path) { ParentShell(navController) { ParentTermsScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentPay.path) {
             ParentShell(navController) {
-                ParentPayScreen(
-                    onBack = { navController.popBackStack() },
-                    onRegisterCard = { navController.navigate(Route.ParentCards.path) },
-                    onOpenTerminal = { navController.navigate(Route.StoreTerminal.path) },
-                )
+                // [보안 방어] 결제 입구 게이트 — 진입 시 새로 검사(런타임 후킹 포착).
+                DefenseGate {
+                    ParentPayScreen(
+                        onBack = { navController.popBackStack() },
+                        onRegisterCard = { navController.navigate(Route.ParentCards.path) },
+                        onOpenTerminal = { navController.navigate(Route.StoreTerminal.path) },
+                    )
+                }
             }
         }
         composable(Route.ParentWallet.path) {
             ParentShell(navController) {
-                ParentWalletScreen(
-                    onBack = { navController.popBackStack() },
-                    onRegisterCard = { navController.navigate(Route.ParentCards.path) },
-                    onOpenTerminal = { navController.navigate(Route.StoreTerminal.path) },
-                )
+                // [보안 방어] 결제 입구 게이트 — 진입 시 새로 검사(런타임 후킹 포착).
+                DefenseGate {
+                    ParentWalletScreen(
+                        onBack = { navController.popBackStack() },
+                        onRegisterCard = { navController.navigate(Route.ParentCards.path) },
+                        onOpenTerminal = { navController.navigate(Route.StoreTerminal.path) },
+                    )
+                }
             }
         }
         composable(Route.ParentCards.path) {
@@ -269,7 +271,10 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
         }
         // 매장 단말 테스트 화면 — 숨은 라우트(회원 앱 정상 내비게이션에 없음, 디버그/시연 전용).
         composable(Route.StoreTerminal.path) {
-            StoreTerminalScreen(onBack = { navController.popBackStack() })
+            // [보안 방어] 결제 승인 입구 게이트 — 진입 시 새로 검사(런타임 후킹 포착).
+            DefenseGate {
+                StoreTerminalScreen(onBack = { navController.popBackStack() })
+            }
         }
         composable(Route.ParentGeofence.path) { ParentShell(navController) { ParentGeofenceScreen(onBack = { navController.popBackStack() }) } }
         composable(Route.ParentAppUsageDetail.path) { ParentShell(navController) { ParentAppUsageDetailScreen(onBack = { navController.popBackStack() }) } }
@@ -345,7 +350,10 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
         }
         composable(Route.ChildPay.path) {
             ChildShell(navController) {
-                ChildPayScreen(onBack = { navController.popBackStack() })
+                // [보안 방어] 결제 입구 게이트 — 진입 시 새로 검사(런타임 후킹 포착).
+                DefenseGate {
+                    ChildPayScreen(onBack = { navController.popBackStack() })
+                }
             }
         }
         composable(Route.ChildProfileEdit.path) {

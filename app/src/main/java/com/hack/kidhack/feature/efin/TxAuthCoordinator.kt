@@ -36,7 +36,7 @@ class TxAuthCoordinator(
         val refId: Long,
         /** OTP 발송 대상(마스킹). */
         val phone: String,
-        val accountPw: String = "",
+        val paymentPw: String = "",
         val otp: String = "",
         val working: Boolean = false,
         val error: String? = null,
@@ -60,8 +60,8 @@ class TxAuthCoordinator(
         return d.await()
     }
 
-    fun onAccountPw(v: String) = _pending.update {
-        it?.copy(accountPw = v.filter { c -> c.isDigit() }.take(6), error = null)
+    fun onPaymentPw(v: String) = _pending.update {
+        it?.copy(paymentPw = v.filter { c -> c.isDigit() }.take(4), error = null)
     }
 
     fun onOtp(v: String) = _pending.update {
@@ -74,10 +74,10 @@ class TxAuthCoordinator(
         if (req.working) return
         _pending.update { it?.copy(working = true, error = null) }
         scope.launch {
-            val okPw = runCatching { efinRepository.verifyAccountPassword(req.accountPw) }.getOrDefault(false)
+            val okPw = runCatching { efinRepository.verifyPaymentPassword(req.paymentPw) }.getOrDefault(false)
             val okOtp = runCatching { efinRepository.verifyOtp(req.otp) }.getOrDefault(false)
             if (!okPw) {
-                _pending.update { it?.copy(working = false, error = "계좌비밀번호가 올바르지 않습니다.") }
+                _pending.update { it?.copy(working = false, error = "결제 비밀번호가 올바르지 않습니다.") }
                 return@launch
             }
             if (!okOtp) {
@@ -87,7 +87,7 @@ class TxAuthCoordinator(
             val nonce = TxSigner.newNonce()
             val sec = TxSecurity(
                 otp = req.otp,
-                accountPassword = req.accountPw,
+                paymentPassword = req.paymentPw,
                 nonce = nonce,
                 signature = TxSigner.sign(req.amount.toLong(), req.refId, nonce),
                 accountHolder = req.targetName,

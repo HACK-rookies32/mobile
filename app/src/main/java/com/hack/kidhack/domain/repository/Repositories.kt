@@ -372,8 +372,8 @@ data class TxSecurity(
     val signature: String? = null,
     val nonce: String? = null,
     val accountHolder: String? = null,
-    /** 거래 비밀번호(계좌비밀번호 6자리). 서버 관문이 필수로 검증. */
-    val accountPassword: String? = null,
+    /** 결제 비밀번호(4자리). 서버 관문이 필수로 검증. */
+    val paymentPassword: String? = null,
 )
 
 interface WalletRepository {
@@ -413,7 +413,9 @@ interface CardRepository {
         cvc: String,
         cardPassword2: String,
         birthDate: String,
-        ownerName: String
+        ownerName: String,
+        /** 접근매체 발급 본인확인용 결제 비밀번호(4자리). 서버 관문이 대조한다. */
+        paymentPassword: String,
     ): Card
     suspend fun list(): List<Card>
     suspend fun delete(cardId: String)
@@ -605,7 +607,7 @@ data class OtpIssue(val phone: String, val code: String, val expiresIn: Long)
 data class IdentityResult(val verified: Boolean, val name: String, val verifiedAt: String?)
 
 /**
- * 전자금융 거래 보안 — 거래 OTP·계좌비밀번호·실명확인(#59).
+ * 전자금융 거래 보안 — 거래 OTP·결제 비밀번호·실명확인(#59).
  *
  * 거래 훅(서명·nonce·소유주 검증)은 별도 API 가 아니라 송금/QR 요청 필드로 전달되므로 여기 없다.
  */
@@ -613,10 +615,15 @@ interface EfinRepository {
     /** 거래 OTP 발급 → mock SMS 발신. 반환 code 는 응답 노출값. */
     suspend fun issueOtp(): OtpIssue
     suspend fun verifyOtp(code: String): Boolean
-    /** 계좌비밀번호가 맞는지 사전 확인(거래 전 UI 점검). 최종 검증은 서버 관문. */
-    suspend fun verifyAccountPassword(password: String): Boolean
-    suspend fun setAccountPassword(password: String, loginPassword: String)
-    suspend fun changeAccountPassword(currentPassword: String, newPassword: String, loginPassword: String)
+    /** 결제 비밀번호가 맞는지 사전 확인(거래 전 UI 점검). 최종 검증은 서버 관문. */
+    suspend fun verifyPaymentPassword(password: String): Boolean
+    /** 결제 비밀번호 최초 설정(카드 발급 흐름). 직전 실명확인이 본인확인을 대신한다. */
+    suspend fun setupPaymentPassword(password: String)
+    suspend fun changePaymentPassword(currentPassword: String, newPassword: String, loginPassword: String)
+    /** 결제 비밀번호 설정 여부(카드 위저드 단계 판단). */
+    suspend fun paymentPasswordSet(): Boolean
+    /** 실명확인 완료 여부(카드 위저드 단계 판단). */
+    suspend fun identityVerified(): Boolean
     suspend fun verifyIdentity(
         name: String,
         birthDate: String,

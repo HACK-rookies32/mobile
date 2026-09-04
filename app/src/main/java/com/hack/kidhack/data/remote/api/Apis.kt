@@ -4,6 +4,7 @@ import com.hack.kidhack.data.remote.ApiEnvelope
 import com.hack.kidhack.data.remote.PageResponse
 import com.hack.kidhack.data.remote.dto.ActivityDto
 import com.hack.kidhack.data.remote.dto.AllowanceDto
+import com.hack.kidhack.data.remote.dto.AttestationChallengeResponse
 import com.hack.kidhack.data.remote.dto.AllowanceEntryDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
@@ -105,10 +106,12 @@ import com.hack.kidhack.data.remote.dto.ChildWalletResponse
 import com.hack.kidhack.data.remote.dto.EfinOtpIssueResponse
 import com.hack.kidhack.data.remote.dto.EfinOtpVerifyRequest
 import com.hack.kidhack.data.remote.dto.EfinOtpVerifyResponse
-import com.hack.kidhack.data.remote.dto.EfinAccountPasswordRequest
-import com.hack.kidhack.data.remote.dto.EfinAccountPasswordChangeRequest
-import com.hack.kidhack.data.remote.dto.EfinAccountPasswordVerifyRequest
-import com.hack.kidhack.data.remote.dto.EfinAccountPasswordVerifyResponse
+import com.hack.kidhack.data.remote.dto.EfinPaymentPasswordSetupRequest
+import com.hack.kidhack.data.remote.dto.EfinPaymentPasswordChangeRequest
+import com.hack.kidhack.data.remote.dto.EfinPaymentPasswordVerifyRequest
+import com.hack.kidhack.data.remote.dto.EfinPaymentPasswordVerifyResponse
+import com.hack.kidhack.data.remote.dto.EfinPaymentPasswordStatusResponse
+import com.hack.kidhack.data.remote.dto.EfinIdentityStatusResponse
 import com.hack.kidhack.data.remote.dto.EfinIdentityVerifyRequest
 import com.hack.kidhack.data.remote.dto.EfinIdentityVerifyResponse
 import com.hack.kidhack.data.remote.dto.CardPublicKeyResponse
@@ -868,13 +871,24 @@ interface StoreTerminalApi {
     @POST("qrpay/terminal/pay")
     suspend fun pay(
         @Header("X-Store-Terminal-Token") terminalToken: String,
+        // [보안 방어 Lv2-D] 네이티브 무결성 증명(nonce:state:mac). 서버 결제 관문이 검증.
+        @Header("X-Attestation") attestation: String,
         @Body body: QrApproveRequest,
     ): ApiEnvelope<QrApproveResponse>
 }
 
 /**
+ * 무결성 증명(attestation) API (/api/efin/attestation) — Swagger 태그 23.
+ * 결제 직전 서버 발급 nonce 를 받아, 네이티브가 HMAC 서명해 결제 요청에 싣는다.
+ */
+interface AttestationApi {
+    @POST("efin/attestation/challenge")
+    suspend fun challenge(): ApiEnvelope<AttestationChallengeResponse>
+}
+
+/**
  * 전자금융 거래 보안 API (/api/efin) — Swagger 태그 20~22.
- * 거래 OTP(2차 인증)·계좌비밀번호·실명확인. 거래 훅(서명·nonce·소유주)은 지갑/QR 요청 필드로 전달된다.
+ * 거래 OTP(2차 인증)·결제 비밀번호·실명확인. 거래 훅(서명·nonce·소유주)은 지갑/QR 요청 필드로 전달된다.
  */
 interface EfinApi {
     // 20. 거래 OTP (발급 코드는 응답에 노출 — [VULN-EFIN-1])
@@ -884,17 +898,23 @@ interface EfinApi {
     @POST("efin/otp/verify")
     suspend fun verifyOtp(@Body body: EfinOtpVerifyRequest): ApiEnvelope<EfinOtpVerifyResponse>
 
-    // 21. 계좌비밀번호
-    @POST("efin/account-password")
-    suspend fun setAccountPassword(@Body body: EfinAccountPasswordRequest): ApiEnvelope<Unit>
+    // 21. 결제 비밀번호 (설정=카드 발급 흐름, 변경=계정설정)
+    @POST("efin/payment-password/setup")
+    suspend fun setupPaymentPassword(@Body body: EfinPaymentPasswordSetupRequest): ApiEnvelope<Unit>
 
-    @PUT("efin/account-password")
-    suspend fun changeAccountPassword(@Body body: EfinAccountPasswordChangeRequest): ApiEnvelope<Unit>
+    @PUT("efin/payment-password")
+    suspend fun changePaymentPassword(@Body body: EfinPaymentPasswordChangeRequest): ApiEnvelope<Unit>
 
-    @POST("efin/account-password/verify")
-    suspend fun verifyAccountPassword(@Body body: EfinAccountPasswordVerifyRequest): ApiEnvelope<EfinAccountPasswordVerifyResponse>
+    @POST("efin/payment-password/verify")
+    suspend fun verifyPaymentPassword(@Body body: EfinPaymentPasswordVerifyRequest): ApiEnvelope<EfinPaymentPasswordVerifyResponse>
 
-    // 22. 실명확인(신분증 진위확인)
+    @GET("efin/payment-password/status")
+    suspend fun paymentPasswordStatus(): ApiEnvelope<EfinPaymentPasswordStatusResponse>
+
+    // 22. 실명확인(신분증 진위확인) + 상태
     @POST("efin/identity/verify")
     suspend fun verifyIdentity(@Body body: EfinIdentityVerifyRequest): ApiEnvelope<EfinIdentityVerifyResponse>
+
+    @GET("efin/identity/status")
+    suspend fun identityStatus(): ApiEnvelope<EfinIdentityStatusResponse>
 }

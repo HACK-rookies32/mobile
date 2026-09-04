@@ -19,6 +19,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.hack.kidhack.core.designsystem.theme.KidhackTheme
 import com.hack.kidhack.core.permission.PermissionRequester
 import com.hack.kidhack.navigation.KidhackNavHost
+import com.hack.kidhack.security.StartupDefenseGate
 import org.koin.android.ext.android.inject
 
 val LocalPermissionRequester = staticCompositionLocalOf<PermissionRequester> {
@@ -40,7 +41,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             CompositionLocalProvider(LocalPermissionRequester provides permissionRequester) {
                 KidhackTheme {
-                    KidhackNavHost()
+                    // [보안 방어] 앱 시작 입구 게이트. onCreate 가 담아 둔 시작 검사 결과에
+                    // 위협이 있으면 경고 다이얼로그 후 강제 종료하고, 없으면 앱 화면을 띄운다.
+                    StartupDefenseGate {
+                        KidhackNavHost()
+                    }
                 }
             }
         }

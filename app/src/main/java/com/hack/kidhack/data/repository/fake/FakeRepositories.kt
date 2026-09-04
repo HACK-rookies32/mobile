@@ -761,7 +761,8 @@ class FakeCardRepository : CardRepository {
         cvc: String,
         cardPassword2: String,
         birthDate: String,
-        ownerName: String
+        ownerName: String,
+        paymentPassword: String,
     ): Card {
         val new = Card("card-${items.size + 1}", cardNumber.takeLast(4), expiry, ownerName)
         items.add(new)
@@ -1180,19 +1181,27 @@ class FakeStoreTerminalRepository : StoreTerminalRepository {
  * OTP 는 고정 코드 428193, 계좌비번은 마지막으로 설정한 값(없으면 기본 135790)만 통과.
  */
 class FakeEfinRepository : EfinRepository {
-    private var accountPw: String = "135790" // 데모 기본값(설정 화면에서 바꾸면 갱신)
+    // 데모 시작 상태: 실명확인·결제비번 미완료 → 첫 카드 등록에서 위저드가 단계대로 흐른다.
+    private var paymentPw: String? = null
+    private var verified: Boolean = false
+
     override suspend fun issueOtp(): OtpIssue = OtpIssue(phone = "010-****-5678", code = "428193", expiresIn = 180)
     override suspend fun verifyOtp(code: String): Boolean = code == "428193"
-    override suspend fun verifyAccountPassword(password: String): Boolean = password == accountPw
-    override suspend fun setAccountPassword(password: String, loginPassword: String) { accountPw = password }
-    override suspend fun changeAccountPassword(currentPassword: String, newPassword: String, loginPassword: String) {
-        accountPw = newPassword
+    override suspend fun verifyPaymentPassword(password: String): Boolean = password == paymentPw
+    override suspend fun setupPaymentPassword(password: String) { paymentPw = password }
+    override suspend fun changePaymentPassword(currentPassword: String, newPassword: String, loginPassword: String) {
+        paymentPw = newPassword
     }
+    override suspend fun paymentPasswordSet(): Boolean = paymentPw != null
+    override suspend fun identityVerified(): Boolean = verified
     override suspend fun verifyIdentity(
         name: String,
         birthDate: String,
         idType: String,
         idNumber: String,
         issuedDate: String,
-    ): IdentityResult = IdentityResult(verified = name.isNotBlank(), name = name, verifiedAt = "방금")
+    ): IdentityResult {
+        verified = name.isNotBlank()
+        return IdentityResult(verified = verified, name = name, verifiedAt = "방금")
+    }
 }

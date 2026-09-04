@@ -10,7 +10,9 @@ import android.provider.OpenableColumns
 import com.hack.kidhack.core.common.DeviceId
 import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.remote.api.AllowanceApi
+import com.hack.kidhack.data.remote.api.AttestationApi
 import com.hack.kidhack.data.remote.api.AppControlApi
+import com.hack.kidhack.security.DefenseChecker
 import com.hack.kidhack.data.remote.api.AppUsageApi
 import com.hack.kidhack.data.remote.api.AuthApi
 import com.hack.kidhack.data.remote.api.BlocklistApi
@@ -51,11 +53,11 @@ import com.hack.kidhack.data.remote.dto.TerminalIssueRequest
 import com.hack.kidhack.data.remote.dto.AllowanceTransferRequest
 import com.hack.kidhack.data.remote.api.WalletApi
 import com.hack.kidhack.data.remote.api.EfinApi
-import com.hack.kidhack.data.remote.dto.EfinAccountPasswordRequest
-import com.hack.kidhack.data.remote.dto.EfinAccountPasswordChangeRequest
+import com.hack.kidhack.data.remote.dto.EfinPaymentPasswordSetupRequest
+import com.hack.kidhack.data.remote.dto.EfinPaymentPasswordChangeRequest
 import com.hack.kidhack.data.remote.dto.EfinIdentityVerifyRequest
 import com.hack.kidhack.data.remote.dto.EfinOtpVerifyRequest
-import com.hack.kidhack.data.remote.dto.EfinAccountPasswordVerifyRequest
+import com.hack.kidhack.data.remote.dto.EfinPaymentPasswordVerifyRequest
 import com.hack.kidhack.domain.repository.EfinRepository
 import com.hack.kidhack.domain.repository.IdentityResult
 import com.hack.kidhack.domain.repository.OtpIssue
@@ -678,11 +680,12 @@ class RealWalletRepository(
 
     override suspend fun transferToChild(childId: String, amount: Int, memo: String?, security: TxSecurity?): TransferResult {
         // memo 는 서버 계약에 필드가 없어 전송하지 않는다(파라미터는 상위 호환 위해 유지).
-        // 전자금융 보안 필드(otp·signature·nonce·accountHolder)는 security 로 함께 싣는다.
+        // 전자금융 보안 필드(otp·signature·nonce·accountHolder·paymentPassword)는 security 로 함께 싣는다.
         val r = walletApi.transfer(WalletTransferRequest(
             childId = childId.toServerId(), amount = amount.toLong(),
             otp = security?.otp, signature = security?.signature,
-            nonce = security?.nonce, accountHolder = security?.accountHolder)).unwrap()
+            nonce = security?.nonce, accountHolder = security?.accountHolder,
+            paymentPassword = security?.paymentPassword)).unwrap()
         return TransferResult(parentBalance = r.fromBalance.toInt(), childBalance = r.toBalance.toInt(), txId = "")
     }
 
@@ -691,7 +694,8 @@ class RealWalletRepository(
         val r = walletApi.recover(WalletTransferRequest(
             childId = childId.toServerId(), amount = amount.toLong(),
             otp = security?.otp, signature = security?.signature,
-            nonce = security?.nonce, accountHolder = security?.accountHolder)).unwrap()
+            nonce = security?.nonce, accountHolder = security?.accountHolder,
+            paymentPassword = security?.paymentPassword)).unwrap()
         return TransferResult(parentBalance = r.toBalance.toInt(), childBalance = r.fromBalance.toInt(), txId = "")
     }
 
@@ -700,7 +704,7 @@ class RealWalletRepository(
 
     override suspend fun prepareCharge(amount: Int, method: String, cardId: String, security: TxSecurity?): com.hack.kidhack.domain.model.Charge =
         walletApi.chargePrepare(WalletChargePrepareRequest(
-            amount = amount.toLong(), otp = security?.otp, accountPassword = security?.accountPassword,
+            amount = amount.toLong(), otp = security?.otp, paymentPassword = security?.paymentPassword,
             signature = security?.signature, nonce = security?.nonce)).unwrap().toCharge()
 
     override suspend fun confirmCharge(chargeId: String, paymentKey: String, amount: Int): Wallet {
@@ -745,12 +749,13 @@ class RealCardRepository(private val api: CardApi) : CardRepository {
         cvc: String,
         cardPassword2: String,
         birthDate: String,
-        ownerName: String
+        ownerName: String,
+        paymentPassword: String,
     ): Card = runCatching {
-        registerOnce(cardNumber, expiry, cvc, cardPassword2, birthDate, ownerName)
+        registerOnce(cardNumber, expiry, cvc, cardPassword2, birthDate, ownerName, paymentPassword)
     }.getOrElse {
         // 공개키 재조회 후 1회 재시도 (KEY_ROTATED 대응).
-        registerOnce(cardNumber, expiry, cvc, cardPassword2, birthDate, ownerName)
+        registerOnce(cardNumber, expiry, cvc, cardPassword2, birthDate, ownerName, paymentPassword)
     }
 
     private suspend fun registerOnce(
@@ -760,6 +765,7 @@ class RealCardRepository(private val api: CardApi) : CardRepository {
         cardPassword2: String,
         birthDate: String,
         ownerName: String,
+        paymentPassword: String,
     ): Card {
         val publicKey = api.publicKey().unwrap()
         val payloadJson = KidhackJson.instance.encodeToString(
@@ -771,6 +777,7 @@ class RealCardRepository(private val api: CardApi) : CardRepository {
                 passwordFront = cardPassword2,
                 birthDate = birthDate,
                 ownerName = ownerName,
+                paymentPassword = paymentPassword,
                 nonce = java.util.UUID.randomUUID().toString(),
                 timestamp = System.currentTimeMillis(),
             ),
@@ -806,7 +813,11 @@ class RealQrPayRepository(private val api: QrPayApi) : QrPayRepository {
  * 매장 단말 리포지토리(서버 v0.2, 태그 16·17) — 테스트/시연 전용, 회원 앱 정상 흐름과 분리.
  * 단말 승인은 `X-Store-Terminal-Token` 헤더로만 인증된다.
  */
-class RealStoreTerminalRepository(private val api: StoreTerminalApi) : StoreTerminalRepository {
+class RealStoreTerminalRepository(
+    private val api: StoreTerminalApi,
+    private val attestationApi: AttestationApi,
+    private val appContext: Context,
+) : StoreTerminalRepository {
     override suspend fun issueTerminal(storeName: String): StoreTerminalInfo =
         api.issue(TerminalIssueRequest(storeName)).unwrap().toDomain()
 
@@ -814,7 +825,14 @@ class RealStoreTerminalRepository(private val api: StoreTerminalApi) : StoreTerm
         api.list().unwrap().map { it.toDomain() }
 
     override suspend fun approve(terminalToken: String, qrToken: String, amount: Int): QrPaymentHistoryItem {
-        val r = api.pay(terminalToken, QrApproveRequest(qrToken, amount.toLong())).unwrap()
+        // [보안 방어 Lv2-D] 결제 직전 서버 nonce 를 받아 네이티브 무결성 증명을 만든다.
+        //   ① challenge(nonce) → ② nativeAttest(nonce)="state:mac" → ③ "nonce:state:mac" 헤더로 결제.
+        // 서버가 nonce/replay/state/HMAC 를 검증하므로, 로컬 방어를 뚫어도 이 증명 없이는 결제 거부.
+        val nonce = attestationApi.challenge().unwrap().nonce
+        val attestation = DefenseChecker.attest(appContext, nonce)
+            ?: throw IllegalStateException("무결성 증명 생성 실패")
+        val header = "$nonce:$attestation"
+        val r = api.pay(terminalToken, header, QrApproveRequest(qrToken, amount.toLong())).unwrap()
         return QrPaymentHistoryItem(
             qrToken = r.qrToken,
             storeName = r.storeName?.takeIf { it.isNotBlank() } ?: "매장",
@@ -1093,17 +1111,23 @@ class RealEfinRepository(
     override suspend fun verifyOtp(code: String): Boolean =
         efinApi.verifyOtp(EfinOtpVerifyRequest(code)).unwrap().valid
 
-    override suspend fun verifyAccountPassword(password: String): Boolean =
-        efinApi.verifyAccountPassword(EfinAccountPasswordVerifyRequest(password)).unwrap().valid
+    override suspend fun verifyPaymentPassword(password: String): Boolean =
+        efinApi.verifyPaymentPassword(EfinPaymentPasswordVerifyRequest(password)).unwrap().valid
 
-    override suspend fun setAccountPassword(password: String, loginPassword: String) {
-        efinApi.setAccountPassword(EfinAccountPasswordRequest(password, loginPassword)).unwrap()
+    override suspend fun setupPaymentPassword(password: String) {
+        efinApi.setupPaymentPassword(EfinPaymentPasswordSetupRequest(password)).unwrap()
     }
 
-    override suspend fun changeAccountPassword(currentPassword: String, newPassword: String, loginPassword: String) {
-        efinApi.changeAccountPassword(
-            EfinAccountPasswordChangeRequest(currentPassword, newPassword, loginPassword)).unwrap()
+    override suspend fun changePaymentPassword(currentPassword: String, newPassword: String, loginPassword: String) {
+        efinApi.changePaymentPassword(
+            EfinPaymentPasswordChangeRequest(currentPassword, newPassword, loginPassword)).unwrap()
     }
+
+    override suspend fun paymentPasswordSet(): Boolean =
+        efinApi.paymentPasswordStatus().unwrap().exists
+
+    override suspend fun identityVerified(): Boolean =
+        efinApi.identityStatus().unwrap().verified
 
     override suspend fun verifyIdentity(
         name: String,
