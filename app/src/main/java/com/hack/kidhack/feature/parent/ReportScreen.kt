@@ -49,6 +49,7 @@ import com.hack.kidhack.core.common.recentDaysRange
 import com.hack.kidhack.core.common.todayRange
 import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
+import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.AppNotification
@@ -505,8 +506,16 @@ private fun WeekBars(weekDays: List<AppUsageStat>, limitMinutes: Int?) {
         MIN_CHART_SCALE_SEC,
     )
 
+    // 막대와 요일 라벨을 <b>한 Column 에 쌓지 않는다.</b> 전에는 [값·막대·요일]을 한 칸에
+    // 세로로 쌓고 Row 를 120dp 로 묶었는데, 가장 높은 막대(80dp)에 값·요일 글자와 간격까지
+    // 더하면 120dp 를 넘겼다. 넘친 만큼 아래로 밀려 막대가 요일 글자를 덮었다.
+    //
+    // 막대는 <b>고정 높이 플롯</b>(값 라벨 + 막대)에서 바닥 정렬로만 자라고, 요일은 그 아래
+    // 별도 줄에 둔다. 두 줄이 나뉘어 있으니 막대가 아무리 높아도 요일을 덮지 못한다.
+    val plotHeight = 108.dp
+    val barMax = 84.dp
     Row(
-        modifier = Modifier.fillMaxWidth().height(120.dp),
+        modifier = Modifier.fillMaxWidth().height(plotHeight),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
@@ -515,12 +524,16 @@ private fun WeekBars(weekDays: List<AppUsageStat>, limitMinutes: Int?) {
             Column(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom,
             ) {
                 Text(
                     // 1 분이 안 되는 날에 "0" 을 적으면 안 쓴 날과 구별되지 않는다.
                     text = if (seconds >= 60) (seconds / 60).toString() else "",
                     color = colors.muted,
+                    fontFamily = KidhackFontFamily,
+                    fontWeight = FontSemibold,
                     fontSize = 10.sp,
+                    maxLines = 1,
                 )
                 Spacer(Modifier.height(4.dp))
                 Box(
@@ -528,19 +541,30 @@ private fun WeekBars(weekDays: List<AppUsageStat>, limitMinutes: Int?) {
                         .fillMaxWidth()
                         // 0 인 날도 자리를 남겨 둔다. 아예 안 그리면 막대가 사라져
                         // 그날 기록이 없는 것인지 화면이 잘린 것인지 알 수 없다.
-                        .height((80.dp * seconds / max).coerceAtLeast(3.dp))
+                        .height((barMax * seconds / max).coerceAtLeast(3.dp))
                         .clip(RoundedCornerShape(6.dp))
                         .background(if (isToday) colors.brand else colors.brandLight),
                 )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = WEEKDAY_LABELS[date.dayOfWeek.value - 1],
-                    color = if (isToday) colors.text else colors.muted,
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontBold,
-                    fontSize = 11.sp,
-                )
             }
+        }
+    }
+    Spacer(Modifier.height(6.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        days.forEach { (date, _) ->
+            val isToday = date == today
+            Text(
+                text = WEEKDAY_LABELS[date.dayOfWeek.value - 1],
+                modifier = Modifier.weight(1f),
+                color = if (isToday) colors.text else colors.muted,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 11.sp,
+                maxLines = 1,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
