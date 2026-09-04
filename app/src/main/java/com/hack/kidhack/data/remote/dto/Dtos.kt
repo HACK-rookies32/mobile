@@ -931,7 +931,7 @@ data class TxResponseDto(
 data class WalletChargePrepareRequest(
     val amount: Long,
     val otp: String? = null,
-    val accountPassword: String? = null,
+    val paymentPassword: String? = null,
     val signature: String? = null,
     val nonce: String? = null,
 )
@@ -1005,7 +1005,7 @@ data class WalletTransferRequest(
     val signature: String? = null,
     val nonce: String? = null,
     val accountHolder: String? = null,
-    val accountPassword: String? = null,
+    val paymentPassword: String? = null,
 )
 
 // --- 20~22. 전자금융 거래 보안 (efin) ---
@@ -1024,21 +1024,28 @@ data class EfinOtpVerifyRequest(val code: String)
 @Serializable
 data class EfinOtpVerifyResponse(val valid: Boolean = false)
 
+/** 결제 비밀번호 최초 설정(카드 발급 흐름) — 직전 실명확인이 본인확인을 대신하므로 로그인 비번 없음. */
 @Serializable
-data class EfinAccountPasswordRequest(val password: String, val loginPassword: String)
+data class EfinPaymentPasswordSetupRequest(val password: String)
 
 @Serializable
-data class EfinAccountPasswordChangeRequest(
+data class EfinPaymentPasswordChangeRequest(
     val currentPassword: String,
     val newPassword: String,
     val loginPassword: String,
 )
 
 @Serializable
-data class EfinAccountPasswordVerifyRequest(val password: String)
+data class EfinPaymentPasswordVerifyRequest(val password: String)
 
 @Serializable
-data class EfinAccountPasswordVerifyResponse(val valid: Boolean = false)
+data class EfinPaymentPasswordVerifyResponse(val valid: Boolean = false)
+
+@Serializable
+data class EfinPaymentPasswordStatusResponse(val exists: Boolean = false)
+
+@Serializable
+data class EfinIdentityStatusResponse(val verified: Boolean = false)
 
 @Serializable
 data class EfinIdentityVerifyRequest(
@@ -1114,6 +1121,8 @@ data class CardPlainPayload(
     val passwordFront: String,
     val birthDate: String,
     val ownerName: String,
+    /** 접근매체 발급 본인확인용 결제 비밀번호(4자리). 서버는 확인만 하고 저장하지 않는다. */
+    val paymentPassword: String,
     val nonce: String,
     val timestamp: Long,
 )
@@ -1152,6 +1161,11 @@ data class QrStatusResponse(
 
 @Serializable
 data class QrApproveRequest(val qrToken: String, val amount: Long)
+
+// --- 23. 무결성 증명(attestation) challenge ---
+
+@Serializable
+data class AttestationChallengeResponse(val nonce: String = "")
 
 @Serializable
 data class QrApproveResponse(

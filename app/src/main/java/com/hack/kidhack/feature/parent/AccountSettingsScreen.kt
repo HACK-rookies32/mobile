@@ -63,8 +63,7 @@ fun ParentAccountSettingsScreen(
     onOpenEditProfile: () -> Unit = {},
     onOpenNotificationSettings: () -> Unit = {},
     onWithdraw: () -> Unit = {},
-    onOpenAccountPassword: () -> Unit = {},
-    onOpenIdentityVerify: () -> Unit = {},
+    onOpenPaymentPassword: () -> Unit = {},
     viewModel: MypageViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -208,17 +207,13 @@ fun ParentAccountSettingsScreen(
                 )
             }
 
-            // 전자금융 거래 보안(#59) — 거래용 별도 비밀번호와 접근매체 발급 전 실명확인.
+            // 전자금융 거래 보안(#59) — 결제 비밀번호 변경만.
+            //   최초 설정과 실명확인은 접근매체(카드) 발급 흐름에서 한 번에 처리하므로 여기서 별도 메뉴로 두지 않는다.
             AccountGroup("전자금융") {
                 AccountRow(
-                    title = "계좌비밀번호",
-                    trailing = "설정·변경",
-                    onClick = onOpenAccountPassword,
-                )
-                AccountRow(
-                    title = "실명확인",
-                    trailing = "신분증 진위확인",
-                    onClick = onOpenIdentityVerify,
+                    title = "결제 비밀번호",
+                    trailing = "변경",
+                    onClick = onOpenPaymentPassword,
                     last = true,
                 )
             }

@@ -32,7 +32,7 @@ import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 /**
  * 거래 승인 다이얼로그 — 앱 루트에 **딱 하나만** 띄운다([TxAuthCoordinator] 참고).
  *
- * 송금·회수·충전 어디서 시작하든 이 다이얼로그가 계좌비밀번호 + OTP 를 받는다. OTP 코드는 알림으로 온다.
+ * 송금·회수·충전 어디서 시작하든 이 다이얼로그가 결제 비밀번호 + OTP 를 받는다. OTP 코드는 알림으로 온다.
  */
 @Composable
 fun TxAuthHost(coordinator: TxAuthCoordinator) {
@@ -55,7 +55,7 @@ fun TxAuthHost(coordinator: TxAuthCoordinator) {
                     color = colors.muted, fontFamily = KidhackFontFamily, fontSize = 12.sp,
                 )
                 Spacer(Modifier.height(12.dp))
-                Field(req.accountPw, coordinator::onAccountPw, "계좌비밀번호 6자리", mask = true)
+                Field(req.paymentPw, coordinator::onPaymentPw, "결제 비밀번호 4자리", mask = true)
                 Spacer(Modifier.height(8.dp))
                 Field(req.otp, coordinator::onOtp, "인증번호 6자리", mask = false)
                 if (req.error != null) {
@@ -68,7 +68,7 @@ fun TxAuthHost(coordinator: TxAuthCoordinator) {
         confirmButton = {
             TextButton(
                 onClick = coordinator::submit,
-                enabled = req.accountPw.length == 6 && req.otp.length == 6 && !req.working,
+                enabled = req.paymentPw.length == 4 && req.otp.length == 6 && !req.working,
             ) { Text("확인", color = colors.brand, fontWeight = FontBold) }
         },
         dismissButton = {

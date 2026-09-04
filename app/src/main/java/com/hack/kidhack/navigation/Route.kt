@@ -22,7 +22,7 @@ sealed class Route(val path: String) {
     data object ParentEditProfile : Route("parent/editprofile")
     data object ParentChildAccount : Route("parent/childaccount")
     data object ParentWithdraw : Route("parent/withdraw")
-    data object ParentAccountPassword : Route("parent/efin/account-password")
+    data object ParentPaymentPassword : Route("parent/efin/payment-password")
     data object ParentIdentityVerify : Route("parent/efin/identity")
     data object ParentAppControl : Route("parent/appcontrol")
     data object ParentScreenshot : Route("parent/screenshot")

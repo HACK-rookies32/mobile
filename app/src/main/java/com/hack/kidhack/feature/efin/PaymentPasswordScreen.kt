@@ -2,11 +2,9 @@ package com.hack.kidhack.feature.efin
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +19,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
@@ -33,7 +30,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.hack.kidhack.core.designsystem.theme.FontBlack
 import com.hack.kidhack.core.designsystem.theme.FontBold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
@@ -47,16 +43,13 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * 계좌비밀번호(전자금융 별도 비밀번호) 설정·변경 화면 — #59.
+ * 결제 비밀번호 변경 화면 — #59.
  *
- * 로그인 비밀번호와 분리된 6자리 거래용 비밀번호. 변경 시 기존 비밀번호로 본인확인하고, 과거에 쓴
- * 비밀번호로는 바꿀 수 없다(서버가 이력 대조). 결함은 서버측이다([VULN-EFIN-5/6]).
+ * 결제용 4자리 PIN 은 첫 카드 등록에서 설정하고, 이 화면은 **변경만** 담당한다(계정설정 진입).
+ * 기존 결제 비밀번호 + 앱 로그인 비밀번호로 본인확인하고, 과거에 쓴 비밀번호로는 바꿀 수 없다.
+ * 저장 결함은 서버측이다([VULN-EFIN-5/6]).
  */
-enum class AccountPwMode { SET, CHANGE }
-
-data class AccountPwUiState(
-    val mode: AccountPwMode = AccountPwMode.SET,
-    val password: String = "",
+data class PaymentPwChangeUiState(
     val current: String = "",
     val newPassword: String = "",
     /** 본인확인용 앱 로그인 비밀번호. */
@@ -66,17 +59,12 @@ data class AccountPwUiState(
     val done: String? = null,
 )
 
-class AccountPasswordViewModel(
+class PaymentPasswordViewModel(
     private val efinRepository: EfinRepository,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(AccountPwUiState())
-    val state: StateFlow<AccountPwUiState> = _state.asStateFlow()
+    private val _state = MutableStateFlow(PaymentPwChangeUiState())
+    val state: StateFlow<PaymentPwChangeUiState> = _state.asStateFlow()
 
-    fun setMode(mode: AccountPwMode) = _state.update {
-        it.copy(mode = mode, error = null, done = null)
-    }
-
-    fun onPassword(v: String) = _state.update { it.copy(password = digits(v)) }
     fun onCurrent(v: String) = _state.update { it.copy(current = digits(v)) }
     fun onNew(v: String) = _state.update { it.copy(newPassword = digits(v)) }
     fun onLoginPassword(v: String) = _state.update { it.copy(loginPassword = v) }
@@ -86,34 +74,28 @@ class AccountPasswordViewModel(
         if (s.working) return
         viewModelScope.launch {
             _state.update { it.copy(working = true, error = null, done = null) }
-            runCatching {
-                when (s.mode) {
-                    AccountPwMode.SET -> efinRepository.setAccountPassword(s.password, s.loginPassword)
-                    AccountPwMode.CHANGE -> efinRepository.changeAccountPassword(s.current, s.newPassword, s.loginPassword)
+            runCatching { efinRepository.changePaymentPassword(s.current, s.newPassword, s.loginPassword) }
+                .onSuccess {
+                    _state.update {
+                        it.copy(working = false, current = "", newPassword = "", loginPassword = "",
+                            done = "결제 비밀번호를 변경했습니다.")
+                    }
                 }
-            }.onSuccess {
-                _state.update {
-                    it.copy(
-                        working = false, password = "", current = "", newPassword = "", loginPassword = "",
-                        done = if (s.mode == AccountPwMode.SET) "계좌비밀번호를 설정했습니다." else "계좌비밀번호를 변경했습니다.",
-                    )
-                }
-            }.onFailure { t ->
-                _state.update { it.copy(working = false, error = t.userMessage()) }
-            }
+                .onFailure { t -> _state.update { it.copy(working = false, error = t.userMessage()) } }
         }
     }
 
-    private fun digits(v: String) = v.filter { it.isDigit() }.take(6)
+    private fun digits(v: String) = v.filter { it.isDigit() }.take(4)
 }
 
 @Composable
-fun AccountPasswordScreen(
+fun PaymentPasswordScreen(
     onBack: () -> Unit = {},
-    viewModel: AccountPasswordViewModel = koinViewModel(),
+    viewModel: PaymentPasswordViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = LocalKidhackColors.current
+    val ready = state.current.length == 4 && state.newPassword.length == 4 && state.loginPassword.isNotBlank()
 
     Column(
         modifier = Modifier
@@ -123,84 +105,30 @@ fun AccountPasswordScreen(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp),
     ) {
-        EfinHeader(title = "계좌비밀번호", onBack = onBack)
+        EfinHeader(title = "결제 비밀번호 변경", onBack = onBack)
 
         Column(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // 설정 / 변경 전환.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                ModeChip("설정", state.mode == AccountPwMode.SET, Modifier.weight(1f)) {
-                    viewModel.setMode(AccountPwMode.SET)
-                }
-                ModeChip("변경", state.mode == AccountPwMode.CHANGE, Modifier.weight(1f)) {
-                    viewModel.setMode(AccountPwMode.CHANGE)
-                }
-            }
-
-            when (state.mode) {
-                AccountPwMode.SET -> {
-                    FieldLabel("6자리 계좌비밀번호")
-                    PinField(state.password, viewModel::onPassword, "숫자 6자리")
-                }
-                AccountPwMode.CHANGE -> {
-                    FieldLabel("기존 계좌비밀번호")
-                    PinField(state.current, viewModel::onCurrent, "기존 6자리")
-                    Spacer(Modifier.height(2.dp))
-                    FieldLabel("새 계좌비밀번호")
-                    PinField(state.newPassword, viewModel::onNew, "새 6자리")
-                }
-            }
-
+            FieldLabel("기존 결제 비밀번호")
+            PinField(state.current, viewModel::onCurrent, "기존 4자리")
+            Spacer(Modifier.height(2.dp))
+            FieldLabel("새 결제 비밀번호")
+            PinField(state.newPassword, viewModel::onNew, "새 4자리")
             Spacer(Modifier.height(2.dp))
             FieldLabel("본인확인 · 앱 로그인 비밀번호")
             LoginPwField(state.loginPassword, viewModel::onLoginPassword)
 
-            EfinPrimaryButton(
-                text = if (state.mode == AccountPwMode.SET) "설정" else "변경",
-                enabled = !state.working && isReady(state),
-                onClick = viewModel::submit,
-            )
-
+            EfinPrimaryButton(text = "변경", enabled = !state.working && ready, onClick = viewModel::submit)
             EfinBanner(error = state.error, done = state.done)
         }
     }
 }
 
-private fun isReady(s: AccountPwUiState): Boolean = s.loginPassword.isNotBlank() && when (s.mode) {
-    AccountPwMode.SET -> s.password.length == 6
-    AccountPwMode.CHANGE -> s.current.length == 6 && s.newPassword.length == 6
-}
-
-@Composable
-private fun ModeChip(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val colors = LocalKidhackColors.current
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) colors.brandLight else colors.surface)
-            .border(1.dp, if (selected) colors.brand else colors.border, RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 11.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            label,
-            color = if (selected) colors.brandDark else colors.muted,
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontBold,
-            fontSize = 14.sp,
-        )
-    }
-}
-
 /** 앱 로그인 비밀번호 입력(마스킹, 길이 제한 없음). */
 @Composable
-private fun LoginPwField(value: String, onChange: (String) -> Unit) {
+internal fun LoginPwField(value: String, onChange: (String) -> Unit) {
     val colors = LocalKidhackColors.current
     Box(
         Modifier
@@ -226,7 +154,7 @@ private fun LoginPwField(value: String, onChange: (String) -> Unit) {
     }
 }
 
-/** 비밀번호(마스킹) 6자리 입력 필드. */
+/** 결제 비밀번호(마스킹) 4자리 입력 필드. 카드 위저드와 변경 화면이 공용. */
 @Composable
 internal fun PinField(value: String, onChange: (String) -> Unit, placeholder: String) {
     val colors = LocalKidhackColors.current

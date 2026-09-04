@@ -15,6 +15,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import com.hack.kidhack.di.appModule
 import com.hack.kidhack.di.backgroundModule
+import com.hack.kidhack.security.DefenseChecker
+import com.hack.kidhack.security.DefenseState
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.GlobalContext
@@ -27,6 +29,11 @@ class KidhackApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // [보안 방어] 가장 이른 시점에 네이티브 방어 검사를 돌린다. 여기서 libdefense.so 가
+        // 로드되고, 루팅/Frida/디버거/무결성 결과가 DefenseState 에 담긴다. Application 은
+        // 화면이 없어 다이얼로그를 못 띄우므로, 실제 경고·종료는 MainActivity 루트의
+        // StartupDefenseGate 가 이 결과를 읽어 처리한다. (검사 시점 ↔ 표시 시점 분리)
+        DefenseState.startupResult = DefenseChecker.runAllChecks(this)
         startKoin {
             androidLogger(if (BuildConfig.DEBUG) Level.ERROR else Level.NONE)
             androidContext(this@KidhackApplication)
