@@ -88,6 +88,8 @@ data class ChildHomeUiState(
     val protectedNow: Boolean = false,
     val services: List<HomeServiceRow> = emptyList(),
     val alerts: List<HomeAlertRow> = emptyList(),
+    /** 안 읽은 알림 수. 헤더 종 배지에 쓴다. 알림 화면을 열면 서버에서 0 으로 준다. */
+    val unreadCount: Int = 0,
     val error: String? = null,
 ) {
     val usedLabel: String get() = formatDurationMin(usedMinutes)
@@ -208,6 +210,7 @@ class ChildHomeViewModel(
                             active = alertsOn,
                         ),
                     ),
+                    unreadCount = notifications.getOrDefault(emptyList()).count { n -> !n.read },
                     alerts = (localAlerts + notifications.getOrDefault(emptyList()))
                         // 기기에 남긴 기록과 서버가 돌려준 같은 사건이 나란히 뜨지 않게 한다.
                         .distinctBy { it.message }

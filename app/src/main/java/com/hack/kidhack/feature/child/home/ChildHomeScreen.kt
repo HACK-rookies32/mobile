@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,6 +40,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -72,9 +74,8 @@ import org.koin.androidx.compose.koinViewModel
  * <p>꺼진 보호가 있을 때만 캔버스 맨 위에 카드가 <b>나타난다</b> — 평소에 없던 것이 생기는
  * 편이 늘 있는 카드의 색이 바뀌는 것보다 눈에 띈다.
  *
- * <p>헤더의 종은 뺐다. 자녀 앱에는 알림을 켜고 끄는 제어가 없어, 종을 눌러도 캡처 내역만
- * 열렸다 — 종 모양이 약속하는 「알림」과 실제로 여는 화면이 어긋났다. 캡처 내역은 마이로
- * 옮겼다.
+ * <p>헤더의 종은 알림 화면으로 들어가는 문이다. 안 읽은 알림이 있으면 개수 배지가 붙고,
+ * 알림 화면을 열면 전체 읽음 처리되어 배지가 사라진다.
  *
  * <p>앱 목록은 두 덩이다. 부모가 한도를 걸어 둔 앱은 「약속한 앱」에서 <b>기준과 함께</b>
  * 보여 준다(8분 / 10분). 전에는 이 규칙을 접근성 서비스만 읽어서, 아이는 무엇이 얼마로 묶여
@@ -83,6 +84,7 @@ import org.koin.androidx.compose.koinViewModel
  */
 @Composable
 fun ChildHomeScreen(
+    onNotifications: () -> Unit = {},
     viewModel: ChildHomeViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -105,6 +107,8 @@ fun ChildHomeScreen(
         },
         action = {
             ProtectionLine(protectedNow = state.protectedNow && state.needsAttention.isEmpty())
+            Spacer(Modifier.width(6.dp))
+            NotificationBell(unread = state.unreadCount, onClick = onNotifications)
         },
     ) {
         state.error?.let { RetryCard(message = it, onRetry = viewModel::refresh) }
@@ -234,6 +238,43 @@ fun ChildHomeScreen(
             }
         }
         Spacer(Modifier.height(4.dp))
+    }
+}
+
+/** 헤더 오른쪽 종. 안 읽은 알림이 있으면 개수 배지가 붙는다. */
+@Composable
+private fun NotificationBell(unread: Int, onClick: () -> Unit) {
+    val colors = LocalKidhackColors.current
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_bell),
+            contentDescription = stringResource(R.string.child_notifications_title),
+            modifier = Modifier.size(21.dp),
+            tint = colors.text,
+        )
+        if (unread > 0) {
+            Text(
+                text = if (unread > 99) "99+" else unread.toString(),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 4.dp, end = 3.dp)
+                    .defaultMinSize(minWidth = 15.dp)
+                    .clip(CircleShape)
+                    .background(colors.danger)
+                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                color = Color.White,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 10.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

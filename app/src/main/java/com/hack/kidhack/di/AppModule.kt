@@ -188,6 +188,7 @@ import com.hack.kidhack.feature.parent.ScreenshotViewModel
 import com.hack.kidhack.feature.child.ChildPairingViewModel
 import com.hack.kidhack.feature.child.chat.ChildChatViewModel
 import com.hack.kidhack.feature.child.home.ChildHomeViewModel
+import com.hack.kidhack.feature.child.notifications.ChildNotificationsViewModel
 import com.hack.kidhack.feature.child.mypage.ChildMypageViewModel
 import com.hack.kidhack.feature.child.mypage.ChildProfileEditViewModel
 import com.hack.kidhack.feature.child.camera.ChildCameraViewModel
@@ -425,6 +426,7 @@ val appModule = module {
     viewModel { StoreTerminalViewModel(get()) }
 
     viewModel { ChildHomeViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { ChildNotificationsViewModel(get(), get()) }
     viewModel { ChildChatViewModel(get(), get()) }
     viewModel { ChildServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChildMypageViewModel(get(), get(), get(), get(), get(), get(), get()) }

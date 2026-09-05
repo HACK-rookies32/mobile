@@ -47,6 +47,7 @@ import com.hack.kidhack.feature.child.camera.ChildCameraScreen
 import com.hack.kidhack.feature.child.ChildPairingScreen
 import com.hack.kidhack.feature.child.chat.ChildChatScreen
 import com.hack.kidhack.feature.child.home.ChildHomeScreen
+import com.hack.kidhack.feature.child.notifications.ChildNotificationsScreen
 import com.hack.kidhack.feature.child.mypage.ChildMypageScreen
 import com.hack.kidhack.feature.child.mypage.ChildProfileEditScreen
 import com.hack.kidhack.feature.child.mypage.ChildTermsScreen
@@ -305,7 +306,9 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
             )
         }
         childTab(Route.ChildHome.path, navController) {
-            ChildHomeScreen()
+            ChildHomeScreen(
+                onNotifications = { navController.navigate(Route.ChildNotifications.path) },
+            )
         }
         childTab(Route.ChildChat.path, navController) { ChildChatScreen() }
         childTab(Route.ChildServices.path, navController) { ChildServicesScreen() }
@@ -342,6 +345,11 @@ fun NavGraphBuilder.childGraph(navController: NavHostController) {
         composable(Route.ChildScreenshot.path) {
             ChildShell(navController) {
                 ChildScreenshotScreen(onBack = { navController.popBackStack() })
+            }
+        }
+        composable(Route.ChildNotifications.path) {
+            ChildShell(navController) {
+                ChildNotificationsScreen(onBack = { navController.popBackStack() })
             }
         }
         composable(Route.ChildPairing.path) {

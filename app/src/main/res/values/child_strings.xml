@@ -7,6 +7,10 @@
     <string name="child_tab_mypage">마이</string>
     <!-- 홈 재설계 -->
     <string name="child_home_alerts_title">알림</string>
+    <string name="child_notifications_title">알림</string>
+    <string name="child_notifications_empty">아직 새 알림이 없어요</string>
+    <string name="child_notifications_empty_hint">부모님 요청이나 안내가 여기에 쌓여요</string>
+    <string name="child_notifications_load_failed">알림을 불러오지 못했어요</string>
     <string name="child_home_hello_named">%1$s, 안녕!</string>
     <string name="child_home_hello">안녕!</string>
     <string name="child_home_protection_warn">보호 기능 %1$d개가 꺼져 있어요</string>

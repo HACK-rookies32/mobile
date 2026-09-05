@@ -88,6 +88,7 @@ sealed class Route(val path: String) {
     data object ChildPairing : Route("child/pairing")
     data object ChildTerms : Route("child/terms")
     data object ChildNotice : Route("child/notice")
+    data object ChildNotifications : Route("child/notifications")
 }
 
 data class TabItem(
