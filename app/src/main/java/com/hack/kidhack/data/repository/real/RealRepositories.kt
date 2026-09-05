@@ -1116,12 +1116,15 @@ class RealEfinRepository(
         efinApi.verifyPaymentPassword(EfinPaymentPasswordVerifyRequest(password)).unwrap().valid
 
     override suspend fun setupPaymentPassword(password: String) {
-        efinApi.setupPaymentPassword(EfinPaymentPasswordSetupRequest(password)).unwrap()
+        // 성공 응답이 data:null(ApiEnvelope<Unit>)이라 unwrap()은 "응답 데이터가 없습니다"로 오인한다.
+        // 다른 Unit 엔드포인트처럼 unwrapOrNull()로 성공/실패만 판정한다(성공 시 200·data:null 정상 통과).
+        efinApi.setupPaymentPassword(EfinPaymentPasswordSetupRequest(password)).unwrapOrNull()
     }
 
     override suspend fun changePaymentPassword(currentPassword: String, newPassword: String, loginPassword: String) {
+        // setup과 동일 — Unit 응답이므로 unwrapOrNull()로 받는다.
         efinApi.changePaymentPassword(
-            EfinPaymentPasswordChangeRequest(currentPassword, newPassword, loginPassword)).unwrap()
+            EfinPaymentPasswordChangeRequest(currentPassword, newPassword, loginPassword)).unwrapOrNull()
     }
 
     override suspend fun paymentPasswordSet(): Boolean =
