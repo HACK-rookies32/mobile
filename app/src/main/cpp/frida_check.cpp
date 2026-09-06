@@ -16,7 +16,6 @@
 // =============================================================================
 
 #include "defense.h"
-#include "obfuscate.h"    // OBF() : 컴파일타임 문자열 암호화 (Layer B)
 #include <unistd.h>       // open/read/close
 #include <fcntl.h>        // O_RDONLY
 #include <cstring>        // strstr
@@ -28,9 +27,8 @@ namespace {
 
 // /proc/self/maps 를 한 덩어리씩 읽으며 Frida 관련 문자열을 찾는다.
 // self = 현재 프로세스 자신이므로 별도 권한 없이 읽을 수 있다.
-// [Lv2] 경로("/proc/self/maps")와 시그니처("frida"/"gadget"/"gum-js")를 OBF 로 암호화.
 bool hasFridaInMaps() {
-    int fd = open(OBF("/proc/self/maps"), O_RDONLY);
+    int fd = open("/proc/self/maps", O_RDONLY);
     if (fd < 0) {
         return false;   // 못 열면 판단 불가 → 흔적 없음으로 처리
     }
@@ -43,10 +41,10 @@ bool hasFridaInMaps() {
     // 512바이트씩 끊어 읽으며 각 조각에서 부분 문자열을 검사한다.
     // (주의: 경계에 걸친 문자열은 놓칠 수 있으나, 교과서 수준에선 충분하다.)
     while ((bytesRead = read(fd, buffer, sizeof(buffer) - 1)) > 0) {
-        buffer[bytesRead] = '\0';                       // strstr 을 위해 널 종료
-        if (strstr(buffer, OBF("frida")) != nullptr ||  // libfrida-gadget 등
-            strstr(buffer, OBF("gadget")) != nullptr ||  // frida-gadget 주입 흔적
-            strstr(buffer, OBF("gum-js")) != nullptr) {  // Frida 의 Gum 엔진 JS 루프
+        buffer[bytesRead] = '\0';                  // strstr 을 위해 널 종료
+        if (strstr(buffer, "frida") != nullptr ||  // libfrida-gadget 등
+            strstr(buffer, "gadget") != nullptr ||  // frida-gadget 주입 흔적
+            strstr(buffer, "gum-js") != nullptr) {  // Frida 의 Gum 엔진 JS 루프
             found = true;
             break;
         }

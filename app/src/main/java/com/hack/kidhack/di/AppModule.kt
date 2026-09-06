@@ -51,7 +51,6 @@ import com.hack.kidhack.data.remote.api.WalletApi
 import com.hack.kidhack.data.remote.api.QrPayApi
 import com.hack.kidhack.data.remote.api.StoreTerminalApi
 import com.hack.kidhack.data.remote.api.EfinApi
-import com.hack.kidhack.data.remote.api.AttestationApi
 import com.hack.kidhack.domain.repository.EfinRepository
 import com.hack.kidhack.data.repository.real.RealEfinRepository
 import com.hack.kidhack.data.repository.fake.FakeEfinRepository
@@ -300,7 +299,6 @@ val appModule = module {
     single { get<Retrofit>().create(QrPayApi::class.java) }
     single { get<Retrofit>().create(StoreTerminalApi::class.java) }
     single { get<Retrofit>().create(EfinApi::class.java) }
-    single { get<Retrofit>().create(AttestationApi::class.java) }
 
     single<AuthRepository> {
         if (useMock) {
@@ -367,7 +365,7 @@ val appModule = module {
     // 매장 단말 — 회원 앱과 분리된 테스트/시연 전용
     single<StoreTerminalRepository> {
         if (useMock) FakeStoreTerminalRepository()
-        else RealStoreTerminalRepository(get(), get(), androidContext())
+        else RealStoreTerminalRepository(get())
     }
     // 전자금융 거래 보안 (거래 OTP · 계좌비밀번호 · 실명확인)
     single<EfinRepository> {

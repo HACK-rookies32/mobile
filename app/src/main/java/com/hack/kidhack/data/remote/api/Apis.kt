@@ -4,7 +4,6 @@ import com.hack.kidhack.data.remote.ApiEnvelope
 import com.hack.kidhack.data.remote.PageResponse
 import com.hack.kidhack.data.remote.dto.ActivityDto
 import com.hack.kidhack.data.remote.dto.AllowanceDto
-import com.hack.kidhack.data.remote.dto.AttestationChallengeResponse
 import com.hack.kidhack.data.remote.dto.AllowanceEntryDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentDto
 import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
@@ -871,19 +870,8 @@ interface StoreTerminalApi {
     @POST("qrpay/terminal/pay")
     suspend fun pay(
         @Header("X-Store-Terminal-Token") terminalToken: String,
-        // [보안 방어 Lv2-D] 네이티브 무결성 증명(nonce:state:mac). 서버 결제 관문이 검증.
-        @Header("X-Attestation") attestation: String,
         @Body body: QrApproveRequest,
     ): ApiEnvelope<QrApproveResponse>
-}
-
-/**
- * 무결성 증명(attestation) API (/api/efin/attestation) — Swagger 태그 23.
- * 결제 직전 서버 발급 nonce 를 받아, 네이티브가 HMAC 서명해 결제 요청에 싣는다.
- */
-interface AttestationApi {
-    @POST("efin/attestation/challenge")
-    suspend fun challenge(): ApiEnvelope<AttestationChallengeResponse>
 }
 
 /**

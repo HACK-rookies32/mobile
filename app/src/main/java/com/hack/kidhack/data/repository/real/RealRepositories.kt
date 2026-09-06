@@ -10,9 +10,7 @@ import android.provider.OpenableColumns
 import com.hack.kidhack.core.common.DeviceId
 import com.hack.kidhack.data.local.ChatMessageStore
 import com.hack.kidhack.data.remote.api.AllowanceApi
-import com.hack.kidhack.data.remote.api.AttestationApi
 import com.hack.kidhack.data.remote.api.AppControlApi
-import com.hack.kidhack.security.DefenseChecker
 import com.hack.kidhack.data.remote.api.AppUsageApi
 import com.hack.kidhack.data.remote.api.AuthApi
 import com.hack.kidhack.data.remote.api.BlocklistApi
@@ -816,8 +814,6 @@ class RealQrPayRepository(private val api: QrPayApi) : QrPayRepository {
  */
 class RealStoreTerminalRepository(
     private val api: StoreTerminalApi,
-    private val attestationApi: AttestationApi,
-    private val appContext: Context,
 ) : StoreTerminalRepository {
     override suspend fun issueTerminal(storeName: String): StoreTerminalInfo =
         api.issue(TerminalIssueRequest(storeName)).unwrap().toDomain()
@@ -826,14 +822,7 @@ class RealStoreTerminalRepository(
         api.list().unwrap().map { it.toDomain() }
 
     override suspend fun approve(terminalToken: String, qrToken: String, amount: Int): QrPaymentHistoryItem {
-        // [보안 방어 Lv2-D] 결제 직전 서버 nonce 를 받아 네이티브 무결성 증명을 만든다.
-        //   ① challenge(nonce) → ② nativeAttest(nonce)="state:mac" → ③ "nonce:state:mac" 헤더로 결제.
-        // 서버가 nonce/replay/state/HMAC 를 검증하므로, 로컬 방어를 뚫어도 이 증명 없이는 결제 거부.
-        val nonce = attestationApi.challenge().unwrap().nonce
-        val attestation = DefenseChecker.attest(appContext, nonce)
-            ?: throw IllegalStateException("무결성 증명 생성 실패")
-        val header = "$nonce:$attestation"
-        val r = api.pay(terminalToken, header, QrApproveRequest(qrToken, amount.toLong())).unwrap()
+        val r = api.pay(terminalToken, QrApproveRequest(qrToken, amount.toLong())).unwrap()
         return QrPaymentHistoryItem(
             qrToken = r.qrToken,
             storeName = r.storeName?.takeIf { it.isNotBlank() } ?: "매장",

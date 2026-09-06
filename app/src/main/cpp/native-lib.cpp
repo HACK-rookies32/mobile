@@ -1,161 +1,85 @@
 // =============================================================================
-// native-lib.cpp — JNI 브릿지 + 집계 (Layer A 심볼 은닉 + Layer C 교차검증)
+// native-lib.cpp — JNI 브릿지 (Kotlin ↔ C++ 연결 지점)
 // -----------------------------------------------------------------------------
-// [Lv2 변경 요약]
-//   (A) 심볼 은닉: 예전엔 Java_com_hack_kidhack_..._nativeIsRooted 처럼 "이름 맹글링"으로
-//       export 했다 → nm/Frida getExportByName 으로 바로 찾혔다. 이제는 그 export 를
-//       모두 없애고, JNI_OnLoad 에서 RegisterNatives 로 "동적 등록"한다. 함수는 static
-//       (hidden)이라 심볼 테이블에 이름이 안 남는다 → 공격자는 RegisterNatives/JNI_OnLoad
-//       를 먼저 후킹해 함수 주소를 알아내야 한다(우회 1단계).
-//   (B) 클래스명/메서드명 문자열도 OBF 로 암호화 → .rodata 스캔에도 안 보인다.
-//   (C) 집계 compute_security_state: 개별 체크를 네이티브 내부에서 직접 호출 + 자체무결성
-//       을 OR 하여 bitmask 로 반환. 게이트는 이 토큰으로만 판단하므로 개별 JNI boolean 을
-//       후킹해도 게이트 결정은 안 바뀐다(교차검증, 우회 2단계).
+// [이 파일의 역할]
+//   Kotlin 쪽 com.hack.kidhack.security.DefenseChecker 의 `external fun` 들이
+//   호출되면, JVM 은 이름 규칙에 따라 아래 C 함수를 찾아 실행한다.
+//   규칙: Java_<패키지경로에서 . 을 _ 로>_<클래스이름>_<함수이름>
+//   예) Kotlin  com.hack.kidhack.security.DefenseChecker.nativeIsRooted()
+//       C 함수  Java_com_hack_kidhack_security_DefenseChecker_nativeIsRooted
 //
-// [보존] 개별 4개 체크(nativeIsRooted 등)는 데모용으로 등록을 유지한다 —
-//   "이걸 후킹해도 게이트엔 안 통한다"를 시연에서 보여주기 위함.
+// [왜 로직을 여기 두지 않는가]
+//   실제 탐지 로직은 root_check.cpp / frida_check.cpp / ... 에 나눠 둔다.
+//   이 파일은 "JNI 규칙에 맞춘 껍데기" 만 모아 두는 얇은 계층이다.
+//
+// [왜 체크마다 함수를 나누는가]
+//   이 데모의 목표는 "방어가 뚫리는 것을 보여주기" 다. 체크를 개별 함수로 노출하면
+//   Frida 로 어느 함수를 후킹했는지(예: nativeIsRooted 의 반환값을 false 로 덮음)가
+//   시연에서 분명히 드러난다. 하나로 합치면 후킹 지점이 모호해진다.
+//
+// [Frida 우회의 표적]
+//   각 함수는 jboolean(사실상 1바이트) 을 돌려준다. 이 반환값 한 개만 뒤집으면
+//   방어가 무력화된다 — 의도된 약점이다(교과서 수준·우회 가능).
 // =============================================================================
 
-#include <jni.h>
-#include <android/log.h>
-#include <cstring>        // strcpy
-#include <cstdio>         // snprintf
-#include <string>
-#include "defense.h"
-#include "obfuscate.h"    // OBF() : 컴파일타임 문자열 암호화
-#include "crypto_native.h" // crypto::hmac_sha256_hex
+#include <jni.h>          // JNIEnv, jobject, jboolean 등 JNI 기본 타입
+#include <android/log.h>  // __android_log_print (logcat 출력)
+#include "defense.h"      // check_root / check_frida / check_debugger / check_integrity 선언
 
+// logcat 에 INFO 레벨로 한 줄 남기는 도우미 매크로.
+// 태그(DEFENSE_LOG_TAG = "KidhackDefense")로 필터링하면 시연 중 방어 흐름만 볼 수 있다:
+//   adb logcat -s KidhackDefense
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, DEFENSE_LOG_TAG, __VA_ARGS__)
 
-// -----------------------------------------------------------------------------
-// 집계: 모든 검사를 네이티브 내부에서 직접 호출해 bitmask 로 취합.
-//   defense.h 에 선언(비-static) — selfcheck.cpp 가 이 함수 주소도 프롤로그 감시 대상에 넣는다.
-// -----------------------------------------------------------------------------
-int compute_security_state(JNIEnv *env, jobject context, bool checkIntegrity) {
-    int state = 0;
-    if (check_root())      state |= SEC_ROOT;
-    if (check_frida())     state |= SEC_FRIDA;
-    if (check_debugger())  state |= SEC_DEBUGGER;
-    // 무결성은 릴리스에서만(디버그 빌드는 서명이 달라 자멸하므로 호출측에서 false 전달).
-    if (checkIntegrity && check_integrity(env, context)) state |= SEC_INTEGRITY;
-    // 자체무결성: 위 함수들이 inline hook 당했으면 비트를 세운다.
-    if (check_inline_hooks()) state |= SEC_HOOK;
-    return state;
-}
+// extern "C": C++ 컴파일러의 이름 맹글링(name mangling)을 끈다.
+// 이걸 빼면 함수 이름이 컴파일 과정에서 변형돼 JVM 이 JNI 규칙대로 찾지 못한다. 필수.
+extern "C" {
 
 // -----------------------------------------------------------------------------
-// JNI 구현부 — 전부 static(외부에 심볼 노출 안 함). RegisterNatives 로만 연결된다.
-//   각 JNI 함수의 2번째 인자 jobject 는 호출한 Kotlin 객체(DefenseChecker 싱글턴) 자신.
+// nativeIsRooted() : 루팅 탐지
+//   env  = JNI 환경 포인터(자바 객체/메서드 접근용). 여기선 안 쓴다.
+//   thiz = 호출한 Kotlin 객체 자신. 여기선 안 쓴다(그래서 이름 생략).
+//   반환 = 루팅 흔적이 있으면 JNI_TRUE, 없으면 JNI_FALSE
 // -----------------------------------------------------------------------------
-namespace {
-
-// 개별 체크(데모용) — 후킹 시연 대상.
-jboolean jni_is_rooted(JNIEnv *, jobject) {
-    bool d = check_root();
-    LOGI("root check -> %s", d ? "DETECTED" : "clean");
-    return d ? JNI_TRUE : JNI_FALSE;
+JNIEXPORT jboolean JNICALL
+Java_com_hack_kidhack_security_DefenseChecker_nativeIsRooted(JNIEnv *env, jobject /*thiz*/) {
+    bool detected = check_root();                       // 실제 로직은 root_check.cpp
+    LOGI("root check -> %s", detected ? "DETECTED" : "clean");
+    return detected ? JNI_TRUE : JNI_FALSE;
 }
-jboolean jni_is_frida(JNIEnv *, jobject) {
-    bool d = check_frida();
-    LOGI("frida check -> %s", d ? "DETECTED" : "clean");
-    return d ? JNI_TRUE : JNI_FALSE;
-}
-jboolean jni_is_debugger(JNIEnv *, jobject) {
-    bool d = check_debugger();
-    LOGI("debugger check -> %s", d ? "DETECTED" : "clean");
-    return d ? JNI_TRUE : JNI_FALSE;
-}
-jboolean jni_check_integrity(JNIEnv *env, jobject, jobject context) {
-    bool v = check_integrity(env, context);
-    LOGI("integrity check -> %s", v ? "VIOLATED" : "ok");
-    return v ? JNI_TRUE : JNI_FALSE;
-}
-
-// 집계 토큰(게이트가 실제로 쓰는 것) — bitmask 반환.
-jint jni_security_state(JNIEnv *env, jobject, jobject context, jboolean checkIntegrity) {
-    int state = compute_security_state(env, context, checkIntegrity == JNI_TRUE);
-    LOGI("security state -> 0x%02x", state);
-    return static_cast<jint>(state);
-}
-
-// 서버 무결성 증명(attestation) — 서버 발급 nonce 에 대해 HMAC 서명을 만든다(Layer D).
-//   state = 집계 보안상태(0=clean). message = "nonce|state". mac = HMAC_SHA256(내장키, message).
-//   반환 문자열 = "state:mac". 내장키는 OBF 로 숨긴 서버 공유 비밀키.
-//   [다단계] 로컬에서 state 를 0 으로 위조해도, 이 HMAC 를 위조하려면 .so 의 키 추출이 필요.
-jstring jni_attest(JNIEnv *env, jobject, jobject context, jstring jnonce, jboolean checkIntegrity) {
-    const char *nonce = env->GetStringUTFChars(jnonce, nullptr);
-
-    int state = compute_security_state(env, context, checkIntegrity == JNI_TRUE);
-    char stateStr[16];
-    snprintf(stateStr, sizeof(stateStr), "%d", state);
-
-    // 서명 대상: "nonce|state" (서버 AttestationVerifier 와 동일 규약).
-    std::string message = std::string(nonce) + "|" + stateStr;
-
-    // 서버와 공유하는 비밀키(OBF 로 난독). 로컬 버퍼에 복호화 후 HMAC.
-    char key[40];
-    strcpy(key, OBF("kidhack-attest-secret"));
-    std::string mac = crypto::hmac_sha256_hex(
-            reinterpret_cast<const uint8_t *>(key), strlen(key),
-            reinterpret_cast<const uint8_t *>(message.c_str()), message.size());
-
-    std::string result = std::string(stateStr) + ":" + mac;
-
-    env->ReleaseStringUTFChars(jnonce, nonce);
-    LOGI("attest -> state=%s", stateStr);
-    return env->NewStringUTF(result.c_str());
-}
-
-} // namespace
 
 // -----------------------------------------------------------------------------
-// JNI_OnLoad — 라이브러리 로드 시 JVM 이 자동 호출. 여기서 native 메서드를 동적 등록한다.
+// nativeIsFridaDetected() : Frida(동적 계측 도구) 탐지
 // -----------------------------------------------------------------------------
-JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void * /*reserved*/) {
-    JNIEnv *env = nullptr;
-    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
-        return JNI_ERR;
-    }
-
-    // 클래스명은 OBF 로 숨긴다. FindClass 는 loadLibrary 호출자(DefenseChecker)의
-    // 클래스로더로 찾으므로 정상 로드된다.
-    char clsName[48];
-    strcpy(clsName, OBF("com/hack/kidhack/security/DefenseChecker"));
-    jclass clazz = env->FindClass(clsName);
-    if (clazz == nullptr) {
-        LOGI("JNI_OnLoad: DefenseChecker class not found");
-        return JNI_ERR;
-    }
-
-    // 메서드명도 OBF 로 숨겨 로컬 버퍼에 복호화(RegisterNatives 호출 동안 유효해야 함).
-    // 시그니처는 민감하지 않아 평문으로 둔다.
-    char nRoot[24], nFrida[24], nDbg[28], nInteg[24], nState[24], nAttest[16];
-    strcpy(nRoot,   OBF("nativeIsRooted"));
-    strcpy(nFrida,  OBF("nativeIsFridaDetected"));
-    strcpy(nDbg,    OBF("nativeIsDebuggerAttached"));
-    strcpy(nInteg,  OBF("nativeCheckIntegrity"));
-    strcpy(nState,  OBF("nativeSecurityState"));
-    strcpy(nAttest, OBF("nativeAttest"));
-
-    const JNINativeMethod methods[] = {
-        { nRoot,  "()Z", reinterpret_cast<void *>(jni_is_rooted) },
-        { nFrida, "()Z", reinterpret_cast<void *>(jni_is_frida) },
-        { nDbg,   "()Z", reinterpret_cast<void *>(jni_is_debugger) },
-        { nInteg, "(Landroid/content/Context;)Z",  reinterpret_cast<void *>(jni_check_integrity) },
-        { nState, "(Landroid/content/Context;Z)I", reinterpret_cast<void *>(jni_security_state) },
-        { nAttest, "(Landroid/content/Context;Ljava/lang/String;Z)Ljava/lang/String;",
-          reinterpret_cast<void *>(jni_attest) },
-    };
-
-    if (env->RegisterNatives(clazz, methods,
-                             sizeof(methods) / sizeof(methods[0])) != JNI_OK) {
-        LOGI("JNI_OnLoad: RegisterNatives failed");
-        return JNI_ERR;
-    }
-
-    // 공격자가 후킹하기 전, 지금(로드 직후) 원본 프롤로그를 baseline 으로 캡처.
-    selfcheck_snapshot();
-
-    LOGI("JNI_OnLoad: registered & snapshotted");
-    return JNI_VERSION_1_6;
+JNIEXPORT jboolean JNICALL
+Java_com_hack_kidhack_security_DefenseChecker_nativeIsFridaDetected(JNIEnv *env, jobject /*thiz*/) {
+    bool detected = check_frida();                      // 실제 로직은 frida_check.cpp
+    LOGI("frida check -> %s", detected ? "DETECTED" : "clean");
+    return detected ? JNI_TRUE : JNI_FALSE;
 }
+
+// -----------------------------------------------------------------------------
+// nativeIsDebuggerAttached() : 디버거 attach 탐지(안티디버깅)
+// -----------------------------------------------------------------------------
+JNIEXPORT jboolean JNICALL
+Java_com_hack_kidhack_security_DefenseChecker_nativeIsDebuggerAttached(JNIEnv *env, jobject /*thiz*/) {
+    bool detected = check_debugger();                   // 실제 로직은 antidebug_check.cpp
+    LOGI("debugger check -> %s", detected ? "DETECTED" : "clean");
+    return detected ? JNI_TRUE : JNI_FALSE;
+}
+
+// -----------------------------------------------------------------------------
+// nativeCheckIntegrity(context) : 앱 무결성(서명) 검증
+//   다른 셋과 달리 context 가 필요하다 — PackageManager 로 현재 APK 서명을
+//   조회해야 하기 때문. context 는 Kotlin 에서 넘겨준 android.content.Context.
+//   반환 = 서명이 정품 해시와 다르면(리패킹/재서명) JNI_TRUE(위반)
+// -----------------------------------------------------------------------------
+JNIEXPORT jboolean JNICALL
+Java_com_hack_kidhack_security_DefenseChecker_nativeCheckIntegrity(JNIEnv *env, jobject /*thiz*/,
+                                                                   jobject context) {
+    bool violated = check_integrity(env, context);      // 실제 로직은 integrity_check.cpp
+    LOGI("integrity check -> %s", violated ? "VIOLATED" : "ok");
+    return violated ? JNI_TRUE : JNI_FALSE;
+}
+
+} // extern "C"
