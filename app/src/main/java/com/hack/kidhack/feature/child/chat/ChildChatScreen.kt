@@ -53,7 +53,11 @@ import com.hack.kidhack.core.designsystem.theme.FontSemibold
 import com.hack.kidhack.core.designsystem.theme.KidhackFontFamily
 import com.hack.kidhack.core.designsystem.theme.LocalKidhackColors
 import com.hack.kidhack.domain.model.ChatMessage
+import com.hack.kidhack.domain.model.MessageType
 import com.hack.kidhack.domain.model.Role
+import com.hack.kidhack.feature.chat.ChatAudioBubble
+import com.hack.kidhack.feature.chat.ChatImageBubble
+import com.hack.kidhack.feature.chat.ChatMediaButtons
 import com.hack.kidhack.feature.parent.formatChatSentAt
 import org.koin.androidx.compose.koinViewModel
 import java.time.LocalDate
@@ -243,9 +247,14 @@ fun ChildChatScreen(
                     // 알려 주므로, 여기서는 모자란 만큼만 더하면 된다. 탭 바가 보일 때든 접혔을
                     // 때든 입력창이 키보드 바로 위에 앉는다.
                     .imePadding()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(start = 6.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                ChatMediaButtons(
+                    onImage = viewModel::sendImage,
+                    onAudio = viewModel::sendAudio,
+                )
+                Spacer(Modifier.size(4.dp))
                 BasicTextField(
                     value = state.draft,
                     onValueChange = viewModel::onDraft,
@@ -350,25 +359,33 @@ private fun ChatBubble(message: ChatMessage, partner: String, showAvatar: Boolea
             )
             Spacer(Modifier.size(6.dp))
         }
-        Text(
-            text = message.text,
-            modifier = Modifier
-                // 폭을 고정하지 않는다. 글자가 짧으면 말풍선도 짧아야 한다.
-                .widthIn(max = 240.dp)
-                .clip(
-                    if (mine) {
-                        RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
-                    } else {
-                        RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp)
-                    },
-                )
-                .background(if (mine) colors.brand else colors.card)
-                .padding(horizontal = 14.dp, vertical = 9.dp),
-            color = if (mine) Color.White else colors.text,
-            fontFamily = KidhackFontFamily,
-            fontWeight = FontSemibold,
-            fontSize = 14.sp,
-        )
+        when (message.type) {
+            MessageType.IMAGE -> ChatImageBubble(mediaUrl = message.mediaUrl)
+            MessageType.AUDIO -> ChatAudioBubble(
+                mediaUrl = message.mediaUrl,
+                bubbleColor = if (mine) colors.brand else colors.card,
+                contentColor = if (mine) Color.White else colors.text,
+            )
+            MessageType.TEXT -> Text(
+                text = message.text,
+                modifier = Modifier
+                    // 폭을 고정하지 않는다. 글자가 짧으면 말풍선도 짧아야 한다.
+                    .widthIn(max = 240.dp)
+                    .clip(
+                        if (mine) {
+                            RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
+                        } else {
+                            RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp)
+                        },
+                    )
+                    .background(if (mine) colors.brand else colors.card)
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                color = if (mine) Color.White else colors.text,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontSemibold,
+                fontSize = 14.sp,
+            )
+        }
         if (!mine) {
             Spacer(Modifier.size(6.dp))
             Text(
