@@ -1162,11 +1162,6 @@ data class QrStatusResponse(
 @Serializable
 data class QrApproveRequest(val qrToken: String, val amount: Long)
 
-// --- 23. 무결성 증명(attestation) challenge ---
-
-@Serializable
-data class AttestationChallengeResponse(val nonce: String = "")
-
 @Serializable
 data class QrApproveResponse(
     val qrToken: String = "",

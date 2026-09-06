@@ -10,8 +10,6 @@ enum class Threat(val label: String) {
     FRIDA("Frida 등 후킹 도구 탐지"),
     DEBUGGER("디버거 연결 탐지"),
     INTEGRITY("앱 위·변조(재서명) 탐지"),
-    // Lv2: 네이티브 함수가 inline hook(트램폴린) 당한 흔적(자체무결성 위반).
-    TAMPER("코드 후킹(변조) 탐지"),
 }
 
 /**
