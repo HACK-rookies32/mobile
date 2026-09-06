@@ -56,8 +56,8 @@ import com.hack.kidhack.domain.model.ChatMessage
 import com.hack.kidhack.domain.model.MessageType
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.feature.chat.ChatAudioBubble
+import com.hack.kidhack.feature.chat.ChatComposer
 import com.hack.kidhack.feature.chat.ChatImageBubble
-import com.hack.kidhack.feature.chat.ChatMediaButtons
 import com.hack.kidhack.feature.parent.formatChatSentAt
 import org.koin.androidx.compose.koinViewModel
 import java.time.LocalDate
@@ -239,70 +239,20 @@ fun ChildChatScreen(
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.card)
-                    // 탭 껍데기(TabShell)가 이미 탭 바 높이만큼 비워 두고 그만큼을 소비했다고
-                    // 알려 주므로, 여기서는 모자란 만큼만 더하면 된다. 탭 바가 보일 때든 접혔을
-                    // 때든 입력창이 키보드 바로 위에 앉는다.
-                    .imePadding()
-                    .padding(start = 6.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ChatMediaButtons(
-                    onImage = viewModel::sendImage,
-                    onAudio = viewModel::sendAudio,
-                )
-                Spacer(Modifier.size(4.dp))
-                BasicTextField(
-                    value = state.draft,
-                    onValueChange = viewModel::onDraft,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(colors.surface)
-                        .padding(horizontal = 16.dp, vertical = 11.dp),
-                    textStyle = TextStyle(
-                        fontFamily = KidhackFontFamily,
-                        fontWeight = FontSemibold,
-                        fontSize = 14.sp,
-                        color = colors.text,
-                    ),
-                    cursorBrush = SolidColor(colors.brand),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { viewModel.send() }),
-                    decorationBox = { inner ->
-                        if (state.draft.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.child_chat_hint),
-                                color = colors.muted,
-                                fontFamily = KidhackFontFamily,
-                                fontWeight = FontSemibold,
-                                fontSize = 14.sp,
-                            )
-                        }
-                        inner()
-                    },
-                )
-                Spacer(Modifier.size(8.dp))
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(if (state.canSend) colors.brand else colors.border)
-                        .clickable(enabled = state.canSend, onClick = viewModel::send),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_send),
-                        // 글자 「전송」 대신 아이콘이라 이름을 읽어 줄 사람이 없다.
-                        contentDescription = stringResource(R.string.child_chat_send),
-                        modifier = Modifier.size(18.dp),
-                        tint = if (state.canSend) Color.White else colors.muted,
-                    )
-                }
-            }
+            ChatComposer(
+                draft = state.draft,
+                onDraft = viewModel::onDraft,
+                onSend = viewModel::send,
+                canSend = state.canSend,
+                onImage = viewModel::sendImage,
+                onAudio = viewModel::sendAudio,
+                hint = stringResource(R.string.child_chat_hint),
+                sendContentDescription = stringResource(R.string.child_chat_send),
+                imeSendAction = true,
+                // 탭 껍데기(TabShell)가 이미 탭 바 높이만큼 비워 두고 그만큼을 소비했다고
+                // 알려 주므로, 여기서는 모자란 만큼만 더하면 된다.
+                modifier = Modifier.imePadding(),
+            )
         }
     }
 }

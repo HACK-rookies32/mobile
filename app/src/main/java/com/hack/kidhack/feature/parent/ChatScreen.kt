@@ -79,8 +79,8 @@ import com.hack.kidhack.domain.model.ChatRoom
 import com.hack.kidhack.domain.model.MessageType
 import com.hack.kidhack.domain.model.Role
 import com.hack.kidhack.feature.chat.ChatAudioBubble
+import com.hack.kidhack.feature.chat.ChatComposer
 import com.hack.kidhack.feature.chat.ChatImageBubble
-import com.hack.kidhack.feature.chat.ChatMediaButtons
 import com.hack.kidhack.domain.repository.ChatRepository
 import com.hack.kidhack.domain.repository.ChildRepository
 import com.hack.kidhack.domain.repository.SelectedChildRepository
@@ -658,8 +658,12 @@ private fun ColumnScope.RoomDetail(
         draft = state.draft,
         onDraft = onDraft,
         onSend = onSend,
-        onSendImage = onSendImage,
-        onSendAudio = onSendAudio,
+        canSend = state.draft.isNotBlank(),
+        onImage = onSendImage,
+        onAudio = onSendAudio,
+        hint = stringResource(R.string.parent_chat_input_hint),
+        sendContentDescription = stringResource(R.string.parent_chat_send),
+        modifier = Modifier.imePadding(),
     )
 }
 
@@ -731,74 +735,3 @@ private fun Stamp(sentAt: String) {
     )
 }
 
-/** 보내기 줄. 글자가 없으면 보내기가 꺼진 색으로 남는다. */
-@Composable
-private fun ChatComposer(
-    draft: String,
-    onDraft: (String) -> Unit,
-    onSend: () -> Unit,
-    onSendImage: (String) -> Unit,
-    onSendAudio: (String) -> Unit,
-) {
-    val colors = LocalKidhackColors.current
-    val canSend = draft.isNotBlank()
-    Column(Modifier.fillMaxWidth().background(colors.card)) {
-        HorizontalDivider(color = colors.line)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                // 탭 껍데기(TabShell)가 비워 둔 만큼을 소비했다고 알려 주므로, 여기서는
-                // 모자란 만큼만 더하면 키보드 바로 위에 앉는다. 전에는 네비바를 직접 빼서
-                // 맞췄는데, 그 식은 탭 바가 접혔을 때만 맞았다.
-                .imePadding()
-                .padding(start = 8.dp, end = 16.dp, top = 10.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ChatMediaButtons(onImage = onSendImage, onAudio = onSendAudio)
-            Spacer(Modifier.width(4.dp))
-            BasicTextField(
-                value = draft,
-                onValueChange = onDraft,
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(colors.surface)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                textStyle = TextStyle(
-                    fontFamily = KidhackFontFamily,
-                    fontWeight = FontSemibold,
-                    fontSize = 13.5.sp,
-                    color = colors.text,
-                ),
-                cursorBrush = SolidColor(colors.brand),
-                maxLines = 4,
-                decorationBox = { inner ->
-                    if (draft.isEmpty()) {
-                        Text(
-                            stringResource(R.string.parent_chat_input_hint),
-                            color = colors.subtle,
-                            fontSize = 13.5.sp,
-                        )
-                    }
-                    inner()
-                },
-            )
-            Spacer(Modifier.width(9.dp))
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(if (canSend) colors.brand else colors.line)
-                    .then(if (canSend) Modifier.clickable(onClick = onSend) else Modifier),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_send),
-                    contentDescription = stringResource(R.string.parent_chat_send),
-                    modifier = Modifier.size(17.dp),
-                    tint = Color.White,
-                )
-            }
-        }
-    }
-}
