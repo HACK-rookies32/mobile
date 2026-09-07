@@ -21,6 +21,7 @@
         접근성 서비스 전체 화면 스캔. 감시 기능 구현에 쓰이나 오용 시 강력한 프라이버시 침해 표면.
         의도된 취약점(OWASP Mobile M8 Security Misconfiguration / M6 Inadequate Privacy Controls).
         아래 ChildBootReceiver exported·permission 없음도 같은 ID. 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md
+        평가항목: 권한 과다 자체는 exported 컴포넌트와 별개 축이며, 금취분평 66항목·주통기에 최소권한 전용 점검항목이 없어 평가표 매핑 대상이 아니다(감사 표에서는 비고로만 기록).
     -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission
@@ -73,7 +74,7 @@
         <!-- [VULN-MOBILE-SECRET-1] Google Maps API 키가 빌드 시 Manifest 에 주입되고(app/build.gradle.kts
              manifestPlaceholders["MAPS_API_KEY"]), Firebase API 키는 google-services.json → strings.xml 리소스로
              박혀 APK 에서 그대로 추출 가능. 의도된 취약점(OWASP Mobile M2/M8). 보존: 고치지 말 것.
-             명세: mobile/docs/vuln-spec-mobile.md -->
+             명세: mobile/docs/vuln-spec-mobile.md  평가항목: (금취분평)MOB-SER-025 앱 소스코드 내 운영정보 노출 방지 / (주통기)해당 항목 없음 -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
@@ -154,9 +155,9 @@
                 android:resource="@xml/harmful_block_accessibility_service" />
         </service>
 
-        <!-- [VULN-MOBILE-COMP-1] ChildBootReceiver 가 exported=true 이면서 permission 미지정 →
-             타 앱이 명시적 인텐트로 호출 가능(부팅 로직 임의 트리거). 위 과도 권한과 같은 ID.
-             의도된 취약점(OWASP Mobile M8). 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md -->
+        <!-- [VULN-MOBILE-COMP-1] ChildBootReceiver 가 exported=true 이면서 permission 미지정 → 타 앱이 명시적 인텐트로 호출 가능. 리시버 본문은 action 이 BOOT_COMPLETED 가 아니면 조기 반환하므로 "부팅 로직이 임의 실행"되는 것은 아니고, 실제 효과는 죽은 프로세스가 먼저 기동되는 것이다 → KidhackApplication.onCreate 의 bind() 가 돌아 자녀 세션·권한이 남아 있으면 위치 추적·화면 캡처가 화면 표시 없이 재가동된다. 강제종료 이후에는 호출측에 FLAG_INCLUDE_STOPPED_PACKAGES 가 필요하고 루팅은 필요 없다. 위 과도 권한과 같은 ID.
+             의도된 취약점(OWASP Mobile M8). 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md
+             평가항목: (금취분평)MOB-SER-050 모바일 DeepLink 도용 제한 여부 — 평가 예시 "인텐트 스키마를 도용하여, 내부 파일에 접근, webview 조작 등 임의 기능을 실행 할 수 있는지를 점검" / MOB-SER-026 화면 강제실행에 의한 인증단계 우회 방지 — MainActivity 의 REMOTE_COMMAND 처리(MainActivity.kt:74) 축 / (주통기)해당 항목 없음. 접근성 서비스는 BIND_ACCESSIBILITY_SERVICE 로 보호되어 타 앱이 붙지 못하므로 비해당. -->
         <receiver
             android:name=".background.ChildBootReceiver"
             android:exported="true">

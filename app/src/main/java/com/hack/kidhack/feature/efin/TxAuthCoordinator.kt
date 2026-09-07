@@ -52,6 +52,7 @@ class TxAuthCoordinator(
      * 계좌비번+OTP+서명+nonce 를 담은 [TxSecurity] 를, 취소하면 null 을 돌려준다.
      */
     suspend fun authorize(amount: Int, targetName: String?, refId: Long): TxSecurity? {
+        // [VULN-MOBILE-EFIN-1] 발급 응답 본문에 실려 온 OTP 코드를 그대로 로컬 알림으로 넘긴다 → 잠금화면 평문 노출. 상세·평가항목은 OtpNotifier 주석. 보존: 고치지 말 것.
         val issued = efinRepository.issueOtp()
         otpNotifier.notifyCode(issued.code)
         val d = CompletableDeferred<TxSecurity?>()

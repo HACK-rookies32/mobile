@@ -19,7 +19,7 @@ object DefenseChecker {
 
     private const val TAG = "KidhackDefense"
 
-    /** .so 로드 성공 여부. 실패하면(예: ABI 불일치) 방어를 건너뛴다(앱은 죽이지 않음). */
+    /** [VULN-MOBILE-DEF-1] .so 로드 성공 여부. 실패하면(예: ABI 불일치, APK 에서 .so 삭제 후 재서명) 방어를 건너뛴다(앱은 죽이지 않음) — fail-open. 보존: 고치지 말 것. */
     private var libraryLoaded = false
 
     init {
@@ -51,14 +51,14 @@ object DefenseChecker {
      * 개별 네이티브 검사 4종을 순서대로 호출한다(교과서 수준: 각 반환값이 후킹 표적).
      *
      * @param context PackageManager 조회에 필요(무결성 검사).
-     * @param checkIntegrity 무결성 검사를 수행할지. 기본은 릴리스에서만 true.
-     *        (디버그 빌드는 디버그 서명이라 정품 지문과 달라 자기 자신을 죽이기 때문)
+     * @param checkIntegrity [VULN-MOBILE-DEF-2] 무결성 검사를 수행할지. 기본은 릴리스에서만 true — 검사 수행 여부가 APK 안의 BuildConfig.DEBUG 상수 하나에 묶여 있다. api 변형은 debug 를 상속하므로 실서버 연동 빌드도 서명 지문 대조를 하지 않는다. 보존: 고치지 말 것.
+     *        (디버그 빌드는 디버그 서명이라 정품 지문과 달라 자기 자신을 죽이기 때문) 평가항목: (금취분평)MOB-FIN-018 [전자금융] 프로그램 무결성 검증 — 평가 예시 "설치파일(APK, IPA) 변조 후 재 설치 시, 정상 실행 가능 여부" / (주통기)해당 항목 없음. 비해당: 보안프로그램 임의해제 방지는 HTS-FIN-014 로 HTS 전용.
      */
     fun runAllChecks(
         context: Context,
         checkIntegrity: Boolean = !BuildConfig.DEBUG,
     ): DefenseResult {
-        // .so 로드 실패 시 방어 불가 → 빈 결과(위협 없음)로 처리. 데모 목적상 fail-open.
+        // [VULN-MOBILE-DEF-1] .so 로드 실패 시 방어 불가 → 빈 결과(위협 없음)로 처리. 데모 목적상 fail-open. 빈 집합은 hasThreat=false 로 판정되어 시작·민감화면 게이트(DefenseGate.kt:24-28, 43-48)가 그대로 통과시키므로 루팅·Frida·디버거·무결성 4종이 한꺼번에 무효화된다. 무결성 검사도 같은 .so 안에 있어 리패킹을 탐지할 수단까지 함께 사라진다. 평가항목: (금취분평)MOB-FIN-011 [전자금융] OS 변조 탐지 기능 적용 · MOB-FIN-021 [전자금융] 디버깅 탐지기능 적용 · MOB-FIN-018 [전자금융] 프로그램 무결성 검증 / (주통기)해당 항목 없음. 비해당: MOB-FIN-012 악성코드 방지(악성코드 탐지 기능 자체가 없음). 보존: 고치지 말 것.
         if (!libraryLoaded) {
             Log.w(TAG, "defense library not loaded, skipping all checks")
             return DefenseResult(emptySet())

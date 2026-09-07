@@ -280,7 +280,7 @@ fun NavGraphBuilder.parentGraph(navController: NavHostController) {
                 )
             }
         }
-        // 매장 단말 테스트 화면 — 숨은 라우트(회원 앱 정상 내비게이션에 없음, 디버그/시연 전용).
+        // [VULN-MOBILE-PAY-1] 매장 단말 테스트 화면 — 숨은 라우트(회원 앱 정상 내비게이션에 없음). "디버그 전용"이 아니다: 진입 버튼만 BuildConfig.DEBUG 로 숨겼고(feature/parent/WalletScreen.kt:517) 이 composable 등록에는 가드가 없어 화면과 승인 호출 코드가 release APK 에도 포함된다. 보존: 고치지 말 것. 평가항목: (금취분평)MOB-SER-040 불필요한 파일 노출 여부. 상세는 navigation/Route.kt 의 StoreTerminal 주석.
         composable(Route.StoreTerminal.path) {
             // [보안 방어] 결제 승인 입구 게이트 — 진입 시 새로 검사(런타임 후킹 포착).
             DefenseGate {
