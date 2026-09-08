@@ -53,10 +53,14 @@ object DefenseChecker {
      * @param context PackageManager 조회에 필요(무결성 검사).
      * @param checkIntegrity 무결성 검사를 수행할지. 기본은 릴리스에서만 true.
      *        (디버그 빌드는 디버그 서명이라 정품 지문과 달라 자기 자신을 죽이기 때문)
+     * @param checkDebugger 디버거 검사를 수행할지. 기본은 릴리스에서만 true.
+     *        (디버그 빌드에서 Android Studio 디버거를 붙이면 앱이 스스로를 종료해
+     *         개발·시연 중 디버깅이 아예 불가능해지기 때문. 무결성과 같은 이유다.)
      */
     fun runAllChecks(
         context: Context,
         checkIntegrity: Boolean = !BuildConfig.DEBUG,
+        checkDebugger: Boolean = !BuildConfig.DEBUG,
     ): DefenseResult {
         // .so 로드 실패 시 방어 불가 → 빈 결과(위협 없음)로 처리. 데모 목적상 fail-open.
         if (!libraryLoaded) {
@@ -67,7 +71,7 @@ object DefenseChecker {
         val threats = mutableSetOf<Threat>()
         if (nativeIsRooted()) threats += Threat.ROOT
         if (nativeIsFridaDetected()) threats += Threat.FRIDA
-        if (nativeIsDebuggerAttached()) threats += Threat.DEBUGGER
+        if (checkDebugger && nativeIsDebuggerAttached()) threats += Threat.DEBUGGER
         if (checkIntegrity && nativeCheckIntegrity(context)) threats += Threat.INTEGRITY
 
         return DefenseResult(threats)
