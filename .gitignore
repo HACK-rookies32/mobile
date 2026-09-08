@@ -20,10 +20,6 @@ local.properties
 *.hprof
 *.jks
 *.keystore
-# [예외] 데모 서명 keystore 는 커밋한다. 의도적 취약점 실습용 프로젝트라
-# 비밀번호도 build.gradle.kts 에 평문 노출돼 있고, 무결성 검사가 대조하는
-# 서명 지문(562060aa...)을 팀원 전원이 동일하게 재현하려면 keystore 공유가 필수다.
-!app/demo.keystore
 google-services.json
 
 # 로컬 환경 변수(API 키 등 비밀 값). .env.example 은 커밋해도 됨
