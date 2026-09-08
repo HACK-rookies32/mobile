@@ -91,6 +91,12 @@ private val UriSaver: Saver<Uri?, String> = Saver(
     restore = { s -> s.takeIf { it.isNotEmpty() }?.let(Uri::parse) },
 )
 
+/** 이 URI 가 가리키는 대상에 읽을 수 있는 바이트가 하나라도 있으면 true. */
+private fun uriHasBytes(context: android.content.Context, uri: Uri): Boolean =
+    runCatching {
+        context.contentResolver.openInputStream(uri)?.use { it.read() != -1 } ?: false
+    }.getOrDefault(false)
+
 /** 파형에 남겨 두는 샘플 개수. 새 샘플이 오른쪽에 붙고 오래된 것이 왼쪽으로 밀려난다. */
 private const val WAVE_SAMPLES = 24
 
@@ -140,7 +146,11 @@ fun ChatComposer(
         val uri = pendingPhotoUri
         pendingPhotoUri = null
         // 촬영 성공 시 바로 보내지 않고 미리보기로 올려 준다. 전송은 호출부가 맡는다.
-        if (success && uri != null) onImagePicked(uri.toString())
+        //
+        // 일부 OEM 카메라앱은 실제로 사진을 찍고도 success=false(RESULT_CANCELED)를 준다.
+        // 그래서 플래그만 믿으면 사진이 조용히 버려진다. 파일에 실제 바이트가 있으면
+        // 성공으로 간주해 미리보기로 넘긴다(진짜 취소면 파일이 비어 있어 걸러진다).
+        if (uri != null && (success || uriHasBytes(context, uri))) onImagePicked(uri.toString())
     }
     fun launchCamera() {
         val file = File(context.cacheDir, "chat-photo-${System.currentTimeMillis()}.jpg")
