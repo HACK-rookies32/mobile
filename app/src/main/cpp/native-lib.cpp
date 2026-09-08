@@ -49,6 +49,18 @@ Java_com_hack_kidhack_security_DefenseChecker_nativeIsRooted(JNIEnv *env, jobjec
 }
 
 // -----------------------------------------------------------------------------
+// nativeIsEmulator() : 에뮬레이터 탐지
+//   루팅되지 않은 정식 AVD 이미지는 nativeIsRooted 로는 잡히지 않으므로 별도 검사.
+//   반환 = QEMU/goldfish 지문이 있으면 JNI_TRUE
+// -----------------------------------------------------------------------------
+JNIEXPORT jboolean JNICALL
+Java_com_hack_kidhack_security_DefenseChecker_nativeIsEmulator(JNIEnv *env, jobject /*thiz*/) {
+    bool detected = check_emulator();                   // 실제 로직은 root_check.cpp
+    LOGI("emulator check -> %s", detected ? "DETECTED" : "clean");
+    return detected ? JNI_TRUE : JNI_FALSE;
+}
+
+// -----------------------------------------------------------------------------
 // nativeIsFridaDetected() : Frida(동적 계측 도구) 탐지
 // -----------------------------------------------------------------------------
 JNIEXPORT jboolean JNICALL

@@ -36,6 +36,9 @@ object DefenseChecker {
     /** 루팅 흔적(su/Magisk/test-keys)이 있으면 true. → root_check.cpp */
     private external fun nativeIsRooted(): Boolean
 
+    /** 에뮬레이터(AVD/Nox 등) 지문이 있으면 true. → root_check.cpp(check_emulator) */
+    private external fun nativeIsEmulator(): Boolean
+
     /** Frida 흔적(maps/포트)이 있으면 true. → frida_check.cpp */
     private external fun nativeIsFridaDetected(): Boolean
 
@@ -51,16 +54,22 @@ object DefenseChecker {
      * 개별 네이티브 검사 4종을 순서대로 호출한다(교과서 수준: 각 반환값이 후킹 표적).
      *
      * @param context PackageManager 조회에 필요(무결성 검사).
-     * @param checkIntegrity 무결성 검사를 수행할지. 기본은 릴리스에서만 true.
-     *        (디버그 빌드는 디버그 서명이라 정품 지문과 달라 자기 자신을 죽이기 때문)
-     * @param checkDebugger 디버거 검사를 수행할지. 기본은 릴리스에서만 true.
-     *        (디버그 빌드에서 Android Studio 디버거를 붙이면 앱이 스스로를 종료해
-     *         개발·시연 중 디버깅이 아예 불가능해지기 때문. 무결성과 같은 이유다.)
+     * @param checkIntegrity 무결성 검사를 수행할지. 기본은 [BuildConfig.DEFENSE_STRICT].
+     *        (디버그/mock 빌드는 디버그 서명이라 정품 지문과 달라 자기 자신을 죽이기 때문.
+     *         그래서 debug=false, api/release=true 로 gradle 에서 설정한다.)
+     * @param checkDebugger 디버거 검사를 수행할지. 기본은 [BuildConfig.DEFENSE_STRICT].
+     *        (디버그 빌드에서 디버거를 붙이면 앱이 스스로를 종료해 개발이 막히기 때문.
+     *         무결성과 같은 이유로 STRICT 빌드에서만 켠다.)
+     * @param checkEmulator 에뮬레이터 검사를 수행할지. 기본은 [BuildConfig.DETECT_EMULATOR].
+     *        (개발·테스트를 AVD/Nox 에서 하는데 항상 켜면 앱이 매번 스스로 종료돼 작업이
+     *         불가능해진다. 그래서 평소엔 꺼두고, gradle 프로퍼티 -PdetectEmulator=true 로
+     *         빌드하거나 release 빌드에서만 켠다.)
      */
     fun runAllChecks(
         context: Context,
-        checkIntegrity: Boolean = !BuildConfig.DEBUG,
-        checkDebugger: Boolean = !BuildConfig.DEBUG,
+        checkIntegrity: Boolean = BuildConfig.DEFENSE_STRICT,
+        checkDebugger: Boolean = BuildConfig.DEFENSE_STRICT,
+        checkEmulator: Boolean = BuildConfig.DETECT_EMULATOR,
     ): DefenseResult {
         // .so 로드 실패 시 방어 불가 → 빈 결과(위협 없음)로 처리. 데모 목적상 fail-open.
         if (!libraryLoaded) {
@@ -70,6 +79,7 @@ object DefenseChecker {
 
         val threats = mutableSetOf<Threat>()
         if (nativeIsRooted()) threats += Threat.ROOT
+        if (checkEmulator && nativeIsEmulator()) threats += Threat.EMULATOR
         if (nativeIsFridaDetected()) threats += Threat.FRIDA
         if (checkDebugger && nativeIsDebuggerAttached()) threats += Threat.DEBUGGER
         if (checkIntegrity && nativeCheckIntegrity(context)) threats += Threat.INTEGRITY
