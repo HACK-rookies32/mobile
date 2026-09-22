@@ -239,7 +239,7 @@ class PayViewModel(
     // [VULN-MOBILE-PAY-2] 충전·송금(send)·회수(reclaim)·QR 결제 금액을 클라이언트 입력값 그대로 서버에 전송한다.
     // 서버 금액 미검증(백엔드 VULN-WALLET-1/7)과 결합하면 금액 변조 표면이 된다. 클라이언트측 신뢰 경계 결함.
     // 의도된 취약점(OWASP Mobile M4 Insufficient Input/Output Validation). 보존: 고치지 말 것.
-    // 명세: mobile/docs/vuln-spec-mobile.md
+    // 명세: mobile/docs/vuln-spec-mobile.md  평가항목: (금취분평)MOB-FIN-004 [전자금융] 거래정보 무결성 검증 — 평가 예시 "예비거래에 이용된 거래정보와 본거래에서 이용된 거래정보의 일치 여부"·"계좌 인증 수행 시 이체 금액을 변조하여 전송 가능 여부"에 직접 해당 / (주통기)해당 항목 없음
     fun charge() {
         val amount = _state.value.amountInput.toIntOrNull() ?: return
         val cardId = _state.value.selectedCardId ?: return

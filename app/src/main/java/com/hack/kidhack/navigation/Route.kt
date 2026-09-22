@@ -59,6 +59,11 @@ sealed class Route(val path: String) {
      * X-Store-Terminal-Token 헤더만으로 임의 qrToken·임의 금액 결제 승인 UI 를 제공한다.
      * 서버 BFLA(백엔드 VULN-WALLET-11: 일반 유저 단말 토큰 발급, VULN-WALLET-15: 토큰 없이 승인)와 결합해
      * 임의 자녀 지갑 차감으로 이어진다. 의도된 취약점(OWASP Mobile M3/M8). 명세: mobile/docs/vuln-spec-mobile.md
+     * 평가항목: (주통기)IN 불충분한 권한 검증 · AE 관리자 페이지 노출 / (금취분평)MOB-SER-003 부적절한 이용자 인가 ·
+     * MOB-SER-039 관리자 페이지 접근 통제 여부(단말 발급은 관리자 기능, 백엔드 짝 VULN-WALLET-11 과 동일 항목) ·
+     * MOB-SER-040 불필요한 파일 노출 여부 — 평가 예시 "개발/테스트 목적으로 사용된 코드가 실 운영환경에서 정상
+     * 동작 가능 여부를 확인"에 직접 해당(진입 버튼만 BuildConfig.DEBUG 로 숨겨져 있고 라우트 등록에는 가드가 없어
+     * navigation/Graphs.kt 의 composable 이 release APK 에도 그대로 포함된다).
      */
     data object StoreTerminal : Route("dev/terminal")
     data object ParentGeofence : Route("parent/geofence")

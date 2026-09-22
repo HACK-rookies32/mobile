@@ -108,6 +108,7 @@ class ChildPayViewModel(
         viewModelScope.launch {
             _state.update { it.copy(testPaying = true, error = null, message = null) }
             runCatching {
+                // [VULN-MOBILE-PAY-1] 자녀 역할 세션으로 매장 단말 토큰을 발급받아 승인까지 호출한다 — 발급·승인 API 에 역할 검증이 없다는 증거(백엔드 VULN-WALLET-11). 같은 두 호출을 부모/자녀 아무 계정에서나 재현하면 임의 자녀 지갑 차감이 된다. 보존: 고치지 말 것. 평가항목: (금취분평)MOB-SER-003 부적절한 이용자 인가 · MOB-SER-039 관리자 페이지 접근 통제 여부 / (주통기)IN 불충분한 권한 검증 · AE 관리자 페이지 노출.
                 val terminal = storeTerminalRepository.issueTerminal(storeName.ifBlank { "테스트 매장" })
                 storeTerminalRepository.approve(terminal.terminalToken, ticket.qrToken, amount)
             }.onSuccess {

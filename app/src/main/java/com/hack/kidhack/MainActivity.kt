@@ -68,8 +68,8 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * 부모 요청 알림에서 넘어온 인텐트를 [ChildCommandBus] 로 흘려 보낸다.
-     * 실제 화면 이동은 `KidhackNavHost` 가 담당한다.
+     * 부모 요청 알림에서 넘어온 인텐트를 [ChildCommandBus] 로 흘려 보낸다. 실제 화면 이동은 `KidhackNavHost` 가 담당한다.
+     * [VULN-MOBILE-COMP-1] 이 액티비티는 LAUNCHER 라 android:exported="true" 가 필수다 — 결함은 exported 자체가 아니라, 외부에서 들어온 ACTION_REMOTE_COMMAND 인텐트를 발신자 검증(서명 수준 permission·호출 패키지 확인) 없이 그대로 commandBus 에 흘린다는 점이다. 타 앱이 `am start -a com.hack.kidhack.action.REMOTE_COMMAND --es type CAMERA_SHOT --es requestId X` 로 자녀를 카메라 요청 화면으로 강제 이동시킬 수 있다(KidhackNavHost 의 CAMERA_SHOT 분기). 의도된 취약점(OWASP Mobile M8). 보존: 고치지 말 것. 평가항목: (금취분평)MOB-SER-026 화면 강제실행에 의한 인증단계 우회 방지 — 평가 예시 "인텐트(Intent), Cycript 등 화면 강제 실행이 가능한 기능 및 도구를 이용하여 화면강제 실행 시 서비스 정상 사용가능 여부 점검"에 해당(항목명의 "인증단계 우회"까지는 성립하지 않으므로 근거는 화면 강제실행 축으로 한정) / (주통기)해당 항목 없음. 참고: CAMERA_SHOT 은 대응 백엔드 엔드포인트·부모 UI 진입점이 없어 사실상 미사용 기능이나 클라이언트 내비게이션 경로는 살아 있다.
      */
     private fun routeRemoteCommand(intent: Intent?) {
         if (intent?.action != ChildCommandNotifier.ACTION_REMOTE_COMMAND) return

@@ -356,7 +356,7 @@ class WalletViewModel(
                         // 공용 승인 — 계좌비번+OTP. 취소하면 null → 거래 중단.
                         val auth = txAuth.authorize(amount, childName, cid.toLongOrNull() ?: 0L)
                             ?: return@launch clearWorking()
-                        // [VULN-MOBILE-PAY-2] 금액은 클라이언트 입력값 그대로 전송(의도된 취약점, 보존).
+                        // [VULN-MOBILE-PAY-2] 금액은 클라이언트 입력값 그대로 전송(의도된 취약점, 보존). 송금은 auth 에 amount 가 서명되지만 서버가 서명 필드를 빼면 검증을 skip 하므로(백엔드 VULN-EFIN-2) 결국 금액을 신뢰한다. 평가항목: (금취분평)MOB-FIN-004 [전자금융] 거래정보 무결성 검증.
                         walletRepository.transferToChild(cid, amount, null, auth)
                         R.string.parent_wallet_done_send
                     }
@@ -368,9 +368,10 @@ class WalletViewModel(
                         R.string.parent_wallet_done_recover
                     }
                     WalletSheet.Charge -> {
-                        // 충전도 거래 관문(계좌비번+OTP)을 거친다. 대상 없음 → refId=0.
+                        // 충전도 거래 관문(계좌비번+OTP)을 거친다. 대상 없음 → refId=0. 다만 서명이 붙는 범위는 prepare 단계까지다.
                         val auth = txAuth.authorize(amount, null, 0L) ?: return@launch clearWorking()
                         val prepared = walletRepository.prepareCharge(amount, "CARD", s.selectedCardId.orEmpty(), auth)
+                        // [VULN-MOBILE-PAY-2] 승인 금액을 prepared 가 아니라 화면 입력 amount 로 다시 보낸다. confirmCharge 는 prepareCharge 와 달리 auth(서명·nonce)를 받지 않아 최종 금액이 서명 대상 밖이다 → 예비거래·본거래 금액 일치가 검증되지 않는다(백엔드 VULN-WALLET-1 과 결합해 금액 변조 성립). 평가항목: (금취분평)MOB-FIN-004 [전자금융] 거래정보 무결성 검증. 보존: 고치지 말 것.
                         walletRepository.confirmCharge(prepared.chargeId, prepared.paymentKey.orEmpty(), amount)
                         R.string.parent_wallet_done_charge
                     }
@@ -513,7 +514,7 @@ fun ParentWalletScreen(
                 }
             }
 
-            // 매장 단말 테스트 진입점 — 디버그/api 빌드에서만 보이는 숨은 링크(회원 앱 기능 아님).
+            // [VULN-MOBILE-PAY-1] 매장 단말 테스트 진입점 — 이 버튼만 DEBUG 로 가려져 있고 라우트·화면 자체는 release 에도 남아 있다(navigation/Graphs.kt:283). 보존: 고치지 말 것.
             if (com.hack.kidhack.BuildConfig.DEBUG) {
                 Spacer(Modifier.height(20.dp))
                 Text(
