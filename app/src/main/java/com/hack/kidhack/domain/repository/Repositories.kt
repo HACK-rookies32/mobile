@@ -400,8 +400,12 @@ interface WalletRepository {
     /** 충전 통합 내역(주문+환불시각). */
     suspend fun getChargeHistory(page: Int = 0): List<ChargeHistoryItem>
 
-    /** 결제 완료(PAID)된 충전을 전액 환불한다. @return 환불 후 잔액. */
-    suspend fun refundCharge(merchantUid: String): Int
+    /**
+     * 결제 완료(PAID)된 충전을 전액 환불한다.
+     * @param cardId 환불받을 카드 id (선택). 지정하면 그 카드로 mock PG 환불(payout)을 태운다.
+     * @return 환불 후 잔액.
+     */
+    suspend fun refundCharge(merchantUid: String, cardId: Long? = null): Int
 
     /** 아직 결제 안 된(READY) 충전 주문을 취소한다. @return 취소 후 주문 상태. */
     suspend fun cancelCharge(merchantUid: String): String

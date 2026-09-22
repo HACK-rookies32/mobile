@@ -369,6 +369,7 @@ fun ParentMypageScreen(
                 onSend = { walletViewModel.openSheet(WalletSheet.Send) },
                 sendEnabled = walletState.children.isNotEmpty(),
                 onDetail = onOpenWallet,
+                onRefund = { walletViewModel.openRefundSheet() },
             )
             WalletBanner(error = walletState.error, messageRes = walletState.messageRes)
 
@@ -397,6 +398,8 @@ fun ParentMypageScreen(
     // 충전·송금 미니 시트. 지갑 화면과 같은 것을 쓴다.
     // 거래 승인(계좌비번+OTP) 다이얼로그는 앱 루트(TxAuthHost)에 하나만 있어 여기서 띄우지 않는다.
     WalletSheetHost(state = walletState, viewModel = walletViewModel, onRegisterCard = onOpenCards)
+    // 환불 확인 다이얼로그 — 잔액 환불 시트에서 「환불」을 누르면 여기서 한 번 더 묻는다.
+    WalletConfirmDialog(state = walletState, viewModel = walletViewModel)
 }
 
 @Composable

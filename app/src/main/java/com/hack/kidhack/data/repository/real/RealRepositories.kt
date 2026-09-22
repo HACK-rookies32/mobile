@@ -43,6 +43,7 @@ import com.hack.kidhack.data.remote.api.UserApi
 import com.hack.kidhack.data.remote.dto.AllowancePaymentRequest
 import com.hack.kidhack.data.remote.dto.WalletChargePrepareRequest
 import com.hack.kidhack.data.remote.dto.WalletChargeApproveRequest
+import com.hack.kidhack.data.remote.dto.WalletChargeRefundRequest
 import com.hack.kidhack.data.remote.dto.WalletTransferRequest
 import com.hack.kidhack.data.remote.dto.CardPlainPayload
 import com.hack.kidhack.data.remote.dto.EncryptedCardRequest
@@ -729,8 +730,8 @@ class RealWalletRepository(
     override suspend fun getChargeHistory(page: Int): List<com.hack.kidhack.domain.model.ChargeHistoryItem> =
         walletApi.chargeHistory(page = page).unwrap().content.map { it.toDomain() }
 
-    override suspend fun refundCharge(merchantUid: String): Int =
-        walletApi.chargeRefund(merchantUid).unwrap().balance.toInt()
+    override suspend fun refundCharge(merchantUid: String, cardId: Long?): Int =
+        walletApi.chargeRefund(merchantUid, WalletChargeRefundRequest(cardId)).unwrap().balance.toInt()
 
     override suspend fun cancelCharge(merchantUid: String): String =
         walletApi.chargeCancel(merchantUid).unwrap().status

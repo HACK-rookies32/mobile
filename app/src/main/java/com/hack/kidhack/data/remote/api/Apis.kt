@@ -93,6 +93,7 @@ import com.hack.kidhack.data.remote.dto.WalletTransactionDto
 import com.hack.kidhack.data.remote.dto.WalletChargePrepareRequest
 import com.hack.kidhack.data.remote.dto.WalletChargePrepareResponse
 import com.hack.kidhack.data.remote.dto.WalletChargeApproveRequest
+import com.hack.kidhack.data.remote.dto.WalletChargeRefundRequest
 import com.hack.kidhack.data.remote.dto.WalletChargeApproveResponse
 import com.hack.kidhack.data.remote.dto.ChargeOrderResponseDto
 import com.hack.kidhack.data.remote.dto.WalletRefundResponse
@@ -747,7 +748,10 @@ interface WalletApi {
     suspend fun chargeCancel(@Path("merchantUid") merchantUid: String): ApiEnvelope<ChargeOrderResponseDto>
 
     @POST("wallet/charge/{merchantUid}/refund")
-    suspend fun chargeRefund(@Path("merchantUid") merchantUid: String): ApiEnvelope<WalletRefundResponse>
+    suspend fun chargeRefund(
+        @Path("merchantUid") merchantUid: String,
+        @Body body: WalletChargeRefundRequest,
+    ): ApiEnvelope<WalletRefundResponse>
 
     @GET("wallet/transactions")
     suspend fun transactions(

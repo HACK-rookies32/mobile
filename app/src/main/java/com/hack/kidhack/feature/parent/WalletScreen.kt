@@ -103,6 +103,8 @@ sealed interface WalletSheet {
     data object Charge : WalletSheet
     data object Send : WalletSheet
     data object Recover : WalletSheet
+    /** 내 지갑 잔액을 등록한 카드로 환불받는 시트. */
+    data object Refund : WalletSheet
 }
 
 /**
@@ -112,7 +114,7 @@ sealed interface WalletSheet {
  * 나가면 두 배가 되므로 확인을 거친다.
  */
 sealed interface WalletConfirm {
-    data class RefundCharge(val merchantUid: String, val amount: Int) : WalletConfirm
+    data class RefundCharge(val merchantUid: String, val amount: Int, val cardId: String? = null) : WalletConfirm
     data class CancelCharge(val merchantUid: String, val amount: Int) : WalletConfirm
     data class CancelPayment(val qrToken: String, val storeName: String, val amount: Int) : WalletConfirm
 }
@@ -319,6 +321,35 @@ class WalletViewModel(
 
     fun closeSheet() = _state.update { it.copy(sheet = null, amountInput = "", error = null) }
 
+    /**
+     * 잔액 환불 시트를 연다.
+     *
+     * <p>환불 가능한(PAID) 충전 주문과 등록 카드를 불러온다. 마이페이지는 [load] 만 하고 충전내역을
+     * 끌어오지 않으므로, 시트를 열 때 여기서 한 번 읽는다. 고른 카드로 되돌리는 것은 [requestRefund].
+     */
+    fun openRefundSheet() {
+        _state.update { it.copy(sheet = WalletSheet.Refund, messageRes = null, error = null) }
+        viewModelScope.launch {
+            val cards = runCatching { cardRepository.list() }.getOrDefault(_state.value.cards)
+            val refundable = runCatching { walletRepository.getChargeHistory(0) }
+                .getOrDefault(emptyList())
+                .filter { it.status == "PAID" }
+            _state.update {
+                it.copy(
+                    cards = cards,
+                    chargeHistory = refundable,
+                    selectedCardId = it.selectedCardId?.takeIf { id -> cards.any { c -> c.cardId == id } }
+                        ?: cards.firstOrNull()?.cardId,
+                )
+            }
+        }
+    }
+
+    /** 고른 카드로 해당 충전을 환불하도록 확인을 요청한다(실행은 [runConfirm]). */
+    fun requestRefund(merchantUid: String, amount: Int) = _state.update {
+        it.copy(sheet = null, confirm = WalletConfirm.RefundCharge(merchantUid, amount, it.selectedCardId))
+    }
+
     /** 금액은 숫자만, 9자리까지. 자릿수를 막지 않으면 천 단위 표기가 Long 을 넘긴다. */
     fun onAmount(raw: String) = _state.update {
         it.copy(amountInput = raw.filter { c -> c.isDigit() }.take(MAX_AMOUNT_DIGITS).trimStart('0'))
@@ -374,6 +405,9 @@ class WalletViewModel(
                         walletRepository.confirmCharge(prepared.chargeId, prepared.paymentKey.orEmpty(), amount)
                         R.string.parent_wallet_done_charge
                     }
+                    // 환불은 금액 입력 없이 충전 건을 골라 확인 다이얼로그로 처리한다(requestRefund → runConfirm).
+                    // 이 시트는 submitSheet 를 태우지 않지만, when 을 완전하게 두려고 방어적으로 중단한다.
+                    WalletSheet.Refund -> return@launch clearWorking()
                 }
             }.onSuccess { done ->
                 _state.update { it.copy(working = false, amountInput = "", messageRes = done) }
@@ -399,7 +433,8 @@ class WalletViewModel(
             runCatching {
                 when (confirm) {
                     is WalletConfirm.RefundCharge -> {
-                        walletRepository.refundCharge(confirm.merchantUid)
+                        // cardId 를 주면 서버가 그 카드로 mock PG 환불(payout)을 태운다.
+                        walletRepository.refundCharge(confirm.merchantUid, confirm.cardId?.toLongOrNull())
                         R.string.parent_wallet_done_refund
                     }
                     is WalletConfirm.CancelCharge -> {
@@ -699,6 +734,7 @@ internal fun WalletBalanceCard(
     showMonthly: Boolean = false,
     sendEnabled: Boolean = true,
     onDetail: (() -> Unit)? = null,
+    onRefund: (() -> Unit)? = null,
 ) {
     val colors = LocalKidhackColors.current
     WalletCard(modifier = modifier, contentPadding = PaddingValues(0.dp)) {
@@ -779,6 +815,16 @@ internal fun WalletBalanceCard(
                 enabled = sendEnabled,
                 onClick = onSend,
             )
+            // 환불 진입점. 마이페이지 잔액 칸에서만 넘겨 준다(지갑 화면에는 충전내역별 환불이 따로 있다).
+            if (onRefund != null) {
+                Box(Modifier.fillMaxHeight().width(1.dp).background(colors.border.copy(alpha = 0.6f)))
+                WalletAction(
+                    label = stringResource(R.string.parent_wallet_action_refund),
+                    accent = false,
+                    modifier = Modifier.weight(1f),
+                    onClick = onRefund,
+                )
+            }
         }
     }
 }
@@ -865,6 +911,7 @@ internal fun WalletSheetHost(
                 WalletSheet.Charge -> ChargeSheetBody(state, viewModel, onRegisterCard)
                 WalletSheet.Send -> TransferSheetBody(state, viewModel, recover = false)
                 WalletSheet.Recover -> TransferSheetBody(state, viewModel, recover = true)
+                WalletSheet.Refund -> RefundSheetBody(state, viewModel, onRegisterCard)
             }
         }
     }
@@ -917,6 +964,113 @@ private fun ChargeSheetBody(state: WalletUiState, viewModel: WalletViewModel, on
         enabled = state.amount > 0 && state.selectedCardId != null && !state.working,
         onClick = viewModel::submitSheet,
     )
+}
+
+/**
+ * 잔액 환불 시트.
+ *
+ * <p>환불받을 카드를 고르고, 환불 가능한(PAID) 충전을 눌러 그 카드로 되돌린다.
+ *
+ * <p>⚠️ 서버가 환불 목적지 카드의 소유자를 검증하지 않으므로([VULN-WALLET-7]), 여기서 고른 카드가
+ * 그대로 환불 수취 계좌가 된다 — 탈취 계정 잔액을 공격자 카드로 빼내는 모의해킹 시나리오의 UI 진입점.
+ */
+@Composable
+private fun RefundSheetBody(state: WalletUiState, viewModel: WalletViewModel, onRegisterCard: () -> Unit) {
+    val colors = LocalKidhackColors.current
+    SheetHeading(
+        title = stringResource(R.string.parent_wallet_sheet_refund_title),
+        hint = stringResource(R.string.parent_wallet_sheet_refund_hint),
+    )
+
+    if (state.cards.isEmpty()) {
+        // 카드가 없으면 환불받을 곳이 없다. 등록으로만 안내한다(충전 시트와 같은 처리).
+        Text(
+            text = stringResource(R.string.parent_wallet_sheet_charge_no_card),
+            color = colors.muted,
+            fontSize = 13.sp,
+        )
+        Spacer(Modifier.height(14.dp))
+        SheetSubmit(stringResource(R.string.parent_wallet_sheet_charge_add_card), enabled = true) {
+            viewModel.closeSheet()
+            onRegisterCard()
+        }
+        return
+    }
+
+    SheetLabel(stringResource(R.string.parent_wallet_sheet_refund_card))
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        state.cards.forEach { card ->
+            MiniCard(card = card, selected = card.cardId == state.selectedCardId) {
+                viewModel.selectCard(card.cardId)
+            }
+        }
+    }
+
+    Spacer(Modifier.height(16.dp))
+    SheetLabel(stringResource(R.string.parent_wallet_sheet_refund_pick))
+    Spacer(Modifier.height(8.dp))
+
+    val refundable = state.chargeHistory.filter { it.status == "PAID" }
+    if (refundable.isEmpty()) {
+        Text(
+            text = stringResource(R.string.parent_wallet_sheet_refund_empty),
+            color = colors.muted,
+            fontSize = 13.sp,
+        )
+        Spacer(Modifier.height(8.dp))
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        refundable.forEach { item ->
+            RefundChargeRow(
+                item = item,
+                enabled = state.selectedCardId != null && !state.working,
+                onRefund = { viewModel.requestRefund(item.merchantUid, item.amount) },
+            )
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+}
+
+/** 환불 시트의 충전 한 건. 오른쪽 「환불」을 누르면 고른 카드로 되돌린다. */
+@Composable
+private fun RefundChargeRow(item: ChargeHistoryItem, enabled: Boolean, onRefund: () -> Unit) {
+    val colors = LocalKidhackColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .border(1.dp, colors.border.copy(alpha = 0.9f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.parent_wallet_amount_won, formatWon(item.amount)),
+                color = colors.text,
+                fontFamily = KidhackFontFamily,
+                fontWeight = FontBold,
+                fontSize = 15.sp,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(item.createdAtLabel, color = colors.muted, fontSize = 12.sp)
+        }
+        Text(
+            text = stringResource(R.string.parent_wallet_charge_refund),
+            modifier = Modifier
+                .clip(RoundedCornerShape(99.dp))
+                .then(if (enabled) Modifier.clickable(onClick = onRefund) else Modifier)
+                .padding(horizontal = 14.dp, vertical = 7.dp),
+            color = if (enabled) colors.brandDark else colors.muted.copy(alpha = 0.6f),
+            fontFamily = KidhackFontFamily,
+            fontWeight = FontBold,
+            fontSize = 13.sp,
+        )
+    }
 }
 
 /**

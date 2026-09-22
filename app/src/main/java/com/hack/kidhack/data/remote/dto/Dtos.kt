@@ -965,11 +965,21 @@ data class WalletChargeApproveResponse(
     val transaction: TxResponseDto? = null,
 )
 
+/** 환불 요청 본문. cardId 를 주면 그 카드로 mock PG 환불(payout)을 태운다. */
+@Serializable
+data class WalletChargeRefundRequest(
+    val cardId: Long? = null,
+)
+
 @Serializable
 data class WalletRefundResponse(
     val merchantUid: String = "",
     val refundedAmount: Long = 0,
     val balance: Long = 0,
+    /** 환불이 나간 카드(마스킹). 카드 지정 환불이 아니면 null. */
+    val maskedCard: String? = null,
+    /** PG 환불 거래 ID(mock). 카드 지정 환불이 아니면 null. */
+    val pgRefundId: String? = null,
     val transaction: TxResponseDto? = null,
 )
 

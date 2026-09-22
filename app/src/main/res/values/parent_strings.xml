@@ -526,6 +526,7 @@
     <string name="parent_wallet_action_charge">충전</string>
     <string name="parent_wallet_action_send">송금</string>
     <string name="parent_wallet_action_recover">회수</string>
+    <string name="parent_wallet_action_refund">환불</string>
     <string name="parent_wallet_amount_won">%1$s원</string>
 
     <string name="parent_wallet_group_transactions">거래 내역</string>
@@ -567,6 +568,12 @@
     <string name="parent_wallet_sheet_recover_target">회수할 자녀</string>
     <string name="parent_wallet_sheet_recover_amount">회수할 금액</string>
     <string name="parent_wallet_sheet_recover_submit">%1$s원 회수하기</string>
+
+    <string name="parent_wallet_sheet_refund_title">잔액 환불</string>
+    <string name="parent_wallet_sheet_refund_hint">등록한 카드로 지갑 잔액을 되돌려요</string>
+    <string name="parent_wallet_sheet_refund_card">환불받을 카드</string>
+    <string name="parent_wallet_sheet_refund_pick">환불할 충전</string>
+    <string name="parent_wallet_sheet_refund_empty">환불 가능한 충전이 없어요.</string>
 
     <string name="parent_wallet_confirm_title">확인</string>
     <string name="parent_wallet_confirm_ok">확인</string>
