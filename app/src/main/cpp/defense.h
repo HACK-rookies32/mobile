@@ -10,6 +10,9 @@
 // 루팅 흔적(su 바이너리, Magisk, test-keys 빌드)이 있으면 true.
 bool check_root();
 
+// 에뮬레이터(AVD/Nox/Genymotion 등) 지문(QEMU 프로퍼티, goldfish 디바이스 파일)이 있으면 true.
+bool check_emulator();
+
 // Frida 흔적(frida-server/gadget 매핑, 27042 포트, gum 스레드)이 있으면 true.
 bool check_frida();
 

@@ -195,6 +195,8 @@ import com.hack.kidhack.feature.child.onboarding.ChildOnboardingViewModel
 import com.hack.kidhack.feature.child.pay.ChildPayViewModel
 import com.hack.kidhack.feature.child.screenshot.ChildScreenshotViewModel
 import com.hack.kidhack.feature.child.services.ChildServicesViewModel
+import com.hack.kidhack.security.CertificatePinning
+import com.hack.kidhack.security.PinningFailureInterceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -239,7 +241,12 @@ val appModule = module {
                 HttpLoggingInterceptor.Level.NONE
             }
         }
+        // [보안 방어] SSL 피닝. https(운영 서버) 연결의 인증서 공개키를 앱에 박아 둔 핀과
+        // 대조해 프록시 MITM 을 막는다. http 평문(debug/api LAN 연동) 연결에는 관여하지 않는다.
+        // 상세·핀 값은 com.hack.kidhack.security.CertificatePinning 참조.
         OkHttpClient.Builder()
+            .certificatePinner(CertificatePinning.pinner)
+            .addInterceptor(PinningFailureInterceptor())   // 피닝 거부를 logcat 에 남김(흐름은 불변)
             .addInterceptor(AuthInterceptor(get()))
             .authenticator(
                 TokenAuthenticator(
@@ -248,7 +255,10 @@ val appModule = module {
                     chatMessageStore = get(),
                     chatWebSocketClient = get(),
                     baseUrl = BuildConfig.BASE_URL.trimEnd('/') + "/",
+                    // [보안 방어] 토큰 갱신 전용 클라이언트에도 반드시 같은 피너를 적용한다.
+                    // 여기를 빼먹으면 401 후 refresh 경로만 무피닝으로 남아 피닝이 무의미해진다.
                     refreshClient = OkHttpClient.Builder()
+                        .certificatePinner(CertificatePinning.pinner)
                         .connectTimeout(15, TimeUnit.SECONDS)
                         .build(),
                 ),

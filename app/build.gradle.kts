@@ -41,6 +41,14 @@ val apiBaseUrl: String =
         ?: "http://10.0.2.2:8080/api"
 logger.lifecycle("kidhack BASE_URL = $apiBaseUrl")
 
+// [보안 방어] 에뮬레이터 탐지 스위치. 기본은 꺼짐 — 개발·테스트를 AVD/Nox 에서 하기 때문에
+// 항상 켜면 앱이 매 실행마다 스스로 종료돼 작업이 불가능해진다. 시연할 때만
+//   gradlew installApi -PdetectEmulator=true
+// 로 켠다. (release 빌드는 아래 buildTypes 에서 별도로 true 로 고정한다.)
+val detectEmulator: Boolean =
+    (project.findProperty("detectEmulator") as String?)?.toBoolean() ?: false
+logger.lifecycle("kidhack DETECT_EMULATOR = $detectEmulator")
+
 // Google Maps API 키. 우선순위: .env → local.properties (둘 다 git 에 커밋되지 않음)
 val mapsApiKey: String = run {
     val fromEnv = Properties().apply {
@@ -74,6 +82,14 @@ android {
         // [VULN-MOBILE-SECRET-1] Google Maps API 키를 빌드 시 Manifest(<meta-data> API_KEY)에 주입. Firebase 키도 app/google-services.json 이 존재해서 플러그인을 사용하게 되면 APK에서 그대로 추출된다. 
         // .env 나 local.properties 에서 키를 읽어 주입하며 두 파일 다 github에 직접 올라가지는 않는다. 빌드된 apk 파일 내부에는 어쩔 수 없이 API 키가 남는다. Google Cloud Console 에서 API 키에 앱 패키지명과 서명 키의 SHA-1을 추가하여 앱 제한을 걸고, Maps SDK for Android에서만 유효하도록 API 제한을 걸어야한다.
         // 의도된 취약점(OWASP Mobile M2 Inadequate Supply Chain / M8). 보존: 고치지 말 것. 명세: mobile/docs/vuln-spec-mobile.md  평가항목: (금취분평)MOB-SER-025 앱 소스코드 내 운영정보 노출 방지 — 항목 정의의 "운영정보 : 서버정보(ID/PW), 고정된 암호키 등"에 해당하고 평가 예시 "애플리케이션을 디컴파일 및 역분석하여 코드상에 운영정보의 노출 여부 점검"에 직접 대응 / (주통기)해당 항목 없음(모바일 단말 보안 대응 항목 부재)
+        
+        // [보안 방어] 방어 검사 활성화 플래그. DefenseChecker.runAllChecks 의 기본값으로 쓰인다.
+        //  - DEFENSE_STRICT : 무결성(서명)·디버거 검사 on/off. debug/mock 은 디버그 서명이라
+        //    켜면 자기 자신을 위·변조로 오탐해 죽으므로 기본 false, api/release 에서 true.
+        //  - DETECT_EMULATOR: 에뮬레이터 검사 on/off. 위 detectEmulator(-PdetectEmulator) 로 결정.
+        buildConfigField("boolean", "DEFENSE_STRICT", "false")
+        buildConfigField("boolean", "DETECT_EMULATOR", "$detectEmulator")
+
         // AndroidManifest의 ${MAPS_API_KEY} 자리에 주입
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
 
@@ -113,6 +129,13 @@ android {
             versionNameSuffix = "-api"
             buildConfigField("boolean", "USE_MOCK", "false")
             buildConfigField("String", "BASE_URL", "\"$apiBaseUrl\"")
+            // [보안 방어] api 변형에서도 무결성·디버거 검사를 켠다(실기기 연동 시연용).
+            // 그래서 demo keystore 로 서명해 정품 지문(562060aa...)과 일치시킨다 —
+            // 서명이 없으면 무결성 검사가 자기 자신을 위·변조로 오탐해 앱이 죽는다.
+            // 주의: 기존에 debug 키로 깔린 com.hack.kidhack.api 는 서명이 달라
+            //       INSTALL_FAILED_UPDATE_INCOMPATIBLE 이 나므로 최초 1회 adb uninstall 필요.
+            buildConfigField("boolean", "DEFENSE_STRICT", "true")
+            signingConfig = signingConfigs.getByName("demo")
             // [VULN-MOBILE-NET-1] api 변형에서 평문 HTTP 허용(usesCleartextTraffic=true). networkSecurityConfig
             // 미설정 + 인증서 피닝 없음 → MITM 노출. 의도된 취약점(OWASP Mobile M5). 명세: mobile/docs/vuln-spec-mobile.md
             manifestPlaceholders["usesCleartextTraffic"] = "true"
@@ -126,6 +149,9 @@ android {
                 "\"https://kidhackapp.com/api\"",
             )
             manifestPlaceholders["usesCleartextTraffic"] = "false"
+            // [보안 방어] release 는 실기기 배포용 → 무결성·디버거·에뮬레이터 검사를 모두 켠다.
+            buildConfigField("boolean", "DEFENSE_STRICT", "true")
+            buildConfigField("boolean", "DETECT_EMULATOR", "true")
             // [보안 방어] 데모 keystore 로 서명 → 무결성 검사가 대조할 안정적 지문 확보.
             signingConfig = signingConfigs.getByName("demo")
             // [VULN-MOBILE-RE-1] release 빌드에서의 optimization (enable=false) 적용 시 R8(코드 축소·최적화·난독화 등을 수행하는 도구), 서명관련 패스워드가 하드코딩되어 있으나 앱을 변조하려면 개인키(demo.keystore)가 필요하다. keystore는 gitignore로 무시되어 repository에 올라가지는 않는다.

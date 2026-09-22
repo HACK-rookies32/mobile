@@ -7,6 +7,7 @@ package com.hack.kidhack.security
  */
 enum class Threat(val label: String) {
     ROOT("루팅된 기기"),
+    EMULATOR("에뮬레이터에서 실행 중"),
     FRIDA("Frida 등 후킹 도구 탐지"),
     DEBUGGER("디버거 연결 탐지"),
     INTEGRITY("앱 위·변조(재서명) 탐지"),

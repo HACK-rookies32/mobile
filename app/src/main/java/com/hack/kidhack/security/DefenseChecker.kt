@@ -36,6 +36,9 @@ object DefenseChecker {
     /** 루팅 흔적(su/Magisk/test-keys)이 있으면 true. → root_check.cpp */
     private external fun nativeIsRooted(): Boolean
 
+    /** 에뮬레이터(AVD/Nox 등) 지문이 있으면 true. → root_check.cpp(check_emulator) */
+    private external fun nativeIsEmulator(): Boolean
+
     /** Frida 흔적(maps/포트)이 있으면 true. → frida_check.cpp */
     private external fun nativeIsFridaDetected(): Boolean
 
@@ -53,10 +56,19 @@ object DefenseChecker {
      * @param context PackageManager 조회에 필요(무결성 검사).
      * @param checkIntegrity [VULN-MOBILE-DEF-2] 무결성 검사를 수행할지. 기본은 릴리스에서만 true — 검사 수행 여부가 APK 안의 BuildConfig.DEBUG 상수 하나에 묶여 있다. api 변형은 debug 를 상속하므로 실서버 연동 빌드도 서명 지문 대조를 하지 않는다. 보존: 고치지 말 것.
      *        (디버그 빌드는 디버그 서명이라 정품 지문과 달라 자기 자신을 죽이기 때문) 평가항목: (금취분평)MOB-FIN-018 [전자금융] 프로그램 무결성 검증 — 평가 예시 "설치파일(APK, IPA) 변조 후 재 설치 시, 정상 실행 가능 여부" / (주통기)해당 항목 없음. 비해당: 보안프로그램 임의해제 방지는 HTS-FIN-014 로 HTS 전용.
+     * @param checkDebugger 디버거 검사를 수행할지. 기본은 [BuildConfig.DEFENSE_STRICT].
+     *        (디버그 빌드에서 디버거를 붙이면 앱이 스스로를 종료해 개발이 막히기 때문.
+     *         무결성과 같은 이유로 STRICT 빌드에서만 켠다.)
+     * @param checkEmulator 에뮬레이터 검사를 수행할지. 기본은 [BuildConfig.DETECT_EMULATOR].
+     *        (개발·테스트를 AVD/Nox 에서 하는데 항상 켜면 앱이 매번 스스로 종료돼 작업이
+     *         불가능해진다. 그래서 평소엔 꺼두고, gradle 프로퍼티 -PdetectEmulator=true 로
+     *         빌드하거나 release 빌드에서만 켠다.)
      */
     fun runAllChecks(
         context: Context,
-        checkIntegrity: Boolean = !BuildConfig.DEBUG,
+        checkIntegrity: Boolean = BuildConfig.DEFENSE_STRICT,
+        checkDebugger: Boolean = BuildConfig.DEFENSE_STRICT,
+        checkEmulator: Boolean = BuildConfig.DETECT_EMULATOR,
     ): DefenseResult {
         // [VULN-MOBILE-DEF-1] .so 로드 실패 시 방어 불가 → 빈 결과(위협 없음)로 처리. 데모 목적상 fail-open. 빈 집합은 hasThreat=false 로 판정되어 시작·민감화면 게이트(DefenseGate.kt:24-28, 43-48)가 그대로 통과시키므로 루팅·Frida·디버거·무결성 4종이 한꺼번에 무효화된다. 무결성 검사도 같은 .so 안에 있어 리패킹을 탐지할 수단까지 함께 사라진다. 평가항목: (금취분평)MOB-FIN-011 [전자금융] OS 변조 탐지 기능 적용 · MOB-FIN-021 [전자금융] 디버깅 탐지기능 적용 · MOB-FIN-018 [전자금융] 프로그램 무결성 검증 / (주통기)해당 항목 없음. 비해당: MOB-FIN-012 악성코드 방지(악성코드 탐지 기능 자체가 없음). 보존: 고치지 말 것.
         if (!libraryLoaded) {
@@ -66,8 +78,9 @@ object DefenseChecker {
 
         val threats = mutableSetOf<Threat>()
         if (nativeIsRooted()) threats += Threat.ROOT
+        if (checkEmulator && nativeIsEmulator()) threats += Threat.EMULATOR
         if (nativeIsFridaDetected()) threats += Threat.FRIDA
-        if (nativeIsDebuggerAttached()) threats += Threat.DEBUGGER
+        if (checkDebugger && nativeIsDebuggerAttached()) threats += Threat.DEBUGGER
         if (checkIntegrity && nativeCheckIntegrity(context)) threats += Threat.INTEGRITY
 
         return DefenseResult(threats)
