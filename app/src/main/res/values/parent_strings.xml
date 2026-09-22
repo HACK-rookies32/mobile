@@ -172,10 +172,10 @@
     <string name="parent_child_account_unpair_desc">자녀 계정이 삭제돼요. 되돌릴 수 없어요.</string>
     <string name="parent_child_account_title">자녀 계정 관리</string>
     <string name="parent_child_account_force_logout">강제 로그아웃</string>
-    <string name="parent_child_account_unpair">연결 해제·탈퇴</string>
+    <string name="parent_child_account_unpair">자녀 회원 탈퇴</string>
     <string name="parent_child_account_logout_confirm_title">%1$s 기기를 로그아웃시킬까요?</string>
     <string name="parent_child_account_logout_confirm_message">자녀는 알림 없이 로그아웃돼요. 다시 로그인하기 전까지 위치·사용 기록이 올라오지 않아요.</string>
-    <string name="parent_child_account_unpair_confirm_title">%1$s 연결을 해제할까요?</string>
+    <string name="parent_child_account_unpair_confirm_title">%1$s 회원을 탈퇴시킬까요?</string>
     <string name="parent_child_account_unpair_confirm_message">· 자녀 계정이 삭제돼요
 · 사용 기록·지정 장소도 함께 사라져요
 · 되돌릴 수 없어요</string>
