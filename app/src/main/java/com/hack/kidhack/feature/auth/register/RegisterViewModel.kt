@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.hack.kidhack.background.ChildPlatformController
 import com.hack.kidhack.core.common.digitsOnlyPhone
 import com.hack.kidhack.core.common.formatPhoneNumber
+import com.hack.kidhack.core.common.phoneNumberRejectReason
 import com.hack.kidhack.core.permission.KidhackPermissions
 import com.hack.kidhack.data.remote.userMessage
 import com.hack.kidhack.domain.model.Role
@@ -46,6 +47,8 @@ data class RegisterUiState(
     val agreedMarketing: Boolean = false,
     val loading: Boolean = false,
     val error: String? = null,
+    /** 한 번만 띄울 토스트 문구. 화면이 띄운 뒤 [RegisterViewModel.consumeToast] 로 비운다. */
+    val toast: String? = null,
     val session: Session? = null,
 ) {
     val agreedAll: Boolean
@@ -79,6 +82,8 @@ class RegisterViewModel(
     fun onPhoneNumber(v: String) = _state.update {
         it.copy(phoneNumber = digitsOnlyPhone(v))
     }
+    /** 화면이 토스트를 띄운 뒤 호출한다. 비워두지 않으면 재구성 때마다 같은 토스트가 다시 뜬다. */
+    fun consumeToast() = _state.update { it.copy(toast = null) }
     fun onEmail(v: String) = _state.update { it.copy(email = v) }
     fun onBirthDate(v: String) = _state.update { it.copy(birthDate = v) }
     fun onAddress(v: String) = _state.update { it.copy(address = v) }
@@ -112,6 +117,9 @@ class RegisterViewModel(
             s.realName.isBlank() -> _state.update { it.copy(error = "이름을 입력해 주세요") }
             s.nickname.isBlank() -> _state.update { it.copy(error = "닉네임을 입력해 주세요") }
             s.phoneNumber.isBlank() -> _state.update { it.copy(error = "휴대폰 번호를 입력해 주세요") }
+            // 010-1234-1234 같은 무의미한 번호는 토스트로 거부하고 이 단계에 머문다 (중복확인·가입 API 안 탐).
+            phoneNumberRejectReason(s.phoneNumber) != null ->
+                _state.update { it.copy(error = null, toast = phoneNumberRejectReason(s.phoneNumber)) }
             role != Role.CHILD && s.email.isBlank() ->
                 _state.update { it.copy(error = "이메일을 입력해 주세요") }
             !birthOk -> _state.update { it.copy(error = "생년월일을 선택해 주세요") }
