@@ -1,5 +1,6 @@
 package com.hack.kidhack.feature.auth.register
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -69,6 +71,15 @@ fun RegisterScreen(
 
     val onPermissionsStep = role == Role.CHILD && state.step == 4 && state.session == null
     val onDoneStep = state.session != null && state.step == state.doneStep
+
+    // 뷰모델이 넣은 일회성 토스트(예: 무의미한 전화번호 거부)를 띄우고 바로 비운다.
+    val context = LocalContext.current
+    LaunchedEffect(state.toast) {
+        state.toast?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.consumeToast()
+        }
+    }
 
     LaunchedEffect(state.error, state.session, state.step) {
         if (onPermissionsStep && state.error != null && !state.loading) {
