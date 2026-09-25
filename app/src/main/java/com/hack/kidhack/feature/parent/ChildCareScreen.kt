@@ -288,6 +288,11 @@ fun ParentChildrenScreen(
     val context = LocalContext.current
     val permissions = permissionRequester()
 
+    // 탭을 오가면 이 화면은 저장해 둔 옛 뷰모델로 되살아나 init 의 조회가 다시 돌지 않는다.
+    // 다른 탭(마이 → 자녀 연결)에서 페어링하면 페어링 전의 빈 목록이 복원돼 자녀가 사라져
+    // 보였다. 들어올 때마다 다시 읽는다 — 최근에 읽었으면 뷰모델이 알아서 건너뛴다.
+    LaunchedEffect(Unit) { viewModel.refreshIfStale() }
+
     // 안전 구역 이탈·유해 사이트 차단을 푸시로 받으려면 알림 권한이 필요하다(안드로이드 13+).
     // 부모가 앱을 열면 처음 닿는 화면이 여기라 여기서 묻는다. 이미 거절해서 시스템
     // 대화상자가 뜨지 않는 상태면 조용히 넘어간다.
