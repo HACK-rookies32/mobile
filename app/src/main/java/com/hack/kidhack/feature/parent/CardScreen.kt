@@ -488,7 +488,7 @@ private fun CreditCard(card: Card, onMore: () -> Unit) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "ROOKIES PAY",
+                text = "HACK PAY",
                 modifier = Modifier.weight(1f),
                 color = Color.White.copy(alpha = 0.5f),
                 fontFamily = KidhackFontFamily,

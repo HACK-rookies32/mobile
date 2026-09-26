@@ -48,7 +48,7 @@ private fun BrandGradientHeaderPreview() {
     KidhackTheme {
         BrandGradientHeader {
             Text(
-                text = "ROOKIES",
+                text = "KIDHACK",
                 color = Color.White.copy(alpha = 0.7f),
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,

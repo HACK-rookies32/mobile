@@ -48,7 +48,7 @@
     <string name="child_home_quick_chat">부모와 채팅</string>
     <string name="child_home_quick_services">내 서비스</string>
     <string name="child_home_quick_mypage">마이페이지</string>
-    <string name="child_home_guarding">🛡️ 루키즈가 지키고 있어요</string>
+    <string name="child_home_guarding">🛡️ 키드핵이 지키고 있어요</string>
     <string name="child_home_svc_location">위치 추적</string>
     <string name="child_home_svc_location_desc">부모님이 위치를 확인 중</string>
     <string name="child_home_svc_harmful">유해 콘텐츠 차단</string>
@@ -80,7 +80,7 @@
     <string name="child_chat_send">보내기</string>
 
     <string name="child_services_title">백그라운드 서비스</string>
-    <string name="child_services_subtitle">루키즈가 조용히 나를 지켜줘요</string>
+    <string name="child_services_subtitle">키드핵이 조용히 나를 지켜줘요</string>
     <string name="child_services_running">● 실행 중</string>
     <string name="child_services_stopped">● 꺼짐</string>
     <string name="child_services_location">위치 추적</string>
@@ -195,7 +195,7 @@
     <string name="child_profile_saving">저장 중...</string>
     <string name="child_profile_cancel">취소</string>
     <string name="child_mypage_section_service">서비스</string>
-    <string name="child_mypage_menu_pay">루키즈 페이</string>
+    <string name="child_mypage_menu_pay">핵페이</string>
     <string name="child_mypage_menu_pay_balance">잔액 %1$sP</string>
     <string name="child_mypage_menu_services">백그라운드 서비스 현황</string>
     <string name="child_mypage_menu_screenshots">화면 캡처 내역</string>
@@ -251,7 +251,7 @@
     <string name="child_onboarding_overlay_title">차단 안내 표시</string>
     <string name="child_onboarding_overlay_body">차단 안내를 화면 위에 띄워요</string>
     <string name="child_onboarding_accessibility_title">유해 콘텐츠 차단</string>
-    <string name="child_onboarding_accessibility_body">루키즈 접근성 서비스를 켜 주세요</string>
+    <string name="child_onboarding_accessibility_body">키드핵 접근성 서비스를 켜 주세요</string>
     <string name="child_onboarding_capture_title">화면 캡처</string>
     <string name="child_onboarding_capture_body">부모님이 화면을 확인할 수 있어요</string>
     <string name="child_onboarding_settings">설정</string>
@@ -276,7 +276,7 @@
     <string name="child_request_camera_body">%1$s 지금 사진을 보고 싶어 해요. 눌러서 카메라를 켜 주세요.</string>
 
     <string name="child_pay_back">←</string>
-    <string name="child_pay_title">루키즈 페이 💳</string>
+    <string name="child_pay_title">핵페이 💳</string>
     <string name="child_pay_subtitle">받은 용돈으로 QR 결제를 할 수 있어요</string>
     <string name="child_pay_balance_label">쓸 수 있는 돈</string>
     <string name="child_pay_balance_value">%1$s원</string>

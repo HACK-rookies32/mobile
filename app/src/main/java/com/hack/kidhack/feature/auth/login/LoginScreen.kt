@@ -51,7 +51,7 @@ fun LoginScreen(
     AuthScaffold(
         header = {
             Text(
-                text = "ROOKIES",
+                text = "KIDHACK",
                 color = colors.brand,
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
@@ -68,7 +68,7 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(7.dp))
             Text(
-                text = "우리 아이 안전, 루키즈가 지켜드려요",
+                text = "우리 아이 안전, 키드핵이 지켜드려요",
                 color = colors.muted,
                 fontSize = 13.5.sp,
             )

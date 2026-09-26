@@ -19,7 +19,7 @@ class OtpNotifier(private val context: Context) {
         ServerAlertNotifications.ensureChannel(context)
         val notification = NotificationCompat.Builder(context, ServerAlertNotifications.CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("루키즈페이 인증번호")
+            .setContentTitle("핵페이 인증번호")
             .setContentText("거래 인증번호 [$code] 를 입력해 주세요. (유효시간 3분)")
             .setStyle(NotificationCompat.BigTextStyle().bigText("거래 인증번호 [$code] 를 입력해 주세요. (유효시간 3분)"))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

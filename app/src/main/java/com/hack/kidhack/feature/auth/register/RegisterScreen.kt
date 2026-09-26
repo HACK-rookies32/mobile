@@ -477,7 +477,7 @@ private fun DoneStep(session: Session, loading: Boolean, onStart: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         Text("가입 완료! 🎉", fontFamily = KidhackFontFamily, fontWeight = FontBlack, fontSize = 24.sp)
         Text(
-            if (parent) "루키즈 부모님 앱을 시작할게요" else "루키즈 자녀 앱을 시작할게요",
+            if (parent) "키드핵 부모님 앱을 시작할게요" else "키드핵 자녀 앱을 시작할게요",
             color = colors.muted,
             fontSize = 14.sp,
         )

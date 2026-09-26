@@ -683,13 +683,13 @@ class FakeNoticeRepository : NoticeRepository {
         NoticeDetail(
             id = "1",
             title = "[안내] 개인정보처리방침 개정",
-            content = "루키즈 서비스 개인정보처리방침이 개정되었습니다. 자세한 내용은 아래 링크를 참고해 주세요.",
+            content = "키드핵 서비스 개인정보처리방침이 개정되었습니다. 자세한 내용은 아래 링크를 참고해 주세요.",
             links = listOf("https://rookiekids.example.com/privacy"),
             createdAt = "2024-08-20T09:00:00",
         ),
         NoticeDetail(
             id = "2",
-            title = "루키즈 2.5.0 업데이트 - 유해사이트 감지 강화",
+            title = "키드핵 2.5.0 업데이트 - 유해사이트 감지 강화",
             content = "키워드 기반 유해사이트 차단이 강화되었습니다.",
             createdAt = "2024-08-15T09:00:00",
         ),

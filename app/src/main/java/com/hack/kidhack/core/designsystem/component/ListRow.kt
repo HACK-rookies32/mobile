@@ -81,7 +81,7 @@ fun ListRow(
 private fun ListRowPreview() {
     KidhackTheme {
         Column(Modifier.padding(16.dp)) {
-            ListRow(leading = "💳", title = "루키즈 페이", subtitle = "잔액 ₩45,000", onClick = {})
+            ListRow(leading = "💳", title = "핵페이", subtitle = "잔액 ₩45,000", onClick = {})
             ListRow(leading = "🔔", title = "알림 설정", onClick = {}, showDivider = false)
         }
     }

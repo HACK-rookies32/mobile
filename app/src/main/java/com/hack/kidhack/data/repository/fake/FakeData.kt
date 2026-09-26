@@ -189,7 +189,7 @@ object FakeData {
         Post(
             id = "3",
             authorId = "105",
-            title = "루키즈 앱 쓰고 마음이 편해졌어요 후기",
+            title = "키드핵 앱 쓰고 마음이 편해졌어요 후기",
             author = "워킹맘",
             preview = "퇴근이 늦어 늘 불안했는데 위치 알림 하나로 마음이 놓입니다.",
             likeCount = 18,

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">루키즈</string>
+    <string name="app_name">kidhack</string>
     <string name="child_platform_channel">자녀 보호 서비스</string>
     <string name="child_platform_channel_desc">위치 추적과 화면 캡처 알림</string>
     <string name="child_location_notif_title">위치 추적 실행 중</string>
