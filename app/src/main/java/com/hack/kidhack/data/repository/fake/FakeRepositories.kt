@@ -747,7 +747,7 @@ class FakeWalletRepository : WalletRepository {
         com.hack.kidhack.domain.model.ChargeHistoryItem("kid_demo1", 50000, "PAID", "08.15 10:00"),
         com.hack.kidhack.domain.model.ChargeHistoryItem("kid_demo2", 10000, "REFUNDED", "08.10 09:00", "08.11 12:00"),
     )
-    override suspend fun refundCharge(merchantUid: String): Int = balance
+    override suspend fun refundCharge(merchantUid: String, cardId: Long?): Int = balance
     override suspend fun cancelCharge(merchantUid: String): String = "CANCELLED"
 }
 
