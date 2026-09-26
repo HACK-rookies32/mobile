@@ -323,7 +323,7 @@ fun ParentPayScreen(
 
     ParentScreenScaffold(
         header = {
-            ParentHeaderBar("루키즈 페이", onBack)
+            ParentHeaderBar("핵페이", onBack)
             Spacer(Modifier.height(16.dp))
             // 오렌지 헤더 위에 흰 불투명 카드를 얹어 경계를 확실히 드러낸다.
             KidCard {

@@ -421,7 +421,7 @@ fun ChildPermissionWizard(
                 .padding(top = 18.dp, bottom = 14.dp),
         ) {
             Text(
-                text = "ROOKIES",
+                text = "KIDHACK",
                 color = colors.brand,
                 fontFamily = KidhackFontFamily,
                 fontWeight = FontBold,
