@@ -19,9 +19,9 @@ import kotlinx.coroutines.launch
  * <p>화면마다 다이얼로그를 붙이던 구조(마이페이지 버그의 근본 원인)를 없앤다. 승인 UI 는 앱 루트에
  * [TxAuthHost] 하나만 띄우고, 각 화면 VM 은 [authorize] 를 호출해 결과(계좌비번+OTP 묶음)를 받는다.
  *
- * <p>흐름: authorize() → 서버에 OTP 발급(문자 발송 mock) + 로컬 알림 → 루트 다이얼로그가 계좌비번·OTP
- * 입력 → submit() 이 계좌비번·OTP 를 사전 확인(틀리면 거부 — 데모도 실서버처럼) → 서명·nonce 를 붙여
- * [TxSecurity] 반환. 최종 검증은 서버 관문(EfinTxGuard)이 한 번 더 한다.
+ * <p>흐름: authorize() → 서버에 OTP 발급(문자 발송 mock, 코드는 응답 패킷에만 실림) → 루트 다이얼로그가
+ * 계좌비번·OTP 입력 → submit() 이 계좌비번·OTP 를 사전 확인(틀리면 거부 — 데모도 실서버처럼) → 서명·nonce 를
+ * 붙여 [TxSecurity] 반환. 최종 검증은 서버 관문(EfinTxGuard)이 한 번 더 한다.
  */
 class TxAuthCoordinator(
     private val efinRepository: EfinRepository,
@@ -48,13 +48,17 @@ class TxAuthCoordinator(
     private var deferred: CompletableDeferred<TxSecurity?>? = null
 
     /**
-     * 거래 승인을 요청한다. OTP 를 발급·알림으로 띄우고 다이얼로그를 연 뒤, 사용자가 확인하면
+     * 거래 승인을 요청한다. OTP 를 발급하고 다이얼로그를 연 뒤, 사용자가 확인하면
      * 계좌비번+OTP+서명+nonce 를 담은 [TxSecurity] 를, 취소하면 null 을 돌려준다.
      */
     suspend fun authorize(amount: Int, targetName: String?, refId: Long): TxSecurity? {
-        // [VULN-MOBILE-EFIN-1] 발급 응답 본문에 실려 온 OTP 코드를 그대로 로컬 알림으로 넘긴다 → 잠금화면 평문 노출. 상세·평가항목은 OtpNotifier 주석. 보존: 고치지 말 것.
+        // [VULN-MOBILE-EFIN-1] OTP 코드는 발급 응답 본문에 평문으로 실려 온다(백엔드 [VULN-EFIN-1],
+        // Excessive Data Exposure). 과거엔 그 코드를 로컬 알림으로 띄웠으나, 공격자가 '피해자 번호'로
+        // 거래하는 시연에서 OTP 가 공격자 자기 폰에 뜨는 건 소지기반 2차인증 전제에 어긋난다. 그래서
+        // 화면 표시(otpNotifier.notifyCode)는 제거하고 코드는 응답 패킷에만 남긴다 — 공격자는 TLS 캡처
+        // (피닝 우회)로 패킷에서 코드를 탈취해야 한다. 취약점(응답 노출) 자체는 그대로 보존된다.
+        // OtpNotifier 는 재사용 대비 남겨 두되 여기서 호출하지 않는다.
         val issued = efinRepository.issueOtp()
-        otpNotifier.notifyCode(issued.code)
         val d = CompletableDeferred<TxSecurity?>()
         deferred = d
         _pending.value = Pending(amount = amount, targetName = targetName, refId = refId, phone = issued.phone)
